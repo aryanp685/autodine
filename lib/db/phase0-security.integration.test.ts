@@ -50,6 +50,7 @@ async function fixture(): Promise<Fixture> {
   for (const label of ['T1', 'T2']) {
     const table = (await db.query(`insert into dining_tables(restaurant_id,label) values($1,$2) returning id`, [restaurant, label])).rows[0].id;
     const token = randomUUID().replaceAll('-', '') + randomUUID().replaceAll('-', '');
+    await db.query('delete from table_qr_codes where table_id=$1',[table]);
     await db.query('insert into table_qr_codes(restaurant_id,table_id,public_token) values($1,$2,$3)', [restaurant, table, token]);
     tokens.push(token);
   }
@@ -87,7 +88,8 @@ describe.skipIf(!URL_VALUE)('Phase 0 database security boundaries', () => {
   describe('restaurant rows', () => {
     it('are not readable by a guest, even though active restaurants exist', async () => {
       expect((await db.query('select count(*)::int n from restaurants where is_active')).rows[0].n).toBeGreaterThanOrEqual(2);
-      expect(await guest(async () => (await db.query('select id from restaurants')).rows)).toEqual([]);
+      await expect(guest(() => db.query('select id from restaurants')))
+        .rejects.toMatchObject({ code: '42501' });
     });
 
     it('are not readable by a signed-in user who is not staff there', async () => {
@@ -96,11 +98,21 @@ describe.skipIf(!URL_VALUE)('Phase 0 database security boundaries', () => {
       expect(await read(b.owner)).toEqual([]);
     });
 
-    it('stay fully readable by their own staff, plan and trial included', async () => {
-      const rows = await staff(a.kitchen, async () => (await db.query('select id, plan, trial_started_at from restaurants')).rows);
+    it('keeps operational restaurant fields readable while withholding account and billing columns', async () => {
+      const rows = await staff(a.kitchen, async () => (await db.query('select id, name, tagline from restaurants')).rows);
       expect(rows.map((row) => row.id)).toEqual([a.restaurant]);
-      expect(rows[0].plan).toBeTruthy();
-      expect(rows[0].trial_started_at).toBeTruthy();
+      expect(rows[0].name).toBe('Phase 0 restaurant');
+
+      // The account link and old per-restaurant plan fields are retained for
+      // compatibility but are not a direct staff read path to subscription
+      // state. SELECT grants are shared by the authenticated database role, so
+      // probe both a privileged restaurant Owner and operational staff roles.
+      for (const user of [a.owner, a.cashier, a.kitchen]) {
+        await expect(staff(user, () => db.query(
+          'select account_id, plan, plan_status, trial_started_at, plan_started_at, plan_expires_at from restaurants where id=$1',
+          [a.restaurant],
+        ))).rejects.toMatchObject({ code: '42501' });
+      }
     });
 
     it('have no public read policy left, and guests hold no write privilege', async () => {
@@ -216,12 +228,21 @@ describe.skipIf(!URL_VALUE)('Phase 0 database security boundaries', () => {
 
   describe('plan and trial state', () => {
     const read = (user: string) => staff(user, async () =>
-      (await db.query('select restaurant_access($1) access, restaurant_trial_ends_at($1) trial_ends, restaurant_features($1) features', [a.restaurant])).rows[0]);
+      (await db.query(
+        `select restaurant_access($1) access,
+                restaurant_trial_ends_at($1) trial_ends,
+                restaurant_features($1) features,
+                restaurant_has_feature($1, 'kitchen') has_kitchen`,
+        [a.restaurant],
+      )).rows[0]);
 
     it('cannot be read by a guest through the plan functions', async () => {
       for (const call of ['restaurant_access($1)', 'restaurant_trial_ends_at($1)', 'restaurant_features($1)']) {
         await expect(guest(() => db.query(`select ${call}`, [a.restaurant]))).rejects.toMatchObject({ code: '42501' });
       }
+      await expect(guest(() => db.query(
+        "select restaurant_has_feature($1, 'kitchen')", [a.restaurant],
+      ))).rejects.toMatchObject({ code: '42501' });
     });
 
     it('is "not found" for a signed-in user who is not staff there', async () => {
@@ -230,13 +251,25 @@ describe.skipIf(!URL_VALUE)('Phase 0 database security boundaries', () => {
         expect(row.access).toBeNull();
         expect(row.trial_ends).toBeNull();
         expect(row.features).toEqual([]);
+        expect(row.has_kitchen).toBe(false);
       }
     });
 
-    it('is still available to the restaurant own staff', async () => {
-      const row = await read(a.cashier);
-      expect(row.access).not.toBeNull();
-      expect(row.trial_ends).not.toBeNull();
+    it('keeps operational entitlements for Cashier/Kitchen but reserves plan and trial state for Owner/Manager', async () => {
+      const owner = await read(a.owner);
+      expect(owner.access).toMatchObject({ plan: 'trial', status: 'trialing', can_write: true, read_only: false });
+      expect(owner.trial_ends).not.toBeNull();
+      expect(owner.has_kitchen).toBe(true);
+
+      for (const user of [a.cashier, a.kitchen]) {
+        const row = await read(user);
+        expect(row.access).toMatchObject({ can_write: true, read_only: false });
+        expect(Array.isArray(row.access.features)).toBe(true);
+        expect(row.access.features.length).toBeGreaterThan(0);
+        expect(Object.keys(row.access).sort()).toEqual(['can_write', 'features', 'read_only']);
+        expect(row.trial_ends).toBeNull();
+        expect(row.has_kitchen).toBe(true);
+      }
     });
 
     it('answers the account subscription functions only for the account own staff', async () => {
@@ -273,7 +306,14 @@ describe.skipIf(!URL_VALUE)('Phase 0 database security boundaries', () => {
       await expect(guest(() => db.query('select account_can_write($1)', [account])))
         .rejects.toMatchObject({ code: '42501' });
 
-      // The same call from the account's own staff still answers in full.
+      // Membership alone still supports the outlet-count operation, but it
+      // does not grant a Cashier access to the account's trial date.
+      const cashierRead = await staff(a.cashier, async () => (await db.query(
+        'select account_trial_ends_at($1) trial_ends, account_outlet_count($1) outlets', [account])).rows[0]);
+      expect(cashierRead.trial_ends).toBeNull();
+      expect(cashierRead.outlets).toBe(1);
+
+      // The same account-state call from its Owner still answers in full.
       const own = await staff(a.owner, async () => (await db.query(
         'select account_trial_ends_at($1) trial_ends, account_outlet_count($1) outlets', [account])).rows[0]);
       expect(own.trial_ends).not.toBeNull();
@@ -319,8 +359,9 @@ describe.skipIf(!URL_VALUE)('Phase 0 database security boundaries', () => {
     });
 
     it('gives a guest no path to the GSTIN, the plan or the trial on the tenant row', async () => {
-      expect(await guest(async () => (await db.query(
-        'select gstin, plan, plan_status, trial_started_at, upi_id from restaurants where slug=$1', [a.slug])).rows)).toEqual([]);
+      await expect(guest(() => db.query(
+        'select gstin, plan, plan_status, trial_started_at, upi_id from restaurants where slug=$1', [a.slug],
+      ))).rejects.toMatchObject({ code: '42501' });
       // The storefront row carries a real GSTIN in the fixture, which is
       // exactly what the public read must not hand out.
       const stored = (await db.query('select gstin from restaurants where id=$1', [a.restaurant])).rows[0];

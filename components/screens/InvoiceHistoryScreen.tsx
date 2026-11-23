@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { OwnerPage, PageHead } from '@/components/owner/chrome';
+import { Notice, OwnerPage, PageHead, btn } from '@/components/owner/chrome';
 import type { InvoiceHistoryRow } from '@/lib/db/invoice-history';
 import { formatBillMoney } from '@/lib/bill';
 import type { OutletBar } from '@/lib/outlets';
@@ -20,6 +20,21 @@ export function InvoiceHistoryScreen({ rows, outlet, einvoiceFollowUps }: { rows
         title="Invoice history"
         meta="The latest 100 closed sessions for this restaurant. Receipt snapshots are immutable; a missing receipt means issuance did not complete."
       />
+
+      {outlet?.operatingMode === 'mode_a' ? (
+        <Notice
+          tone="plain"
+          label={`Mode A · Alongside ${outlet.posIntegrationName || 'your existing POS'}`}
+          action={
+            <Link href="/dashboard/settings#settings-operating-mode" className={btn('ghost', 'sm')}>
+              Switch to Mode B
+            </Link>
+          }
+        >
+          Invoices are currently issued in your existing POS. Switch to Mode B in Settings whenever
+          you want AutoDine to issue GST tax invoices, e-Invoice IRNs, and thermal receipts.
+        </Notice>
+      ) : null}
 
       {einvoiceFollowUps}
       {!rows.length ? (

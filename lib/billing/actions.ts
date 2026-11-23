@@ -36,6 +36,8 @@ export type SubscriptionActionResult = {
   message: string;
   /** Set when the refusal is "no provider yet", so the UI can say so plainly. */
   providerUnavailable?: boolean;
+  /** Cashfree / provider hosted checkout URL when a live provider is active. */
+  checkoutUrl?: string;
 };
 
 /**
@@ -77,17 +79,26 @@ export async function choosePlanAction(plan: string): Promise<SubscriptionAction
     };
   }
 
-  // A provider exists from here on. The checkout session is created with the
-  // server's own amount and currency — never an amount the browser offered —
-  // and the plan is only activated when the provider's webhook says the money
-  // arrived.
-  //
-  //   const session = await provider.createCheckoutSession({
-  //     accountId: context.context.restaurantId, plan, months, amountPaise,
-  //     currency: BILLING_CURRENCY, returnPath: '/dashboard/subscription',
-  //   });
-  //   redirect(session.url);
-  return { ok: false, message: PROVIDER_UNAVAILABLE_MESSAGE, providerUnavailable: true };
+  try {
+    const session = await provider.createCheckoutSession({
+      accountId: context.context.slug || context.context.restaurantId,
+      plan,
+      months,
+      amountPaise,
+      currency: BILLING_CURRENCY,
+      returnPath: '/dashboard/subscription',
+    });
+    return {
+      ok: true,
+      checkoutUrl: session.url,
+      message: `Checkout ready for ${planName(plan)} (${formatBillMoney(amountPaise)} ${BILLING_CURRENCY}).`,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      message: err instanceof Error ? err.message : PROVIDER_UNAVAILABLE_MESSAGE,
+    };
+  }
 }
 
 /**

@@ -6,6 +6,9 @@ import { AutoRefresh } from '@/components/owner/AutoRefresh';
 import { demoReport, resolveRange } from '@/lib/db/reports';
 import type { OrderLedgerRow, OrdersLedgerScreenData } from '@/lib/db/orders-ledger';
 import { dateTimeInZone } from '@/lib/db/time';
+import { toggleOrderKotHandoffAction } from '@/app/orders/actions';
+import { kotHandoffLabel, normalizeKotHandoffStatus } from '@/lib/operating-mode';
+import { assessOrderReliability } from '@/lib/order-health';
 import {
   BtnLink,
   Empty,
@@ -39,11 +42,12 @@ import {
  * already holds in memory.
  */
 
-export type OrderFilter = 'all' | 'open' | 'settled' | 'cancelled';
+export type OrderFilter = 'all' | 'open' | 'delayed' | 'settled' | 'cancelled';
 
 const FILTERS: Array<{ key: OrderFilter; label: string }> = [
   { key: 'all', label: 'All' },
   { key: 'open', label: 'Open' },
+  { key: 'delayed', label: 'Delayed / alerts' },
   { key: 'settled', label: 'Settled' },
   { key: 'cancelled', label: 'Cancelled' },
 ];
@@ -68,11 +72,17 @@ function isOpen(order: OrderLedgerRow): boolean {
  * other three filters stay mutually exclusive and skip cancelled bills, which
  * is why they are worth having.
  */
-function matches(order: OrderLedgerRow, filter: OrderFilter, query: string): boolean {
+function matches(
+  order: OrderLedgerRow,
+  filter: OrderFilter,
+  query: string,
+  needsAttention: boolean,
+): boolean {
   // The tab narrows first...
   if (filter === 'cancelled' && order.prepStatus !== 'cancelled') return false;
   if (filter !== 'all' && filter !== 'cancelled' && order.prepStatus === 'cancelled') return false;
   if (filter === 'open' && !isOpen(order)) return false;
+  if (filter === 'delayed' && !needsAttention) return false;
   if (filter === 'settled' && order.paymentStatus !== 'paid') return false;
 
   // ...and then the search narrows what is left. The Cancelled tab used to
@@ -132,6 +142,8 @@ export function OrdersScreen({
   const blocked = data?.blocked;
   const canViewFinance = data?.canViewFinance ?? true;
   const canExport = data?.canExport === true;
+  const isModeA = (data?.operatingMode ?? outlet?.operatingMode) === 'mode_a';
+  const posIntegrationName = data?.posIntegrationName ?? outlet?.posIntegrationName ?? null;
   const timezone = data?.timezone ?? 'Asia/Kolkata';
   // A custom range stays itself. It used to be flattened to 'today', which lit
   // the wrong chip and made the custom form's Apply look like it had failed.
@@ -148,8 +160,35 @@ export function OrdersScreen({
   const orders: OrderLedgerRow[] =
     data?.orders ?? demoReport(resolveRange('7d', timezone), timezone).orders;
 
-  const visible = orders.filter((order) => matches(order, activeFilter, query.trim()));
+  const operatingMode = data?.operatingMode ?? outlet?.operatingMode;
+  const healthById = new Map(
+    orders.map((order) => [
+      order.id,
+      live && !blocked
+        ? assessOrderReliability(
+            {
+              id: order.id,
+              code: order.code,
+              tableLabel: order.tableLabel,
+              placedAt: order.placedAt,
+              updatedAt: order.updatedAt,
+              prepStatus: order.prepStatus,
+              holdRequired: order.holdRequired,
+              confirmedAt: order.confirmedAt,
+              kitchenAnnouncementStatus: order.kitchenAnnouncementStatus,
+              kotHandoffStatus: order.kotHandoffStatus,
+            },
+            { operatingMode },
+          )
+        : null,
+    ]),
+  );
+
+  const visible = orders.filter((order) =>
+    matches(order, activeFilter, query.trim(), Boolean(healthById.get(order.id)?.needsAttention)),
+  );
   const openCount = orders.filter(isOpen).length;
+  const delayedCount = orders.filter((o) => Boolean(healthById.get(o.id)?.needsAttention)).length;
   const unsettledCount = canViewFinance
     ? orders.filter((o) => o.prepStatus !== 'cancelled' && o.paymentStatus !== 'paid').length
     : 0;
@@ -157,12 +196,20 @@ export function OrdersScreen({
   const settledCount = canViewFinance
     ? orders.filter((o) => o.prepStatus !== 'cancelled' && o.paymentStatus === 'paid').length
     : 0;
+  const pendingHandoffCount = isModeA
+    ? orders.filter((o) => {
+        if (o.prepStatus === 'cancelled') return false;
+        const status = normalizeKotHandoffStatus(o.kotHandoffStatus);
+        return status !== 'entered_in_pos' && status !== 'webhook_sent';
+      }).length
+    : 0;
   // Each chip says how many rows it would show, from the same array the table
   // is drawn from. A filter that turns out to be empty is then a fact about the
   // day rather than something you find out by clicking it.
   const filterCounts: Record<OrderFilter, number> = {
     all: orders.length,
     open: openCount,
+    delayed: delayedCount,
     settled: settledCount,
     cancelled: cancelledCount,
   };
@@ -228,6 +275,27 @@ export function OrdersScreen({
       />
 
       {blocked && <SignInPrompt reason={blocked} screen="order ledger" />}
+
+      {isModeA && !blocked && (
+        <Notice
+          tone="plain"
+          label={
+            <strong className="font-semibold text-gink">
+              Mode A · Alongside {posIntegrationName || 'your existing POS'}
+            </strong>
+          }
+          action={
+            <Link href="/dashboard/settings#settings-operating-mode" className={btn('ghost', 'sm')}>
+              Operating mode
+            </Link>
+          }
+        >
+          Billing stays in your existing POS.{' '}
+          {pendingHandoffCount > 0
+            ? `${pendingHandoffCount} active order${pendingHandoffCount === 1 ? ' is' : 's are'} awaiting POS entry — mark Entered in POS after punching the bill so nothing is duplicated.`
+            : 'All orders in this range are handed off to your billing POS.'}
+        </Notice>
+      )}
 
       {!blocked && (
         <div className="mb-3 flex flex-col gap-2">
@@ -376,6 +444,7 @@ export function OrdersScreen({
                         <Th>Reference</Th>
                         <Th>Table</Th>
                         <Th>Kitchen</Th>
+                        {isModeA ? <Th>POS handoff</Th> : null}
                         {canViewFinance ? (
                           <>
                             <Th>Payment</Th>
@@ -413,20 +482,66 @@ export function OrdersScreen({
                             </Td>
                             <Td>{order.tableLabel ?? 'Takeaway'}</Td>
                             <Td>
-                              {cancelled ? (
-                                <Tag tone="neutral">Cancelled</Tag>
-                              ) : (
-                                <PrepPill
-                                  state={
-                                    order.prepStatus === 'preparing' ||
-                                    order.prepStatus === 'ready' ||
-                                    order.prepStatus === 'served'
-                                      ? order.prepStatus
-                                      : 'new'
-                                  }
-                                />
-                              )}
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                {cancelled ? (
+                                  <Tag tone="neutral">Cancelled</Tag>
+                                ) : (
+                                  <PrepPill
+                                    state={
+                                      order.prepStatus === 'preparing' ||
+                                      order.prepStatus === 'ready' ||
+                                      order.prepStatus === 'served'
+                                        ? order.prepStatus
+                                        : 'new'
+                                    }
+                                  />
+                                )}
+                                {healthById.get(order.id)?.summary ? (
+                                  <Tag tone="due">{healthById.get(order.id)?.summary}</Tag>
+                                ) : null}
+                              </div>
                             </Td>
+                            {isModeA ? (
+                              <Td>
+                                {cancelled ? (
+                                  <span className="text-[11.5px] text-gink-46">—</span>
+                                ) : (
+                                  <div className="flex flex-wrap items-center gap-1.5">
+                                    <Tag
+                                      tone={
+                                        order.kotHandoffStatus === 'entered_in_pos' ||
+                                        order.kotHandoffStatus === 'webhook_sent'
+                                          ? 'live'
+                                          : 'due'
+                                      }
+                                    >
+                                      {kotHandoffLabel(
+                                        normalizeKotHandoffStatus(order.kotHandoffStatus),
+                                      )}
+                                    </Tag>
+                                    {live && !blocked ? (
+                                      <form action={toggleOrderKotHandoffAction}>
+                                        <input type="hidden" name="orderId" value={order.id} />
+                                        <input
+                                          type="hidden"
+                                          name="nextStatus"
+                                          value={
+                                            order.kotHandoffStatus === 'entered_in_pos'
+                                              ? 'pending'
+                                              : 'entered_in_pos'
+                                          }
+                                        />
+                                        <button type="submit" className={btn('quiet', 'sm')}>
+                                          {order.kotHandoffStatus === 'entered_in_pos'
+                                            ? 'Reset'
+                                            : 'Mark entered'}
+                                        </button>
+                                      </form>
+                                    ) : null}
+                                  </div>
+                                )}
+                              </Td>
+                            ) : null}
                             {canViewFinance ? (
                               <>
                                 <Td>
@@ -516,6 +631,21 @@ export function OrdersScreen({
                             }
                           />
                         )}
+                        {healthById.get(order.id)?.summary ? (
+                          <Tag tone="due">{healthById.get(order.id)?.summary}</Tag>
+                        ) : null}
+                        {isModeA && !cancelled ? (
+                          <Tag
+                            tone={
+                              order.kotHandoffStatus === 'entered_in_pos' ||
+                              order.kotHandoffStatus === 'webhook_sent'
+                                ? 'live'
+                                : 'due'
+                            }
+                          >
+                            {kotHandoffLabel(normalizeKotHandoffStatus(order.kotHandoffStatus))}
+                          </Tag>
+                        ) : null}
                         {canViewFinance ? (
                           <PaymentPill
                             state={

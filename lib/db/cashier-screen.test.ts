@@ -12,7 +12,7 @@ import { getCashierScreenData } from './cashier-screen';
 
 type Row = Record<string, unknown>;
 
-function fakeSupabase(rows: Record<string, Row[]>) {
+function fakeSupabase(rows: Record<string, Row[]>, errors: Record<string, string> = {}) {
   const from = (table: string) => {
     const data = rows[table] ?? [];
     // Not annotated as PromiseLike on purpose: the real client's generics
@@ -26,9 +26,12 @@ function fakeSupabase(rows: Record<string, Row[]>) {
       in: () => chain,
       order: () => chain,
       limit: () => chain,
-      maybeSingle: () => Promise.resolve({ data: data[0] ?? null, error: null }),
+      maybeSingle: () => Promise.resolve({
+        data: errors[table] ? null : data[0] ?? null,
+        error: errors[table] ? { message: errors[table] } : null,
+      }),
       then: (onFulfilled?: unknown, onRejected?: unknown) =>
-        Promise.resolve({ data, error: null }).then(
+        Promise.resolve({ data: errors[table] ? null : data, error: errors[table] ? { message: errors[table] } : null }).then(
           onFulfilled as () => unknown,
           onRejected as () => unknown
         ),
@@ -71,6 +74,96 @@ beforeEach(() => {
 });
 
 describe('getCashierScreenData', () => {
+  it.each(['orders', 'items', 'item_variants', 'dining_tables', 'order_items'])('does not hide a failed %s read from waiters', async (table) => {
+    const staff = signedIn(fakeSupabase({ orders: [order()] }, { [table]: 'database unavailable' }));
+    mocks.staff.result = { ...staff, context: { ...staff.context, role: 'waiter' } };
+    await expect(getCashierScreenData()).rejects.toThrow(/database unavailable/);
+  });
+
+  it('does not hide a failed table read when the queue is empty', async () => {
+    mocks.staff.result = signedIn(fakeSupabase({}, { dining_tables: 'database unavailable' }));
+    await expect(getCashierScreenData()).rejects.toThrow(/database unavailable/);
+  });
+
+  it.each(['items', 'item_variants', 'dining_tables', 'payments'])('does not present a failed %s read as an empty counter', async (table) => {
+    mocks.staff.result = signedIn(
+      fakeSupabase({ orders_finance: [order()] }, { [table]: 'database unavailable' }),
+    );
+    await expect(getCashierScreenData()).rejects.toThrow(/database unavailable/);
+  });
+
+  it.each(['orders_finance', 'payments'])('does not hide a failed %s refund-history read', async (table) => {
+    const supabase = fakeSupabase({});
+    const originalFrom = (supabase as { from: (name: string) => unknown }).from;
+    let financeReads = 0;
+    const from = (name: string) => {
+      if (name === 'orders_finance') {
+        financeReads += 1;
+        if (financeReads === 2) {
+          return (fakeSupabase(
+            { orders_finance: [order()] },
+            table === 'orders_finance' ? { orders_finance: 'refund history unavailable' } : {},
+          ) as { from: (name: string) => unknown }).from(name);
+        }
+      }
+      if (name === 'payments') {
+        return (fakeSupabase({}, { payments: 'refund history unavailable' }) as { from: (name: string) => unknown }).from(name);
+      }
+      return originalFrom(name);
+    };
+    const staff = signedIn({ ...(supabase as object), from });
+    mocks.staff.result = { ...staff, context: { ...staff.context, role: 'owner' } };
+    await expect(getCashierScreenData()).rejects.toThrow(/refund history unavailable/);
+  });
+
+  it.each(['restaurant_gst_config', 'restaurant_coupons', 'order_sessions'])('rejects a failed %s read rather than showing default billing data', async (table) => {
+    mocks.staff.result = signedIn(fakeSupabase({}, { [table]: 'billing data unavailable' }));
+    await expect(getCashierScreenData()).rejects.toThrow(/billing data unavailable/);
+  });
+
+  it('does not hide a failed session-order read', async () => {
+    const supabase = fakeSupabase({ order_sessions: [{ id: 's-1', table_id: null }] });
+    const originalFrom = (supabase as { from: (name: string) => unknown }).from;
+    let reads = 0;
+    const from = (name: string) => {
+      if (name === 'orders_finance' && ++reads === 2) {
+        return (fakeSupabase({}, { orders_finance: 'session orders unavailable' }) as { from: (name: string) => unknown }).from(name);
+      }
+      return originalFrom(name);
+    };
+    mocks.staff.result = signedIn({ ...(supabase as object), from });
+    await expect(getCashierScreenData()).rejects.toThrow(/session orders unavailable/);
+  });
+
+  it('propagates rejected session reads instead of claiming there are no sessions', async () => {
+    const supabase = fakeSupabase({});
+    const originalFrom = (supabase as { from: (name: string) => unknown }).from;
+    const from = (name: string) => {
+      if (name !== 'order_sessions') return originalFrom(name);
+      const chain = {
+        select: () => chain,
+        eq: () => chain,
+        then: (resolve: (value: unknown) => unknown, reject: (reason: unknown) => unknown) =>
+          Promise.reject(new Error('session connection failed')).then(resolve, reject),
+      };
+      return chain;
+    };
+    mocks.staff.result = signedIn({ ...(supabase as object), from });
+    await expect(getCashierScreenData()).rejects.toThrow('session connection failed');
+  });
+
+  it('preserves restaurant identity, printers and operating mode on an empty counter', async () => {
+    const printer = { id: 'printer-1', restaurant_id: 'r-1', name: 'Counter printer' };
+    const staff = signedIn(fakeSupabase({ restaurant_printers: [printer] }));
+    mocks.staff.result = { ...staff, context: { ...staff.context, operatingMode: 'mode_a', posIntegrationName: 'Existing POS' } };
+    const data = await getCashierScreenData();
+    expect(data?.queue).toEqual([]);
+    expect(data?.restaurantId).toBe('r-1');
+    expect(data?.printers).toEqual([expect.objectContaining({ id: printer.id, name: printer.name })]);
+    expect(data?.operatingMode).toBe('mode_a');
+    expect(data?.posIntegrationName).toBe('Existing POS');
+  });
+
   it('returns null when Supabase is unconfigured, so the screen uses demo data', async () => {
     mocks.staff.result = { ok: false, reason: 'unconfigured' };
     expect(await getCashierScreenData()).toBeNull();
@@ -94,7 +187,7 @@ describe('getCashierScreenData', () => {
   });
 
   it('leaves blocked unset when a real queue loads, even an empty one', async () => {
-    mocks.staff.result = signedIn(fakeSupabase({ orders: [], order_items: [] }));
+    mocks.staff.result = signedIn(fakeSupabase({ orders_finance: [], order_items: [] }));
     const data = await getCashierScreenData();
     expect(data?.queue).toEqual([]);
     expect(data?.blocked).toBeUndefined();
@@ -106,7 +199,7 @@ describe('getCashierScreenData', () => {
 
     it('equals the total when nothing has been recorded', async () => {
       mocks.staff.result = signedIn(
-        fakeSupabase({ orders: [order()], order_items: [], dining_tables: [{ id: 't-3', label: 'T3' }] })
+        fakeSupabase({ orders_finance: [order()], order_items: [], dining_tables: [{ id: 't-3', label: 'T3' }] })
       );
       const row = (await getCashierScreenData())?.queue[0];
       expect(row?.total).toBe(1247);
@@ -117,7 +210,7 @@ describe('getCashierScreenData', () => {
     it('subtracts a recorded partial payment', async () => {
       mocks.staff.result = signedIn(
         fakeSupabase({
-          orders: [order()],
+          orders_finance: [order()],
           order_items: [],
           dining_tables: [{ id: 't-3', label: 'T3' }],
           payments: [{ order_id: 'o-1', amount_paise: 50_000, status: 'recorded' }],
@@ -133,7 +226,7 @@ describe('getCashierScreenData', () => {
       // understate the balance and let the guest leave owing money.
       mocks.staff.result = signedIn(
         fakeSupabase({
-          orders: [order()],
+          orders_finance: [order()],
           order_items: [],
           dining_tables: [{ id: 't-3', label: 'T3' }],
           payments: [
@@ -151,7 +244,7 @@ describe('getCashierScreenData', () => {
     it('never goes negative on an overpaid order', async () => {
       mocks.staff.result = signedIn(
         fakeSupabase({
-          orders: [order()],
+          orders_finance: [order()],
           order_items: [],
           dining_tables: [{ id: 't-3', label: 'T3' }],
           payments: [{ order_id: 'o-1', amount_paise: 200_000, status: 'recorded' }],
@@ -167,7 +260,7 @@ describe('getCashierScreenData', () => {
     it('sums several recorded payments against one order', async () => {
       mocks.staff.result = signedIn(
         fakeSupabase({
-          orders: [order()],
+          orders_finance: [order()],
           order_items: [],
           dining_tables: [{ id: 't-3', label: 'T3' }],
           payments: [
@@ -182,7 +275,7 @@ describe('getCashierScreenData', () => {
 
   it('converts paise to rupees', async () => {
     mocks.staff.result = signedIn(
-      fakeSupabase({ orders: [order()], order_items: [], dining_tables: [{ id: 't-3', label: 'T3' }] })
+      fakeSupabase({ orders_finance: [order()], order_items: [], dining_tables: [{ id: 't-3', label: 'T3' }] })
     );
     expect((await getCashierScreenData())?.queue[0].total).toBe(1247);
   });
@@ -190,7 +283,7 @@ describe('getCashierScreenData', () => {
   it('summarises items as one line of "qty × name"', async () => {
     mocks.staff.result = signedIn(
       fakeSupabase({
-        orders: [order()],
+        orders_finance: [order()],
         order_items: [
           { order_id: 'o-1', qty: 2, name_snapshot: 'Chicken Biryani', sort_order: 0 },
           { order_id: 'o-1', qty: 3, name_snapshot: 'Tandoori Roti', sort_order: 1 },
@@ -205,7 +298,7 @@ describe('getCashierScreenData', () => {
 
   it('says so when a ticket has no items rather than rendering blank', async () => {
     mocks.staff.result = signedIn(
-      fakeSupabase({ orders: [order()], order_items: [], dining_tables: [{ id: 't-3', label: 'T3' }] })
+      fakeSupabase({ orders_finance: [order()], order_items: [], dining_tables: [{ id: 't-3', label: 'T3' }] })
     );
     expect((await getCashierScreenData())?.queue[0].items).toBe('No items recorded');
   });
@@ -213,7 +306,7 @@ describe('getCashierScreenData', () => {
   it('humanises the prep state for the queue row', async () => {
     mocks.staff.result = signedIn(
       fakeSupabase({
-        orders: [order({ id: 'o-1', prep_status: 'ready' })],
+        orders_finance: [order({ id: 'o-1', prep_status: 'ready' })],
         order_items: [],
         dining_tables: [{ id: 't-3', label: 'T3' }],
       })
@@ -224,7 +317,7 @@ describe('getCashierScreenData', () => {
   it('keeps the order UUID so payment can target it, and keeps the code separate', async () => {
     mocks.staff.result = signedIn(
       fakeSupabase({
-        orders: [order({ id: 'o-77', code: 'A-1041' })],
+        orders_finance: [order({ id: 'o-77', code: 'A-1041' })],
         order_items: [],
         dining_tables: [{ id: 't-3', label: 'T3' }],
       })
@@ -238,7 +331,7 @@ describe('getCashierScreenData', () => {
 
   it('labels a takeaway order when there is no table', async () => {
     mocks.staff.result = signedIn(
-      fakeSupabase({ orders: [order({ table_id: null })], order_items: [] })
+      fakeSupabase({ orders_finance: [order({ table_id: null })], order_items: [] })
     );
     expect((await getCashierScreenData())?.queue[0].table).toBe('Takeaway');
   });
@@ -246,7 +339,7 @@ describe('getCashierScreenData', () => {
   it('skips the tables query entirely when no order has a table', async () => {
     // An empty `in ([])` is rejected by Postgres, so this path has to short
     // circuit or a takeaway-only queue would throw.
-    mocks.staff.result = signedIn(fakeSupabase({ orders: [order({ table_id: null })], order_items: [] }));
+    mocks.staff.result = signedIn(fakeSupabase({ orders_finance: [order({ table_id: null })], order_items: [] }));
     await expect(getCashierScreenData()).resolves.toBeTruthy();
   });
 });

@@ -9,7 +9,7 @@ AutoDine is a mobile-first QR ordering and restaurant-operations application for
 - GST behavior must follow adviser-approved rules. The current code supports only its explicitly configured rate path; it does not implement a complete tax-policy model for every jurisdiction, inclusive price, item classification, exemption, or place of supply. Do not treat sample values as tax advice or extend the model by guessing.
 - Local and automated UI tests may use fictional sample data only when a developer explicitly opts into demo mode. A production build without the required Supabase URL and public key fails rather than serving sample restaurant data.
 - `/demo/menu`, where enabled, is a clearly identified, read-only sample. It is not a real restaurant, order path, or database-backed flow.
-- Passing unit or demo-mode browser tests does not prove that production credentials, email delivery, AI providers, or a specific restaurant's configuration work. See [`docs/website-readiness-audit.md`](docs/website-readiness-audit.md) and `RELEASE-BLOCKER-REPORT.md` for the dated readiness evidence and open gates. Production readiness remains **NO-GO** until fresh, authorized acceptance evidence is recorded.
+- Passing unit or demo-mode browser tests does not prove that production credentials, email delivery, AI providers, or a specific restaurant's configuration work. See `RELEASE-BLOCKER-REPORT.md` for the dated readiness evidence and open gates. Production readiness remains **NO-GO** until fresh, authorized acceptance evidence is recorded.
 
 ## Local development
 

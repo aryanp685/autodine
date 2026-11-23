@@ -13,14 +13,29 @@
  * (only files matching the autodine-*.{sql.gz.enc,manifest.json} pattern are
  * ever considered; foreign files are never touched).
  *
+ * MANIFEST VERIFICATION CONTRACT (both formats, no exceptions):
+ * every manifest carries `file`, `format`, `bytes` (plaintext length),
+ * `sha256` (of the encrypted artifact), `createdAt`, `counts`
+ * ({tables, rows, functions, policies} measured in the backup snapshot)
+ * and `financialSpotChecks` ({payments_amount_paise,
+ * subscription_payments_amount_paise}; null when a table/column is
+ * absent). verify-restored-db.mjs refuses to verify against a manifest
+ * that lacks any of these — a restore drill must never pass on missing
+ * evidence. Mode A (pg_dump) measures its expectations inside the same
+ * exported snapshot pg_dump reads (`--snapshot`), so the contract
+ * describes the dump exactly even on a live source database.
+ *
  * Exit code 0 = backup complete and verified; 1 = failed (webhook alerted when
  * BACKUP_ALERT_WEBHOOK is set).
  */
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, readdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { encryptBuffer, sha256 } from './lib-crypto.mjs';
-import { dumpDatabase } from './lib-dump.mjs';
+import { encryptBuffer, passphraseProblem, sha256 } from './lib-crypto.mjs';
+import { dumpDatabase, openBackupSnapshot } from './lib-dump.mjs';
+import { backupSourceDecision } from './lib-backup-source.mjs';
+import { selectBackupMode } from './lib-backup-mode.mjs';
+import { resolvePgClient } from './lib-pg-client.mjs';
 
 const args = process.argv.slice(2);
 const opt = {};
@@ -43,8 +58,17 @@ const outDir = opt['out-dir'];
 if (!outDir) fail('missing --out-dir');
 const sourceUrl = process.env.AUTODINE_BACKUP_SOURCE_URL || opt['source-url'];
 if (!sourceUrl) fail('set AUTODINE_BACKUP_SOURCE_URL (never pass the URL on the command line; it leaks into shell history)');
+// A consistent snapshot cannot be taken through the transaction pooler, so
+// refuse that source BEFORE anything is written or connected to. The rule
+// used to live only in the runbooks; a rule in prose is not a rule.
+const sourceDecision = backupSourceDecision(sourceUrl);
+if (!sourceDecision.allowed) fail(sourceDecision.reason);
 const passphrase = process.env.AUTODINE_BACKUP_PASSPHRASE;
-if (!passphrase) fail('set AUTODINE_BACKUP_PASSPHRASE (12+ chars; store in a password manager)');
+// Refuse a passphrase that violates the encryption contract before any
+// connection is opened or any byte is written: failing here costs nothing,
+// failing after a long dump costs a whole run and teaches an operator nothing.
+const passphraseProblemText = passphraseProblem(passphrase);
+if (passphraseProblemText) fail(passphraseProblemText);
 const schema = opt.schema || 'public';
 const keepDaily = Number(opt['keep-daily'] ?? 14);
 const keepWeekly = Number(opt['keep-weekly'] ?? 8);
@@ -59,26 +83,55 @@ try {
   const started = Date.now();
   let outFile, manifest;
   const enc = encryptBuffer;
-  const usePgDump = opt['pg-dump'] === '1' || (opt['pg-dump'] === undefined && (() => { try { execFileSync('pg_dump', ['--version'], { stdio: 'ignore' }); return true; } catch { return false; } })());
+  // Resolve pg_dump to the binary that will actually run.
+  //
+  // The runner image ships an older pg_dump that can shadow the pinned one
+  // on PATH, and the tool that WRITES the archive decides its format: a
+  // dump written by a newer pg_dump is refused outright by an older
+  // pg_restore. When the composite action has pinned a directory, the
+  // absolute path of the VERIFIED binary is used, so PATH cannot change
+  // which client runs, and the version is re-checked at the moment of use.
+  const pgDump = resolvePgClient('pg_dump');
+  const mode = selectBackupMode(opt['pg-dump'], pgDump !== null);
+  if (mode === 'missing_client') {
+    await fail('--pg-dump was requested but no PostgreSQL client is available');
+  }
+  const usePgDump = mode === 'pg_dump';
 
   if (usePgDump) {
     // Mode A: pg_dump custom format. Scoped to the same schema Mode B and the
     // restore target cover — the shim/managed scaffold (auth.*, storage.*,
     // roles) already exists on the restore side and must not be replayed.
-    const sqlPath = path.join(outDir, `${base}.dump`);
-    execFileSync('pg_dump', ['--format=custom', '--no-owner', `--schema=${schema}`, `--file=${sqlPath}`, sourceUrl], { stdio: ['ignore', 'ignore', 'inherit'] });
-    const plaintext = readFileSync(sqlPath);
-    writeFileSync(sqlPath + '.enc', enc(plaintext, passphrase));
-    unlinkSync(sqlPath);
-    outFile = `${base}.dump.enc`;
-    manifest = { format: 'pg_dump-custom', bytes: plaintext.length, sha256: sha256(readFileSync(path.join(outDir, outFile))) };
+    // pg_dump must write plaintext briefly. A private directory and file
+    // limit exposure; all ordinary errors remove it, including dump failure.
+    // An uncatchable termination can still leave the directory behind.
+    const tempDir = mkdtempSync(path.join(outDir, '.autodine-plaintext-'));
+    const sqlPath = path.join(tempDir, 'backup.dump');
+    try {
+      writeFileSync(sqlPath, '', { mode: 0o600, flag: 'wx' });
+      // Counts and the dump use the same exported repeatable-read snapshot.
+      const snapshot = await openBackupSnapshot(sourceUrl, { schema });
+      let evidence;
+      try {
+        evidence = await snapshot.collectCounts();
+        execFileSync(pgDump.path, ['--format=custom', '--no-owner', `--schema=${schema}`, `--snapshot=${snapshot.snapshotId}`, `--file=${sqlPath}`, sourceUrl], { stdio: ['ignore', 'ignore', 'inherit'] });
+      } finally {
+        await snapshot.close();
+      }
+      const plaintext = readFileSync(sqlPath);
+      outFile = `${base}.dump.enc`;
+      writeFileSync(path.join(outDir, outFile), enc(plaintext, passphrase), { flag: 'wx', mode: 0o600 });
+      manifest = { format: 'pg_dump-custom', bytes: plaintext.length, sha256: sha256(readFileSync(path.join(outDir, outFile))), counts: evidence.counts, financialSpotChecks: evidence.financialSpotChecks };
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
   } else {
     // Mode B: built-in consistent snapshot (REPEATABLE READ READ ONLY).
-    const { sql, counts } = await dumpDatabase(sourceUrl, { schema, log: (m) => process.stderr.write('  ' + m + '\n') });
+    const { sql, counts, financialSpotChecks } = await dumpDatabase(sourceUrl, { schema, log: (m) => process.stderr.write('  ' + m + '\n') });
     const plaintext = Buffer.from(sql, 'utf8');
-    writeFileSync(path.join(outDir, `${base}.sql.gz.enc`), enc(plaintext, passphrase));
+    writeFileSync(path.join(outDir, `${base}.sql.gz.enc`), enc(plaintext, passphrase), { flag: 'wx', mode: 0o600 });
     outFile = `${base}.sql.gz.enc`;
-    manifest = { format: 'autodine-logical-1', bytes: plaintext.length, sha256: sha256(readFileSync(path.join(outDir, outFile))), counts };
+    manifest = { format: 'autodine-logical-1', bytes: plaintext.length, sha256: sha256(readFileSync(path.join(outDir, outFile))), counts, financialSpotChecks };
   }
 
   const full = path.join(outDir, outFile);
@@ -88,7 +141,7 @@ try {
   manifest.schema = schema;
   manifest.retention = { keepDaily, keepWeekly, keepMonthly };
   manifest.notes = 'Logical backup. Does NOT cover: Supabase Auth schema (auth.*), Storage buckets, or platform-managed settings — those rely on the managed provider. Restore target must be empty.';
-  writeFileSync(path.join(outDir, `${base}.manifest.json`), JSON.stringify(manifest, null, 2) + '\n');
+  writeFileSync(path.join(outDir, `${base}.manifest.json`), JSON.stringify(manifest, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
 
   // Retention: bucket own files only.
   const files = readdirSync(outDir).filter((f) => /^autodine-.*\.(sql\.gz\.enc|dump\.enc)$/.test(f)).sort();

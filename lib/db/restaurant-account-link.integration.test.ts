@@ -155,7 +155,7 @@ describe.skipIf(!URL_VALUE)('Phase 6D restaurant account-link guard', () => {
     for (const user of [a.linked.owner, a.manager]) {
       for (const destination of [null, a.target.account]) {
         await expect(staff(user, () => db.query(
-          'update public.restaurants set account_id=$1 where id=$2 returning account_id',
+          'update public.restaurants set account_id=$1 where id=$2 returning id',
           [destination, a.linked.restaurant],
         ))).rejects.toMatchObject({ code: '42501' });
       }
@@ -194,7 +194,7 @@ describe.skipIf(!URL_VALUE)('Phase 6D restaurant account-link guard', () => {
              accent='maroon', updated_at=now(),
              upi_id='phase6d.owner@okicici', upi_payee_name='Synthetic Owner'
        where id=$7
-       returning account_id, name, tagline, address, phone, gstin, slug, timezone,
+       returning name, tagline, address, phone, gstin, slug, timezone,
                  tax_rate_bps, guest_verification_mode, announcement_text, announcement_on,
                  is_active, online_payments_enabled, logo_path, banner_path, accent,
                  upi_id, upi_payee_name
@@ -204,7 +204,6 @@ describe.skipIf(!URL_VALUE)('Phase 6D restaurant account-link guard', () => {
     ])).rows[0]);
 
     expect(result).toMatchObject({
-      account_id: a.linked.account,
       name: 'Phase 6D updated name',
       tagline: 'Synthetic tagline',
       address: 'Synthetic address',
@@ -224,6 +223,10 @@ describe.skipIf(!URL_VALUE)('Phase 6D restaurant account-link guard', () => {
       upi_id: 'phase6d.owner@okicici',
       upi_payee_name: 'Synthetic Owner',
     });
+    const billingAccess = await staff(a.linked.owner, async () => (await db.query(
+      'select public.restaurant_access($1) access', [a.linked.restaurant],
+    )).rows[0].access);
+    expect(billingAccess.account_id).toBe(a.linked.account);
     expect((await db.query('select public.restaurant_can_write($1) ok', [a.linked.restaurant])).rows[0].ok).toBe(false);
 
     // Manager: every ordinary field EXCEPT tax_rate_bps / gstin, which the
@@ -267,22 +270,30 @@ describe.skipIf(!URL_VALUE)('Phase 6D restaurant account-link guard', () => {
       )).rows[0].result as { ok: boolean; already?: boolean };
       expect(published).toMatchObject({ ok: true, already: false });
       const live = (await db.query(
-        'select name, account_id, brand_theme_enabled from public.restaurants where id=$1',
+        'select name, brand_theme_enabled from public.restaurants where id=$1',
         [a.target.restaurant],
       )).rows[0];
       expect(live).toMatchObject({
-        name: 'Synthetic published brand', account_id: a.target.account, brand_theme_enabled: true,
+        name: 'Synthetic published brand', brand_theme_enabled: true,
       });
+      const billingAccess = (await db.query(
+        'select public.restaurant_access($1) access', [a.target.restaurant],
+      )).rows[0].access;
+      expect(billingAccess.account_id).toBe(a.target.account);
 
       const rolledBack = (await db.query(
         'select public.rollback_last_publish($1) result', [a.target.restaurant],
       )).rows[0].result as { ok: boolean; already?: boolean };
       expect(rolledBack).toMatchObject({ ok: true, already: false });
       const restored = (await db.query(
-        'select account_id, brand_theme_enabled from public.restaurants where id=$1',
+        'select brand_theme_enabled from public.restaurants where id=$1',
         [a.target.restaurant],
       )).rows[0];
-      expect(restored).toMatchObject({ account_id: a.target.account, brand_theme_enabled: false });
+      expect(restored.brand_theme_enabled).toBe(false);
+      const restoredAccess = (await db.query(
+        'select public.restaurant_access($1) access', [a.target.restaurant],
+      )).rows[0].access;
+      expect(restoredAccess.account_id).toBe(a.target.account);
     });
   });
 
@@ -301,17 +312,20 @@ describe.skipIf(!URL_VALUE)('Phase 6D restaurant account-link guard', () => {
 
     const legacy = await staff(owner, async () => {
       const gate = (await db.query(
-        'select account_id, public.restaurant_can_write(id) can_write from public.restaurants where id=$1',
-        [restaurant],
-      )).rows[0];
+        'select public.restaurant_access($1) access', [restaurant],
+      )).rows[0].access;
       const updated = (await db.query(
-        'update public.restaurants set name=$1 where id=$2 returning account_id,name',
+        'update public.restaurants set name=$1 where id=$2 returning name',
         ['Synthetic legacy repair', restaurant],
       )).rows[0];
-      return { gate, updated };
+      const after = (await db.query(
+        'select public.restaurant_access($1) access', [restaurant],
+      )).rows[0].access;
+      return { gate, updated, after };
     });
-    expect(legacy.gate).toEqual({ account_id: null, can_write: true });
-    expect(legacy.updated).toEqual({ account_id: null, name: 'Synthetic legacy repair' });
+    expect(legacy.gate).toMatchObject({ account_id: null, can_write: true });
+    expect(legacy.updated).toEqual({ name: 'Synthetic legacy repair' });
+    expect(legacy.after.account_id).toBeNull();
   });
 
   it('keeps initial service-role account creation and authenticated create_outlet linking intact', async () => {
@@ -325,9 +339,11 @@ describe.skipIf(!URL_VALUE)('Phase 6D restaurant account-link guard', () => {
       )).rows[0].id as string;
       await db.query('reset role');
       const link = (await db.query(
-        'select account_id from public.restaurants where id=$1', [created],
-      )).rows[0].account_id;
-      expect(link).toBeTruthy();
+        'select account_id, tax_rate_bps from public.restaurants where id=$1', [created],
+      )).rows[0];
+      expect(link.account_id).toBeTruthy();
+      // A new outlet starts at 0% until the owner sets the rate.
+      expect(Number(link.tax_rate_bps)).toBe(0);
       expect((await db.query('select count(*)::int n from public.memberships where restaurant_id=$1 and user_id=$2 and role=\'owner\'', [created, signupOwner])).rows[0].n).toBe(1);
     } finally {
       await db.query('rollback');
@@ -338,16 +354,20 @@ describe.skipIf(!URL_VALUE)('Phase 6D restaurant account-link guard', () => {
         'select public.create_outlet($1,$2) id',
         [`Phase 6D added outlet ${randomUUID().slice(0, 8)}`, `phase6d-outlet-${randomUUID()}`],
       )).rows[0].id as string;
-      const row = (await db.query(
-        'select account_id from public.restaurants where id=$1', [id],
-      )).rows[0];
+      const access = (await db.query(
+        'select public.restaurant_access($1) access', [id],
+      )).rows[0].access;
       const membership = (await db.query(
         "select role from public.memberships where restaurant_id=$1 and user_id=auth.uid()", [id],
       )).rows[0];
-      return { id, account_id: row.account_id, membership: membership.role };
+      const tax = (await db.query(
+        'select tax_rate_bps from public.restaurants where id=$1', [id],
+      )).rows[0].tax_rate_bps;
+      return { id, account_id: access.account_id, membership: membership.role, tax_rate_bps: tax };
     });
     expect(outlet.account_id).toBe(a.target.account);
     expect(outlet.membership).toBe('owner');
+    expect(Number(outlet.tax_rate_bps)).toBe(0);
   });
 
   it('retains the audited entitlement function grants and makes no probe-grant change', async () => {

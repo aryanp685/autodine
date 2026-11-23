@@ -70,9 +70,13 @@ function stripUnsupported(sql) {
   // revoke ... ;  (parser has no REVOKE; added with migration 0003, which
   // revokes the default PUBLIC execute on a SECURITY DEFINER function)
   out = out.replace(/^\s*revoke\s[\s\S]*?;\s*$/gim, '');
-  // comment on function ... ;  (COMMENT ON TABLE/COLUMN parses fine; the
-  // FUNCTION form does not, so only that form is stripped)
-  out = out.replace(/^\s*comment\s+on\s+function[\s\S]*?;\s*$/gim, '');
+  // CREATE VIEW options are valid PostgreSQL, but this parser cannot read
+  // WITH (security_barrier = true). Strip only that option so the view query
+  // still gets parsed; a real PostgreSQL replay validates the option itself.
+  out = out.replace(/\bwith\s*\(\s*security_barrier\s*=\s*true\s*\)/gi, '');
+  // comment on function/view ... ; (COMMENT ON TABLE/COLUMN parses fine;
+  // the FUNCTION and VIEW forms do not, so those forms are stripped)
+  out = out.replace(/^\s*comment\s+on\s+(?:function|view)[\s\S]*?;\s*$/gim, '');
   // alter table ... enable/disable row level security;
   out = out.replace(/^\s*alter\s+table[\s\S]*?row\s+level\s+security\s*;\s*$/gim, '');
   // alter table ... alter column ... drop not null; (the parser cannot read
@@ -90,6 +94,8 @@ function stripUnsupported(sql) {
   // Added with migration 00600, which renames the pricing function so that the
   // wrapper carrying the guest token is the only callable door to it.)
   out = out.replace(/^\s*alter\s+function[\s\S]*?;\s*$/gim, '');
+  // alter type ... add value ...; (no such statement in pgsql-ast-parser)
+  out = out.replace(/^\s*alter\s+type[\s\S]*?;\s*$/gim, '');
   // do $$ ... $$;  (migration 0010 uses a DO block to make an ALTER
   // PUBLICATION idempotent. The parser has no plpgsql, so the whole block
   // goes. It is reported as unverified like the functions above.)
@@ -131,7 +137,9 @@ for (const file of files) {
   const removedGrants = (sql.match(/^\s*grant\s/gim) || []).length;
   const removedRevokes = (sql.match(/^\s*revoke\s/gim) || []).length;
   const removedComments =
-    (sql.match(/^\s*comment\s+on\s+function/gim) || []).length;
+    (sql.match(/^\s*comment\s+on\s+(?:function|view)/gim) || []).length;
+  const removedSecurityBarrierOptions =
+    (sql.match(/\bwith\s*\(\s*security_barrier\s*=\s*true\s*\)/gi) || []).length;
   const removedRls = (sql.match(/row\s+level\s+security/gi) || []).length;
   const removedAlterNotNull = (sql.match(/^\s*alter\s+table[\s\S]*?alter\s+column[\s\S]*?drop\s+not\s+null\s*;/gim) || []).length;
   const removedTriggers = (sql.match(/^\s*create\s+(?:or\s+replace\s+)?trigger/gim) || []).length;
@@ -154,7 +162,8 @@ for (const file of files) {
       `${file}: nothing parser-checkable — UNVERIFIED: ` +
         `${removedFns} function(s), ${removedPolicies} policy/policies, ` +
         `${removedDrops} policy drop(s), ${removedGrants} grant(s), ` +
-        `${removedRevokes} revoke(s), ${removedComments} function comment(s), ` +
+        `${removedRevokes} revoke(s), ${removedComments} function/view comment(s), ` +
+        `${removedSecurityBarrierOptions} security_barrier option(s), ` +
         `${removedAlterNotNull} ALTER COLUMN nullability change(s), ` +
         `${removedRls} RLS statement(s), ` +
         `${removedTriggers} trigger(s), ${removedTriggerDrops} trigger drop(s), ` +
@@ -173,7 +182,8 @@ for (const file of files) {
       `${removedDrops} policy drop(s)`,
       `${removedGrants} grant(s)`,
       `${removedRevokes} revoke(s)`,
-      `${removedComments} function comment(s)`,
+      `${removedComments} function/view comment(s)`,
+      `${removedSecurityBarrierOptions} security_barrier option(s)`,
       `${removedAlterNotNull} ALTER COLUMN nullability change(s)`,
       `${removedRls} RLS statement(s)`,
       `${removedTriggers} trigger(s), ${removedTriggerDrops} trigger drop(s)`,

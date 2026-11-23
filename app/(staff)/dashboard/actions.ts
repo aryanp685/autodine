@@ -1,15 +1,27 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { getInvoiceData } from '@/lib/db/invoice';
+import { loadRestaurantPrinters } from '@/lib/db/printers';
 import { CASHIER_ROLES, getStaffContext } from '@/lib/db/staff';
 import { checkGstin } from '@/lib/gst/gstin';
+import { tryAutoRegisterInvoiceIrp } from '@/lib/gst/einvoice-auto';
+import { buildThermalPrintJob, type PrintBridgeJob } from '@/lib/print-bridge';
 
 export type MarkSessionPaidResult =
   | { ok: true; paidAt: string }
   | { ok: false; error: string };
 
 export type CheckoutSessionResult =
-  | { ok: true; invoiceId: string; invoiceUrl: string }
+  | {
+      ok: true;
+      invoiceId: string;
+      invoiceUrl: string;
+      irpStatus?: 'not_required' | 'pending' | 'generated' | 'failed';
+      irn?: string | null;
+      irpMessage?: string | null;
+      printJob?: PrintBridgeJob | null;
+    }
   | { ok: false; error: string };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -94,5 +106,60 @@ export async function checkoutSessionAction(sessionId: string, recipient?: Check
   revalidatePath('/dashboard/orders');
   revalidatePath('/cashier');
   revalidatePath(`/invoice/${data}`);
-  return { ok: true, invoiceId: data, invoiceUrl: `/invoice/${data}` };
+
+  const baseResult: CheckoutSessionResult = {
+    ok: true,
+    invoiceId: data,
+    invoiceUrl: `/invoice/${data}`,
+  };
+
+  if (typeof staff.supabase.from !== 'function') {
+    return baseResult;
+  }
+
+  const [autoIrp, printers] = await Promise.all([
+    tryAutoRegisterInvoiceIrp({
+      supabase: staff.supabase,
+      restaurantId: staff.restaurantId,
+      invoiceId: data,
+    }),
+    loadRestaurantPrinters(staff.supabase, staff.restaurantId),
+  ]);
+
+  const autoPrinter = printers.find((p) => p.autoPrintOnClose) ?? null;
+  if (!autoIrp.attempted && !autoPrinter) {
+    return baseResult;
+  }
+
+  let printJob: PrintBridgeJob | null = null;
+  if (autoPrinter) {
+    try {
+      const invRes = await getInvoiceData(data);
+      if (invRes.ok) {
+        printJob = buildThermalPrintJob(invRes.invoice, {
+          widthMm: autoPrinter.paperWidth === '58mm' ? 58 : 80,
+          paperFormat: autoPrinter.paperWidth,
+          copyNumber: 1,
+          printerTarget: {
+            printerId: autoPrinter.id,
+            printerName: autoPrinter.name,
+            connectionType: autoPrinter.connectionType,
+            bridgePrinterName: autoPrinter.bridgePrinterName,
+            networkHost: autoPrinter.networkHost,
+            networkPort: autoPrinter.networkPort,
+          },
+        });
+      }
+    } catch {
+      // Never fail checkout if pre-building the print job raises.
+    }
+  }
+
+  return {
+    ...baseResult,
+    ...(autoIrp.attempted
+      ? { irpStatus: autoIrp.irpStatus, irn: autoIrp.irn, irpMessage: autoIrp.message }
+      : {}),
+    ...(printJob ? { printJob } : {}),
+  };
 }

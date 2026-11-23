@@ -116,7 +116,9 @@ describe('getKitchenScreenData', () => {
     expect(data?.blocked).toBeUndefined();
   });
 
-  it('converts paise to rupees and keeps an integer-safe total', async () => {
+  it('does not return order amounts or payment state to the kitchen projection', async () => {
+    // Include restricted values in the mock row to prove the mapper never
+    // forwards them, independently of the database column grants.
     mocks.staff.result = signedIn(
       fakeSupabase({
         orders: [
@@ -136,7 +138,9 @@ describe('getKitchenScreenData', () => {
     );
 
     const ticket = (await getKitchenScreenData())?.tickets[0];
-    expect(ticket?.total).toBe(776);
+    expect(ticket).toBeTruthy();
+    expect(ticket).not.toHaveProperty('payment');
+    expect(ticket).not.toHaveProperty('total');
   });
 
   it('joins the table label and falls back to Takeaway', async () => {
@@ -277,26 +281,32 @@ describe('getKitchenScreenData', () => {
     expect(items[0].detail).toBeUndefined();
   });
 
-  it('reads a refunded order as paid, so it is not badged unpaid', async () => {
+  it('keeps held-table summaries free of per-order amounts', async () => {
     mocks.staff.result = signedIn(
       fakeSupabase({
         orders: [
           {
             id: 'o-1',
             code: 'A-1',
-            table_id: null,
+            table_id: 't-1',
+            table_session_id: 'ts-1',
             customer_note: null,
             prep_status: 'new',
-            payment_status: 'refunded',
+            payment_status: 'pending',
             total_paise: 100,
+            hold_required: true,
+            confirmed_at: null,
             placed_at: iso(1),
           },
         ],
         order_items: [],
+        dining_tables: [{ id: 't-1', label: 'T1' }],
       })
     );
 
-    expect((await getKitchenScreenData())?.tickets[0].payment).toBe('paid');
+    const heldOrder = (await getKitchenScreenData())?.held?.[0]?.orders[0];
+    expect(heldOrder).toEqual({ id: 'o-1', code: 'A-1' });
+    expect(heldOrder).not.toHaveProperty('total');
   });
 
   it('keeps the order UUID so the advance button can target it', async () => {

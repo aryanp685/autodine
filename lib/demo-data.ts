@@ -43,6 +43,8 @@ export type Item = {
   price: number;
   category: string;
   veg: boolean | null;
+  jain: boolean | null;
+  allergens: string[] | null;
   spice?: 0 | 1 | 2;
   badge?: string;
   available: boolean;
@@ -81,6 +83,8 @@ export const items: Item[] = [
     price: 349,
     category: 'starters',
     veg: true,
+    jain: null,
+    allergens: null,
     spice: 1,
     badge: 'Bestseller',
     available: true,
@@ -109,6 +113,8 @@ export const items: Item[] = [
     price: 299,
     category: 'starters',
     veg: true,
+    jain: null,
+    allergens: null,
     available: true,
     img: '/img/dishes/hara-bhara-kebab.jpg',
   },
@@ -119,6 +125,8 @@ export const items: Item[] = [
     price: 429,
     category: 'starters',
     veg: false,
+    jain: null,
+    allergens: null,
     spice: 0,
     available: true,
     img: '/img/dishes/chicken-malai-tikka.jpg',
@@ -131,6 +139,8 @@ export const items: Item[] = [
     price: 349,
     category: 'tandoor',
     veg: false,
+    jain: null,
+    allergens: null,
     spice: 2,
     available: true,
     img: '/img/dishes/tandoori-chicken.jpg',
@@ -147,6 +157,8 @@ export const items: Item[] = [
     price: 459,
     category: 'tandoor',
     veg: false,
+    jain: null,
+    allergens: null,
     spice: 2,
     available: true,
     img: '/img/dishes/seekh-kebab.jpg',
@@ -158,6 +170,8 @@ export const items: Item[] = [
     price: 469,
     category: 'curries',
     veg: false,
+    jain: null,
+    allergens: null,
     spice: 1,
     badge: "Chef's pick",
     available: true,
@@ -187,6 +201,8 @@ export const items: Item[] = [
     price: 389,
     category: 'curries',
     veg: true,
+    jain: null,
+    allergens: null,
     available: true,
     img: '/img/dishes/dal-bukhara.jpg',
   },
@@ -197,6 +213,8 @@ export const items: Item[] = [
     price: 399,
     category: 'curries',
     veg: true,
+    jain: null,
+    allergens: null,
     spice: 1,
     available: true,
     img: '/img/dishes/paneer-butter-masala.jpg',
@@ -212,6 +230,8 @@ export const items: Item[] = [
     price: 549,
     category: 'curries',
     veg: false,
+    jain: null,
+    allergens: null,
     spice: 2,
     badge: 'Sold out',
     available: false,
@@ -224,6 +244,8 @@ export const items: Item[] = [
     price: 499,
     category: 'biryani',
     veg: false,
+    jain: null,
+    allergens: null,
     spice: 2,
     badge: 'Bestseller',
     available: true,
@@ -249,6 +271,8 @@ export const items: Item[] = [
     price: 379,
     category: 'biryani',
     veg: true,
+    jain: null,
+    allergens: null,
     available: true,
     img: '/img/dishes/subz-dum-biryani.jpg',
   },
@@ -259,18 +283,20 @@ export const items: Item[] = [
     price: 249,
     category: 'biryani',
     veg: true,
+    jain: null,
+    allergens: null,
     available: true,
     img: '/img/dishes/masala-dosa.jpg',
   },
-  { id: 'it-naan', name: 'Butter Naan', desc: 'Tandoor-baked, brushed with butter', price: 79, category: 'breads', veg: true, available: true, img: '/img/dishes/butter-naan.jpg' },
-  { id: 'it-garlic-naan', name: 'Garlic Naan', desc: 'Fresh garlic and coriander', price: 99, category: 'breads', veg: true, available: true , img: '/img/dishes/garlic-naan.jpg' },
-  { id: 'it-roti', name: 'Tandoori Roti', desc: 'Whole wheat, tandoor-fired', price: 59, category: 'breads', veg: true, available: true , img: '/img/dishes/tandoori-roti.jpg' },
-  { id: 'it-paratha', name: 'Laccha Paratha', desc: 'Layered, flaky, brushed with ghee', price: 89, category: 'breads', veg: true, available: true , img: '/img/dishes/laccha-paratha.jpg' },
-  { id: 'it-gulab', name: 'Gulab Jamun', desc: 'Two warm dumplings, cardamom syrup', price: 149, category: 'desserts', veg: true, available: true , img: '/img/dishes/gulab-jamun.jpg' },
-  { id: 'it-rasmalai', name: 'Rasmalai', desc: 'Chhena discs in saffron-scented milk', price: 179, category: 'desserts', veg: true, available: true , img: '/img/dishes/rasmalai.jpg' },
-  { id: 'it-chai', name: 'Masala Chai', desc: 'Assam leaf, ginger, cardamom, single estate', price: 99, category: 'drinks', veg: true, available: true , img: '/img/dishes/masala-chai.jpg' },
-  { id: 'it-lassi', name: 'Mango Lassi', desc: 'Alphonso pulp, hung curd, lightly sweetened', price: 149, category: 'drinks', veg: true, available: true , img: '/img/dishes/mango-lassi.jpg' },
-  { id: 'it-lime', name: 'Fresh Lime Soda', desc: 'Sweet or salted, soda, mint', price: 119, category: 'drinks', veg: true, available: true , img: '/img/dishes/fresh-lime-soda.jpg' },
+  { id: 'it-naan', name: 'Butter Naan', desc: 'Tandoor-baked, brushed with butter', price: 79, category: 'breads', veg: true, jain: null, allergens: null, available: true, img: '/img/dishes/butter-naan.jpg' },
+  { id: 'it-garlic-naan', name: 'Garlic Naan', desc: 'Fresh garlic and coriander', price: 99, category: 'breads', veg: true, jain: null, allergens: null, available: true , img: '/img/dishes/garlic-naan.jpg' },
+  { id: 'it-roti', name: 'Tandoori Roti', desc: 'Whole wheat, tandoor-fired', price: 59, category: 'breads', veg: true, jain: null, allergens: null, available: true , img: '/img/dishes/tandoori-roti.jpg' },
+  { id: 'it-paratha', name: 'Laccha Paratha', desc: 'Layered, flaky, brushed with ghee', price: 89, category: 'breads', veg: true, jain: null, allergens: null, available: true , img: '/img/dishes/laccha-paratha.jpg' },
+  { id: 'it-gulab', name: 'Gulab Jamun', desc: 'Two warm dumplings, cardamom syrup', price: 149, category: 'desserts', veg: true, jain: null, allergens: null, available: true , img: '/img/dishes/gulab-jamun.jpg' },
+  { id: 'it-rasmalai', name: 'Rasmalai', desc: 'Chhena discs in saffron-scented milk', price: 179, category: 'desserts', veg: true, jain: null, allergens: null, available: true , img: '/img/dishes/rasmalai.jpg' },
+  { id: 'it-chai', name: 'Masala Chai', desc: 'Assam leaf, ginger, cardamom, single estate', price: 99, category: 'drinks', veg: true, jain: null, allergens: null, available: true , img: '/img/dishes/masala-chai.jpg' },
+  { id: 'it-lassi', name: 'Mango Lassi', desc: 'Alphonso pulp, hung curd, lightly sweetened', price: 149, category: 'drinks', veg: true, jain: null, allergens: null, available: true , img: '/img/dishes/mango-lassi.jpg' },
+  { id: 'it-lime', name: 'Fresh Lime Soda', desc: 'Sweet or salted, soda, mint', price: 119, category: 'drinks', veg: true, jain: null, allergens: null, available: true , img: '/img/dishes/fresh-lime-soda.jpg' },
   {
     id: 'it-coffee',
     name: 'Filter Coffee',
@@ -278,6 +304,8 @@ export const items: Item[] = [
     price: 109,
     category: 'drinks',
     veg: true,
+    jain: null,
+    allergens: null,
     available: true,
     img: '/img/dishes/filter-coffee.jpg',
     variants: [
@@ -292,12 +320,9 @@ export type KitchenOrder = {
   table: string;
   placedAt: string;
   ageMin: number;
-  payment: 'paid' | 'pending' | 'failed';
-  paymentMethod?: string;
   state: 'new' | 'preparing' | 'ready' | 'served';
   note?: string;
   items: { qty: number; name: string; detail?: string; veg: boolean }[];
-  total: number;
 };
 
 /**
@@ -341,8 +366,6 @@ export const kitchenOrders: KitchenOrder[] = [
     table: 'T7',
     placedAt: '12:42 PM',
     ageMin: 4,
-    payment: 'paid',
-    paymentMethod: 'UPI · counter',
     state: 'new',
     note: 'Ring the bell — no onion in the gravy.',
     items: [
@@ -350,64 +373,51 @@ export const kitchenOrders: KitchenOrder[] = [
       { qty: 2, name: 'Butter Naan', veg: true },
       { qty: 1, name: 'Mango Lassi', veg: true },
     ],
-    total: 776,
   },
   {
     id: 'A-1041',
     table: 'T3',
     placedAt: '12:38 PM',
     ageMin: 8,
-    payment: 'pending',
-    paymentMethod: 'Pay at counter',
     state: 'preparing',
     items: [
       { qty: 2, name: 'Hyderabadi Chicken Biryani', detail: 'Hot · Boondi raita', veg: false },
       { qty: 3, name: 'Tandoori Roti', veg: true },
     ],
-    total: 1247,
   },
   {
     id: 'A-1040',
     table: 'T12',
     placedAt: '12:31 PM',
     ageMin: 15,
-    payment: 'paid',
-    paymentMethod: 'Card · counter',
     state: 'ready',
     items: [
       { qty: 1, name: 'Paneer Tikka', detail: 'Sharing · Medium · Extra mint chutney', veg: true },
       { qty: 4, name: 'Laccha Paratha', veg: true },
     ],
-    total: 985,
   },
   {
     id: 'A-1039',
     table: 'T5',
     placedAt: '12:24 PM',
     ageMin: 22,
-    payment: 'paid',
-    paymentMethod: 'UPI · counter',
     state: 'served',
     items: [
       { qty: 1, name: 'Dal Bukhara', veg: true },
       { qty: 3, name: 'Garlic Naan', veg: true },
       { qty: 2, name: 'Masala Chai', veg: true },
     ],
-    total: 864,
   },
   {
     id: 'A-1038',
     table: 'T9',
     placedAt: '12:19 PM',
     ageMin: 27,
-    payment: 'pending',
-    paymentMethod: 'Pay at counter',
     state: 'ready',
     items: [
       { qty: 1, name: 'Subz Dum Biryani', veg: true },
       { qty: 2, name: 'Rasmalai', veg: true },
     ],
-    total: 737,
   },
 ];
 

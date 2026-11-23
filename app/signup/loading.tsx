@@ -1,5 +1,5 @@
-import { RouteSkeleton } from '@/components/RouteSkeleton';
+import { AuthLoading } from '@/components/auth/AuthLoading';
 
 export default function Loading() {
-  return <RouteSkeleton variant="page" />;
+  return <AuthLoading />;
 }

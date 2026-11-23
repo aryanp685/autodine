@@ -76,6 +76,7 @@ test.describe('kitchen — real database', () => {
     const ticket = board.locator('article[data-state="new"]', {
       hasText: 'e2e: less chilli in the gravy',
     });
+    await expect(ticket).toHaveCount(1);
     await expect(ticket).toBeVisible({ timeout: 45_000 });
     await expect(ticket).toContainText(/×/); // quantities per line
     await expect(ticket).toContainText(new RegExp(fixtureTableLabel(), 'i')); // synthetic fixture table
@@ -97,6 +98,7 @@ test.describe('kitchen — real database', () => {
     const ticket = board.locator('article[data-state="new"]', {
       hasText: 'e2e: status sync ticket',
     });
+    await expect(ticket).toHaveCount(1);
     await expect(ticket).toBeVisible({ timeout: 45_000 });
 
     await ticket.getByRole('button', { name: 'Start preparing' }).click();

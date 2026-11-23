@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { GuestFlow } from '@/components/GuestFlow';
 import { GuestTabs } from '@/components/GuestTabs';
 import { GuestLiveStatus } from '@/components/GuestLiveStatus';
+import { OrderRecoveryBanner } from '@/components/OrderRecoveryBanner';
 import { guestBrandStyle, type GuestBrandState } from '@/lib/branding/guest-theme';
 import {
   browserStorage,
@@ -82,6 +83,12 @@ export function GuestOrdersScreen({
       </header>
 
       <div className="px-4 pb-8">
+        {slug ? (
+          <div className="mb-4">
+            <OrderRecoveryBanner slug={slug} mode="summary" />
+          </div>
+        ) : null}
+
         {state === 'checking' && (
           <p className="text-[13.5px] text-gink-46">
             Checking this device…

@@ -1,18 +1,22 @@
 'use client';
 
 import Link from 'next/link';
+import { useRef } from 'react';
 import { DishPhoto } from '@/components/DishPhoto';
 import { GuestFlow } from '@/components/GuestFlow';
 import { guestBrandStyle, type GuestBrandState } from '@/lib/branding/guest-theme';
 import { PlaceOrderButton } from '@/components/PlaceOrderButton';
 import { AttemptToken } from '@/components/AttemptToken';
+import { OrderRecoveryBanner } from '@/components/OrderRecoveryBanner';
 import { useCart } from '@/components/CartProvider';
+import { browserStorage } from '@/lib/guest-orders';
+import { buildCartSignature, markPendingOrderSubmitting } from '@/lib/order-recovery';
 import { inr } from '@/lib/demo-data';
 import { VegMark } from '@/components/ui';
 import { paiseToRupees } from '@/lib/money';
 import { priceCart, type MenuItemPrice } from '@/lib/cart-pricing';
 import { placeOrderAction } from '@/app/menu/checkout/actions';
-import { gstLabel } from '@/lib/pricing';
+import { gstLabel, type GstMode } from '@/lib/pricing';
 
 /**
  * Checkout.
@@ -29,6 +33,7 @@ export function Checkout({
   restaurantName,
   tableLabel,
   taxRateBps,
+  gstMode = 'off',
   items,
 }: {
   brandState?: GuestBrandState | null;
@@ -38,12 +43,23 @@ export function Checkout({
   tableLabel?: string | null;
   /** The restaurant's own rate. Without it the bill is priced at a sample. */
   taxRateBps?: number;
+  /** The approved GST mode the order RPC will use. Defaults to GST off. */
+  gstMode?: GstMode;
   items: MenuItemPrice[];
 }) {
   const paint = guestBrandStyle(brandState);
   const cart = useCart();
-  const priced = priceCart(cart.lines, items, taxRateBps);
-  const { subtotalPaise, taxPaise, totalPaise } = priced.totals;
+  const formRef = useRef<HTMLFormElement>(null);
+  const submitGuardRef = useRef(false);
+  const cartSignature = buildCartSignature(cart.lines);
+  const priced = priceCart(
+    cart.lines,
+    items,
+    gstMode === 'off' ? taxRateBps : { mode: gstMode, rateBps: taxRateBps ?? null }
+  );
+  const { subtotalPaise, taxablePaise, taxPaise, totalPaise } = priced.totals;
+  const regular = gstMode === 'regular';
+  const composition = gstMode === 'composition';
 
   const withSlug = (path: string) => (slug ? `${path}?s=${encodeURIComponent(slug)}` : path);
   const canOrder = cart.ready && priced.lines.length > 0;
@@ -79,14 +95,52 @@ export function Checkout({
           in the bill and the one pinned at the bottom -- can read the same
           pending state. Two independent submits would have needed the action
           to be called twice, and would have disagreed about being busy. */}
-      <form id="co-place-order" action={placeOrderAction} className="px-4 pb-8">
+      {slug ? (
+        <div className="px-4 pb-3">
+          <OrderRecoveryBanner
+            slug={slug}
+            mode="checkout"
+            onRetryForm={() => formRef.current?.requestSubmit()}
+          />
+        </div>
+      ) : null}
+
+      <form
+        ref={formRef}
+        id="co-place-order"
+        action={placeOrderAction}
+        onSubmit={(event) => {
+          if (submitGuardRef.current) {
+            event.preventDefault();
+            return;
+          }
+          submitGuardRef.current = true;
+          window.setTimeout(() => {
+            submitGuardRef.current = false;
+          }, 8000);
+          if (slug) {
+            const fd = new FormData(event.currentTarget);
+            const attemptToken = String(fd.get('attempt') ?? '').trim();
+            const note = String(fd.get('note') ?? '').trim();
+            if (attemptToken) {
+              markPendingOrderSubmitting(browserStorage(), {
+                attemptToken,
+                slug,
+                lines: cart.lines,
+                note,
+              });
+            }
+          }
+        }}
+        className="px-4 pb-8"
+      >
         <input type="hidden" name="slug" value={slug ?? ''} />
         {/* Only ids and quantities go to the server. The prices are read from
             the database when the order is written. */}
         <input type="hidden" name="lines" value={JSON.stringify(cart.lines)} />
         {/* One key per checkout attempt: a replayed POST lands on the order it
             already wrote instead of writing a second one. */}
-        <AttemptToken />
+        <AttemptToken slug={slug} lines={cart.lines} cartSignature={cartSignature} />
 
         {/* One column at every width. The bill used to sit in a second column
             on a wide screen and inside the form on a phone; the money is the
@@ -221,19 +275,46 @@ export function Checkout({
           <section className="g-panel mt-5 px-4 py-4">
             <h2 className="g-eyebrow mb-1">Bill</h2>
             <dl className="text-[13.5px]">
-              <div className="flex items-baseline justify-between py-1 text-gink-64">
-                <dt>Subtotal</dt>
-                <dd className="tnum">{inr(paiseToRupees(subtotalPaise))}</dd>
-              </div>
-              <div className="flex items-baseline justify-between py-1 text-gink-64">
-                <dt>{taxRateBps == null ? 'Taxes' : `Taxes (${gstLabel(taxRateBps)})`}</dt>
-                <dd className="tnum">{inr(paiseToRupees(taxPaise))}</dd>
-              </div>
+              {regular ? (
+                <>
+                  <div className="flex items-baseline justify-between py-1 text-gink-64">
+                    <dt>Taxable value</dt>
+                    <dd className="tnum">{inr(paiseToRupees(taxablePaise))}</dd>
+                  </div>
+                  <div className="flex items-baseline justify-between py-1 text-gink-64">
+                    <dt>{gstLabel(taxRateBps)} included</dt>
+                    <dd className="tnum">{inr(paiseToRupees(taxPaise))}</dd>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-baseline justify-between py-1 text-gink-64">
+                    <dt>Subtotal</dt>
+                    <dd className="tnum">{inr(paiseToRupees(subtotalPaise))}</dd>
+                  </div>
+                  <div className="flex items-baseline justify-between py-1 text-gink-64">
+                    <dt>{composition ? 'GST' : taxRateBps == null ? 'Taxes' : `Taxes (${gstLabel(taxRateBps)})`}</dt>
+                    <dd className="tnum">
+                      {composition ? 'Not charged' : inr(paiseToRupees(taxPaise))}
+                    </dd>
+                  </div>
+                </>
+              )}
               <div className="mt-1.5 flex items-baseline justify-between border-t border-hair pt-2.5 text-[16px] font-semibold text-gink">
                 <dt>Total payable</dt>
                 <dd className="tnum">{inr(paiseToRupees(totalPaise))}</dd>
               </div>
             </dl>
+            {regular && (
+              <p className="mt-2.5 text-[11.5px] leading-[1.5] text-gink-46">
+                Menu prices include GST. The GST shown is already part of the total, not added on top.
+              </p>
+            )}
+            {composition && (
+              <p className="mt-2.5 text-[11.5px] leading-[1.5] text-gink-46">
+                Composition scheme: the restaurant issues a Bill of Supply and does not charge GST.
+              </p>
+            )}
 
             <PlaceOrderButton canOrder={canOrder} form="co-place-order" variant="bill" />
             <p role="note" className="mt-2.5 text-[11.5px] leading-[1.5] text-gink-46">

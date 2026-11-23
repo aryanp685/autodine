@@ -32,7 +32,7 @@ type Row = Record<string, unknown>;
 
 function fakeSupabase(rows: Record<string, Row[]>) {
   const from = (table: string) => {
-    const data = rows[table] ?? [];
+    const data = rows[table] ?? (table === 'order_items_finance' ? rows.order_items ?? [] : []);
     // Not annotated on purpose: see lib/db/kitchen-screen.test.ts.
     const chain = {
       select: () => chain,
@@ -56,7 +56,11 @@ function fakeSupabase(rows: Record<string, Row[]>) {
   return { from } as never;
 }
 
-function signedIn(supabase: unknown, timezone: string = RESTAURANT_TIME_ZONE) {
+function signedIn(
+  supabase: unknown,
+  timezone: string = RESTAURANT_TIME_ZONE,
+  role: 'owner' | 'manager' | 'cashier' | 'kitchen' = 'owner',
+) {
   return {
     ok: true as const,
     context: {
@@ -65,8 +69,9 @@ function signedIn(supabase: unknown, timezone: string = RESTAURANT_TIME_ZONE) {
       restaurantName: 'Kings of Kings',
       timezone,
       tagline: null,
-      role: 'owner',
-      access: { canWrite: true },
+      role,
+      entitlement: { canWrite: true, readOnly: false, features: [] },
+      access: null,
     },
   };
 }
@@ -94,6 +99,8 @@ const payment = (orderId: string, amountPaise: number, status = 'recorded') => (
   order_id: orderId,
   amount_paise: amountPaise,
   status,
+  recorded_at: earlierToday(),
+  created_at: earlierToday(),
 });
 
 beforeEach(() => {
@@ -118,8 +125,20 @@ describe('getDashboardScreenData', () => {
     expect((await getDashboardScreenData())?.blocked).toBe('no-membership');
   });
 
+  it('keeps cashier payment controls operational without loading commercial plan presentation', async () => {
+    mocks.staff.result = signedIn(
+      fakeSupabase({ orders_finance: [], payments: [] }),
+      RESTAURANT_TIME_ZONE,
+      'cashier',
+    );
+
+    const data = await getDashboardScreenData();
+    expect(data?.canMarkPaid).toBe(true);
+    expect(data?.access).toBeNull();
+  });
+
   it('returns zeroed stats on an empty day instead of dividing by zero', async () => {
-    mocks.staff.result = signedIn(fakeSupabase({ orders: [], payments: [] }));
+    mocks.staff.result = signedIn(fakeSupabase({ orders_finance: [], payments: [] }));
     const data = await getDashboardScreenData();
 
     expect(data?.stats).toEqual({
@@ -135,7 +154,7 @@ describe('getDashboardScreenData', () => {
   it('counts only settled payments as revenue, so pending orders do not flatter the day', async () => {
     mocks.staff.result = signedIn(
       fakeSupabase({
-        orders: [order('1')],
+        orders_finance: [order('1')],
         payments: [
           payment('1', 10000),
           payment('1', 5000, 'pending'),
@@ -149,7 +168,7 @@ describe('getDashboardScreenData', () => {
   it('averages the billed ticket over orders, rounding to whole paise', async () => {
     mocks.staff.result = signedIn(
       fakeSupabase({
-        orders: [order('1'), order('2'), order('3')],
+        orders_finance: [order('1'), order('2'), order('3')],
         payments: [payment('1', 1000), payment('2', 1000), payment('3', 1001)],
       })
     );
@@ -161,7 +180,7 @@ describe('getDashboardScreenData', () => {
   it('counts open orders as new/preparing/ready and excludes served and cancelled', async () => {
     mocks.staff.result = signedIn(
       fakeSupabase({
-        orders: [
+        orders_finance: [
           order('1', { prep_status: 'new' }),
           order('2', { prep_status: 'preparing' }),
           order('3', { prep_status: 'ready' }),
@@ -176,7 +195,7 @@ describe('getDashboardScreenData', () => {
   it('ranks top items by quantity sold and caps the list', async () => {
     mocks.staff.result = signedIn(
       fakeSupabase({
-        orders: [order('1')],
+        orders_finance: [order('1')],
         payments: [],
         order_items: [
           { order_id: '1', name_snapshot: 'Naan', qty: 2, unit_price_paise: 5000 },
@@ -207,7 +226,7 @@ describe('getDashboardScreenData', () => {
   it('resolves the table label, and says Takeaway when there is no table', async () => {
     mocks.staff.result = signedIn(
       fakeSupabase({
-        orders: [order('1', { table_id: 't-1' }), order('2')],
+        orders_finance: [order('1', { table_id: 't-1' }), order('2')],
         payments: [],
         dining_tables: [{ id: 't-1', label: 'T7' }],
       })
@@ -220,7 +239,7 @@ describe('getDashboardScreenData', () => {
 
   it('trims the live orders table to the rows it renders', async () => {
     const many = Array.from({ length: 30 }, (_, i) => order(String(i)));
-    mocks.staff.result = signedIn(fakeSupabase({ orders: many, payments: [] }));
+    mocks.staff.result = signedIn(fakeSupabase({ orders_finance: many, payments: [] }));
 
     const data = await getDashboardScreenData();
     expect(data?.orders.length).toBe(RECENT_ORDER_LIMIT);
@@ -242,16 +261,44 @@ describe('getDashboardScreenData', () => {
     expect(kolkata).toBe(11);
   });
 
+  it.each(['Asia/Kolkata', 'UTC'])('charts collections by payment time in %s, including older orders', async (timezone) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-11-22T10:00:00Z'));
+    try {
+      const midnight = startOfDayUtc(timezone, new Date()).toISOString();
+      const collectedAt = '2026-11-22T06:00:00Z';
+      mocks.staff.result = signedIn(fakeSupabase({
+        orders_finance: [order('1', { placed_at: midnight })],
+        payments: [
+          { ...payment('1', 7000), recorded_at: collectedAt, created_at: midnight },
+          { ...payment('older-order', 3000), recorded_at: collectedAt, created_at: '2026-11-20T06:00:00Z' },
+          { ...payment('legacy-order', 2000), recorded_at: null, created_at: midnight },
+          { ...payment('1', 4000, 'pending'), recorded_at: collectedAt, created_at: midnight },
+          { ...payment('old-payment', 5000), recorded_at: '2026-11-20T06:00:00Z', created_at: midnight },
+          { ...payment('future-payment', 6000), recorded_at: '2026-11-22T10:00:01Z', created_at: midnight },
+        ],
+      }), timezone);
+
+      const data = await getDashboardScreenData();
+      expect(data?.hourlyPaise[0]).toBe(2000);
+      expect(data?.hourlyPaise[hourInZone(timezone, new Date(collectedAt))]).toBe(10000);
+      expect(data?.stats.revenueTodayPaise).toBe(12000);
+      expect(data?.hourlyPaise.reduce((sum, amount) => sum + amount, 0)).toBe(12000);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('sizes the hourly series to the elapsed day, not to a full 24 hours', async () => {
-    mocks.staff.result = signedIn(fakeSupabase({ orders: [], payments: [] }));
+    mocks.staff.result = signedIn(fakeSupabase({ orders_finance: [], payments: [] }));
     const data = await getDashboardScreenData();
     expect(data?.hourlyPaise.length).toBe(hourInZone(RESTAURANT_TIME_ZONE, new Date()) + 1);
   });
 
-  it('books each order into the hour it was placed, in the restaurant zone', async () => {
+  it('books each payment into the hour it was recorded, in the restaurant zone', async () => {
     mocks.staff.result = signedIn(
       fakeSupabase({
-        orders: [order('1')],
+        orders_finance: [order('1')],
         payments: [payment('1', 7000)],
       })
     );
@@ -295,7 +342,7 @@ describe('active table sessions', () => {
   it('groups tickets by the durable session and computes only the outstanding balance', async () => {
     mocks.staff.result = signedIn(
       fakeSupabase({
-        orders: [
+        orders_finance: [
           order('1', { order_session_id: 'session-1', table_id: 'table-1', total_paise: 10000 }),
           order('2', { order_session_id: 'session-1', table_id: 'table-1', total_paise: 20000 }),
         ],
@@ -338,7 +385,7 @@ describe('active table sessions', () => {
   it('clears an old paid timestamp from the card when a new ticket adds a balance', async () => {
     mocks.staff.result = signedIn(
       fakeSupabase({
-        orders: [order('1', { order_session_id: 'session-1', table_id: 'table-1', total_paise: 10000 })],
+        orders_finance: [order('1', { order_session_id: 'session-1', table_id: 'table-1', total_paise: 10000 })],
         order_sessions: [
           { id: 'session-1', table_id: 'table-1', opened_at: earlierToday(), paid_at: earlierToday(0.2) },
         ],
@@ -356,7 +403,7 @@ describe('active table sessions', () => {
     const lastPayment = earlierToday(0.7);
     mocks.staff.result = signedIn(
       fakeSupabase({
-        orders: [order('1', { order_session_id: 'session-1', table_id: 'table-1', total_paise: 10000 })],
+        orders_finance: [order('1', { order_session_id: 'session-1', table_id: 'table-1', total_paise: 10000 })],
         order_sessions: [
           { id: 'session-1', table_id: 'table-1', opened_at: earlierToday(), paid_at: null },
         ],

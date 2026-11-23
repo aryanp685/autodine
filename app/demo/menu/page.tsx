@@ -3,6 +3,8 @@ import Link from 'next/link';
 import { SiteNav } from '@/components/SiteNav';
 import { SiteFooter } from '@/components/SiteFooter';
 import { SampleMenu } from '@/components/screens/SampleMenu';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { readPublicRestaurant } from '@/lib/db/public-restaurant';
 
 export const metadata: Metadata = {
   title: 'Sample menu · AutoDine',
@@ -22,8 +24,30 @@ export const metadata: Metadata = {
  * session, no database read and, importantly, no controls: a sample menu that
  * offered an "Add" button would promise an order it cannot take. Ordering
  * stays where it belongs, behind the QR code on a table.
+ *
+ * ?s=<slug> picks the restaurant whose public name, address and phone are
+ * shown in the footer. With no slug (or no configured database) the footer
+ * keeps its default note and renders no contact line.
  */
-export default function SampleMenuPage() {
+export default async function SampleMenuPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ s?: string }>;
+}) {
+  const params = await searchParams;
+  const { s } = params;
+
+  let address: string | undefined;
+  let phone: string | undefined;
+  if (s?.trim()) {
+    const supabase = await createSupabaseServerClient();
+    if (supabase) {
+      const { data } = await readPublicRestaurant(supabase, s);
+      address = data?.address ?? undefined;
+      phone = data?.phone ?? undefined;
+    }
+  }
+
   return (
     <>
       <SiteNav
@@ -60,7 +84,7 @@ export default function SampleMenuPage() {
           </div>
         </section>
 
-        <SiteFooter />
+        <SiteFooter address={address} phone={phone} />
       </main>
     </>
   );

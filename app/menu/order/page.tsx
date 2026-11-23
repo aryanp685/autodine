@@ -1,3 +1,4 @@
+import { cookies } from 'next/headers';
 import type { Metadata } from 'next';
 import { CartProvider } from '@/components/CartProvider';
 import { ClearCartOnOrder } from '@/components/ClearCartOnOrder';
@@ -34,7 +35,10 @@ export default async function OrderPage({
 }: {
   searchParams: Promise<{ s?: string; code?: string; t?: string; placed?: string }>;
 }) {
-  const { s, code, t, placed: justPlaced } = await searchParams;
+  const { s, code, t: urlToken, placed: justPlaced } = await searchParams;
+  const cookieStore = await cookies();
+  const cookieToken = cookieStore.get('autodine_guest_token')?.value;
+  const t = urlToken || cookieToken;
   const [data, access] = await Promise.all([
     getOrderScreenData(s, code, t),
     loadTableAccess(s),

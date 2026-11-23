@@ -42,6 +42,10 @@ type RowState = {
 const LANGUAGE_TABS: { code: LanguageCode; label: string }[] = [
   { code: 'hi', label: 'हिन्दी' },
   { code: 'mr', label: 'मराठी' },
+  { code: 'gu', label: 'ગુજરાતી' },
+  { code: 'ta', label: 'தமிழ்' },
+  { code: 'te', label: 'తెలుగు' },
+
 ];
 
 export function TranslationPanel({ rows }: { rows: TranslateRowModel[] }) {

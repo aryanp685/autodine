@@ -6,6 +6,7 @@ vi.mock('next/navigation', () => ({
 }));
 
 import { Dashboard } from './DashboardScreen';
+import { StaffShell } from '@/components/owner/StaffShell';
 
 // The server action pulls in lib/supabase/admin, which imports the
 // `server-only` marker package that Next provides at build time and vitest
@@ -146,6 +147,28 @@ describe('Dashboard, live and empty', () => {
     );
     expect(paid).toContain('Professional');
     expect(paid).not.toMatch(/during the trial/);
+  });
+
+  it('keeps the Cashier dashboard free of billing details and subscription navigation', () => {
+    const outlet = {
+      outlets: [{ id: 'cashier-restaurant', name: 'Kings of Kings', role: 'cashier' }],
+      activeId: 'cashier-restaurant',
+    };
+    const html = renderToStaticMarkup(
+      <StaffShell outlet={outlet} signOut={false}>
+        <Dashboard data={{ ...EMPTY, access: null }} />
+      </StaffShell>,
+    );
+
+    // The component receives the same null billing projection as getDashboardScreenData
+    // returns for a Cashier, and the real role-aware shell must not add an Owner link.
+    expect(html).not.toContain('data-plan-line');
+    expect(html).not.toContain('data-subscription-link');
+    expect(html).not.toContain('href="/dashboard/subscription"');
+    expect(html).not.toContain('href="/pricing"');
+    expect(html).toContain('Revenue today');
+    expect(html).toContain('href="/cashier"');
+    expect(html).toContain('href="/dashboard/orders"');
   });
 
   it('tells a read-only workspace its data is still there', () => {
@@ -439,5 +462,41 @@ describe('Dashboard active table sessions', () => {
     expect(html).toContain('Paid 4:12 pm');
     expect(html).not.toContain('data-mark-session-paid');
     expect(html).toContain('data-checkout-session="session-1"');
+  });
+
+  it('surfaces delayed or unacknowledged orders in the Order reliability & delays panel', () => {
+    const html = renderToStaticMarkup(
+      <Dashboard
+        data={live({
+          orderHealth: {
+            totalChecked: 2,
+            flaggedCount: 1,
+            delayedCount: 1,
+            unacknowledgedCount: 0,
+            criticalCount: 1,
+            flaggedOrders: [
+              {
+                orderId: 'ord-late-1',
+                code: 'MA-901',
+                tableLabel: 'T4',
+                prepStatus: 'new',
+                needsAttention: true,
+                isDelayed: true,
+                severity: 'critical',
+                elapsedMinutes: 22,
+                stageElapsedMinutes: 22,
+                reasons: [{ kind: 'kitchen_stall_new', severity: 'critical', label: 'Waiting to start · 22m' }],
+                summary: 'Waiting to start · 22m',
+              },
+            ],
+          },
+        })}
+      />,
+    );
+    expect(html).toContain('Order reliability &amp; delays');
+    expect(html).toContain('MA-901');
+    expect(html).toContain('Waiting to start · 22m');
+    expect(html).toContain('/dashboard/orders?status=delayed');
+    expect(html).toContain('/bill/ord-late-1');
   });
 });

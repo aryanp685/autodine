@@ -4,8 +4,13 @@
  *
  * Emits, in restore-safe order:
  *   1. extension notes   4. data (PK order)    7. indexes
- *   2. CREATE TABLEs     5. deferred FKs       8. views
- *   3. sequences note    6. UNIQUE/CHECK       9. functions, triggers, policies, RLS flags
+ *   2. CREATE TABLEs     5. deferred FKs       8. functions AND views, together
+ *   3. sequences note    6. UNIQUE/CHECK       9. triggers, policies, RLS flags
+ *
+ * Functions and views are dependency-ordered against EACH OTHER: a view
+ * whose query calls a function cannot be created before that function
+ * exists, and a `language sql` function whose body reads a view cannot be
+ * created before that view exists.
  *
  * Function bodies are emitted with pg_get_functiondef() (complete DDL).
  * Values round-trip through ::text casts, which is lossless for built-in
@@ -17,6 +22,99 @@ import pg from 'pg';
 
 const quoteIdent = (s) => '"' + String(s).replaceAll('"', '""') + '"';
 const quoteLit = (s) => "'" + String(s).replaceAll("'", "''") + "'";
+
+/**
+ * Financial spot-check tables. The manifest contract (see backup-logical.mjs)
+ * records `sum(amount_paise)` for each of these at backup time — or null
+ * when the table (or the column) is absent — and verify-restored-db.mjs
+ * recomputes and compares them after a restore. Expectations are always
+ * measured from the source, never invented at verification time.
+ */
+export const FINANCIAL_SPOT_CHECK_TABLES = ['payments', 'subscription_payments'];
+
+// The current manifest contract stores numbers as JSON numbers. Do not round
+// PostgreSQL bigint evidence into a plausible but wrong financial fingerprint.
+// A future versioned string-based contract can support larger values.
+function manifestInteger(value, label) {
+  const number = Number(value);
+  if (!Number.isSafeInteger(number) || number < 0) throw new Error(`backup evidence ${label} is not a non-negative safe integer`);
+  return number;
+}
+
+async function financialSpotChecksOn(client, schema, presentTables) {
+  const result = {};
+  for (const table of FINANCIAL_SPOT_CHECK_TABLES) {
+    const key = `${table}_amount_paise`;
+    if (!presentTables.has(table)) { result[key] = null; continue; }
+    const col = await client.query(
+      `select 1 from information_schema.columns where table_schema = $1 and table_name = $2 and column_name = 'amount_paise'`,
+      [schema, table]);
+    if (!col.rows.length) { result[key] = null; continue; }
+    const r = await client.query(`select coalesce(sum(amount_paise), 0)::bigint as s from ${quoteIdent(schema)}.${quoteIdent(table)}`);
+    result[key] = manifestInteger(r.rows[0].s, key);
+  }
+  return result;
+}
+
+/**
+ * The verification-contract counts for one schema, computed on an open
+ * client: tables (relkind 'r'), exact total rows, functions
+ * (prokind 'f'/'p'), RLS policies — the exact definitions lib-dump's
+ * incremental counts and verify-restored-db.mjs both use — plus the
+ * financial spot checks.
+ */
+async function schemaCountsOn(client, schema) {
+  const tableNames = (await client.query(
+    `select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
+      where n.nspname = $1 and c.relkind = 'r' order by c.relname`, [schema])).rows.map((r) => r.relname);
+  let rows = 0;
+  for (const t of tableNames) {
+    const r = await client.query(`select count(*)::bigint as n from ${quoteIdent(schema)}.${quoteIdent(t)}`);
+    rows = manifestInteger(rows + manifestInteger(r.rows[0].n, 'table rows'), 'total rows');
+  }
+  // Extension-owned functions (pg_depend.deptype='e') are excluded: Supabase
+  // installs platform extensions into the public schema of a freshly restored
+  // disposable database, so restored-DB counts would otherwise exceed the
+  // dumped source and fail the manifest comparison.
+  const functions = await client.query(
+    `select count(*)::int as n from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+      where n.nspname = $1 and p.prokind in ('f','p')
+        and not exists (select 1 from pg_depend d where d.objid = p.oid and d.deptype = 'e')`, [schema]);
+  const policies = await client.query(`select count(*)::int as n from pg_policies where schemaname = $1`, [schema]);
+  return {
+    counts: { tables: tableNames.length, rows, functions: functions.rows[0].n, policies: policies.rows[0].n },
+    financialSpotChecks: await financialSpotChecksOn(client, schema, new Set(tableNames)),
+  };
+}
+
+/**
+ * Open one REPEATABLE READ snapshot on the source and export it, so an
+ * external pg_dump can read the IDENTICAL snapshot (`pg_dump --snapshot`).
+ * Returns the snapshot id, a collector for the verification-contract
+ * counts/financials measured inside that snapshot, and a closer. The
+ * snapshot stays open (holding back vacuum, briefly) until close() — keep
+ * it only for the duration of the dump.
+ */
+export async function openBackupSnapshot(connectionString, { schema = 'public' } = {}) {
+  const client = new pg.Client({ connectionString, application_name: 'autodine-backup-snapshot' });
+  await client.connect();
+  try {
+    await client.query('begin isolation level repeatable read read only');
+    await client.query('set local statement_timeout = 0');
+    const { rows } = await client.query('select pg_export_snapshot() as snapshot');
+    return {
+      snapshotId: rows[0].snapshot,
+      collectCounts: () => schemaCountsOn(client, schema),
+      close: async () => {
+        await client.query('commit').catch(() => {});
+        await client.end().catch(() => {});
+      },
+    };
+  } catch (err) {
+    await client.end().catch(() => {});
+    throw err;
+  }
+}
 
 export async function dumpDatabase(connectionString, { schema = 'public', log = () => {} } = {}) {
   // The whole dump is one read-only snapshot; statement_timeout disabled.
@@ -132,7 +230,11 @@ export async function dumpDatabase(connectionString, { schema = 'public', log = 
       const cols = (await client.query(colSql, [t.oid])).rows;
       const colList = cols.map((c) => quoteIdent(c.attname)).join(', ');
       const overriding = cols.some((c) => c.attidentity === 'a') ? ' overriding system value' : '';
-      const data = await client.query(`select * from ${fqn}`);
+      // Fetch PostgreSQL text directly, never JS-decoded values: node-postgres
+      // Date/JSON/float conversions can silently lose precision (including
+      // microseconds and large JSON numbers) before the dump is rendered.
+      const projection = cols.map((c) => `${quoteIdent(c.attname)}::text as ${quoteIdent(c.attname)}`).join(', ');
+      const data = await client.query(`select ${projection} from ${fqn}`);
       let buf = [];
       const flush = () => {
         if (!buf.length) return;
@@ -140,7 +242,7 @@ export async function dumpDatabase(connectionString, { schema = 'public', log = 
         buf = [];
       };
       for (const row of data.rows) {
-        const vals = cols.map((c) => renderValue(row[c.attname], c.type));
+        const vals = cols.map((c) => row[c.attname] === null ? 'null' : `E${quoteLit(row[c.attname].replaceAll('\\', '\\\\'))}::${c.type}`);
         buf.push('  (' + vals.join(', ') + ')');
         if (buf.length >= 200) flush();
       }
@@ -182,48 +284,138 @@ export async function dumpDatabase(connectionString, { schema = 'public', log = 
     for (const i of idx.rows) { out.push(i.indexdef + ';'); counts.indexes += 1; }
     if (idx.rows.length) out.push('');
 
-    // 8) views (simple: one replace per view, ordered by dependency via reltuples heuristic — views here are independent)
-    const views = await client.query('select viewname, definition from pg_views where schemaname = $1 order by viewname', [schema]);
-    for (const v of views.rows) { out.push(`create or replace view ${quoteIdent(schema)}.${quoteIdent(v.viewname)} as\n${v.definition};`); counts.views += 1; }
-    if (views.rows.length) out.push('');
-
-    // 9) functions (full DDL incl. security definer + search_path), then triggers, then policies, then RLS flags.
-    //    Function bodies may reference other functions regardless of definition
-    //    order only when PostgreSQL validates eagerly — plpgsql/SQL functions
-    //    are parsed at CREATE time, so they must come out dependency-ordered.
-    //    Topologically sort on same-schema function references so a dump of a
-    //    schema whose migrations were replayed out of order still restores.
+    // 8) FUNCTIONS AND VIEWS, dependency-ordered TOGETHER.
+    //
+    //    PostgreSQL validates a view's query when the view is CREATED, so a
+    //    view that calls a function cannot be created before that function
+    //    exists. It validates a `language sql` function's body the same
+    //    way, so a function that reads a view cannot be created before that
+    //    view exists. The two kinds of object therefore have to be ordered
+    //    against EACH OTHER — emitting all views first and all functions
+    //    afterwards makes a restore of any schema with a role-checking view
+    //    fail with
+    //      function has_restaurant_role(uuid, text[]) does not exist
+    //    and leaves the target half-restored.
+    //
+    //    The edges come from the catalog, which records exactly what
+    //    PostgreSQL itself used: pg_rewrite for a view's query, pg_depend
+    //    for a function's body. A plpgsql body is never analysed at
+    //    creation time, so the catalog stays silent about it — a body scan
+    //    adds those edges back.
     const fns = await client.query(
       `select p.oid, p.proname, pg_get_functiondef(p.oid) as def
          from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-        where n.nspname = $1 and p.prokind in ('f','p')`, [schema]);
+        where n.nspname = $1 and p.prokind in ('f','p')
+          and not exists (select 1 from pg_depend d where d.objid = p.oid and d.deptype = 'e')`, [schema]);
+    const views = await client.query(
+      `select c.oid, v.viewname, v.definition
+         from pg_views v
+         join pg_namespace n on n.nspname = v.schemaname
+         join pg_class c on c.relname = v.viewname and c.relnamespace = n.oid
+        where v.schemaname = $1 order by v.viewname`, [schema]);
+
+    const FN = (oid) => `f:${oid}`;
+    const VW = (oid) => `v:${oid}`;
+    const fnIds = new Set(fns.rows.map((f) => FN(f.oid)));
+    const viewIds = new Set(views.rows.map((v) => VW(v.oid)));
+
+    const deps = new Map();
+    const addDep = (id, depId) => {
+      if (id === depId) return;
+      if (!deps.has(id)) deps.set(id, new Set());
+      deps.get(id).add(depId);
+    };
+
+    // Catalog edges — what PostgreSQL actually recorded.
+    const viewDeps = await client.query(
+      `select r.ev_class as view_oid, d.refobjid as dep_oid,
+              case when d.refclassid = 'pg_proc'::regclass then 'fn' else 'rel' end as dep_kind
+         from pg_depend d
+         join pg_rewrite r on r.oid = d.objid
+         join pg_class vc on vc.oid = r.ev_class and vc.relkind = 'v'
+         join pg_namespace vn on vn.oid = vc.relnamespace
+        where d.classid = 'pg_rewrite'::regclass
+          and vn.nspname = $1
+          and d.refclassid in ('pg_proc'::regclass, 'pg_class'::regclass)`, [schema]);
+    for (const row of viewDeps.rows) {
+      if (row.dep_kind === 'fn') {
+        if (fnIds.has(FN(row.dep_oid))) addDep(VW(row.view_oid), FN(row.dep_oid));
+      } else if (viewIds.has(VW(row.dep_oid))) {
+        addDep(VW(row.view_oid), VW(row.dep_oid));
+      }
+    }
+    const fnDeps = await client.query(
+      `select p.oid as fn_oid, d.refobjid as dep_oid,
+              case when d.refclassid = 'pg_proc'::regclass then 'fn' else 'rel' end as dep_kind
+         from pg_depend d
+         join pg_proc p on p.oid = d.objid
+        where d.classid = 'pg_proc'::regclass
+          and p.pronamespace = $1::regnamespace
+          and d.refclassid in ('pg_proc'::regclass, 'pg_class'::regclass)`, [schema]);
+    for (const row of fnDeps.rows) {
+      if (row.dep_kind === 'fn') {
+        if (fnIds.has(FN(row.dep_oid))) addDep(FN(row.fn_oid), FN(row.dep_oid));
+      } else if (viewIds.has(VW(row.dep_oid))) {
+        addDep(FN(row.fn_oid), VW(row.dep_oid));
+      }
+    }
+
+    // Body scan — a plpgsql body is not analysed at CREATE time, so the
+    // catalog records nothing for it. Scan for same-schema function names.
     const bodyOf = (def) => {
       const m = def.match(/\$[A-Za-z_]*\$[\s\S]*\$[A-Za-z_]*\$/);
       return m ? m[0] : '';
     };
-    const names = fns.rows.map((f) => f.proname);
-    const nameSet = new Set(names);
+    const fnByName = new Map();
+    for (const f of fns.rows) {
+      if (!fnByName.has(f.proname)) fnByName.set(f.proname, []);
+      fnByName.get(f.proname).push(f);
+    }
     const bodyCache = new Map(fns.rows.map((f) => [f.oid, bodyOf(f.def)]));
-    const dependsOn = (f) => {
+    for (const f of fns.rows) {
       const body = bodyCache.get(f.oid);
-      const deps = new Set();
-      for (const other of fns.rows) {
-        if (other.oid === f.oid) continue;
-        if (nameSet.has(other.proname) && new RegExp(`\\b${other.proname}\\b`).test(body)) deps.add(other.oid);
+      for (const [name, candidates] of fnByName) {
+        if (candidates.some((c) => c.oid === f.oid)) continue;
+        if (!new RegExp(`\\b${name}\\b`).test(body)) continue;
+        for (const c of candidates) addDep(FN(f.oid), FN(c.oid));
       }
-      return deps;
-    };
-    const remaining = new Map(fns.rows.map((f) => [f.oid, f]));
+    }
+    // A view's text is the same story for a view whose catalog edge was not
+    // recorded (a view created before the function it calls was replaced).
+    for (const v of views.rows) {
+      for (const [name, candidates] of fnByName) {
+        if (!new RegExp(`\\b${name}\\b`).test(v.definition)) continue;
+        for (const c of candidates) addDep(VW(v.oid), FN(c.oid));
+      }
+    }
+
+    // Topological sort over the combined function+view graph.
+    const nodes = [
+      ...fns.rows.map((f) => ({ id: FN(f.oid), kind: 'fn', sort: f.proname, oid: f.oid, def: f.def })),
+      ...views.rows.map((v) => ({ id: VW(v.oid), kind: 'view', sort: v.viewname, oid: v.oid, definition: v.definition })),
+    ];
+    const nodeById = new Map(nodes.map((n) => [n.id, n]));
+    const remaining = new Map(nodes.map((n) => [n.id, n]));
     const ordered = [];
     const emitted = new Set();
-    let guard = fns.rows.length + 1;
+    let guard = nodes.length + 1;
     while (remaining.size && guard-- > 0) {
-      const ready = [...remaining.values()].filter((f) => [...dependsOn(f)].every((d) => emitted.has(d) || !remaining.has(d)));
-      const batch = (ready.length ? ready : [...remaining.values()]).sort((a, b) => a.proname.localeCompare(b.proname) || a.oid - b.oid);
-      if (!ready.length) out.push('-- WARNING: dependency cycle among functions; emitting in name order — restore may fail');
-      for (const f of batch) { ordered.push(f); emitted.add(f.oid); remaining.delete(f.oid); }
+      const ready = [...remaining.values()].filter((n) =>
+        [...(deps.get(n.id) ?? [])].every((d) => emitted.has(d) || !nodeById.has(d) || !remaining.has(d)));
+      const batch = (ready.length ? ready : [...remaining.values()])
+        .sort((a, b) => a.kind.localeCompare(b.kind) || a.sort.localeCompare(b.sort) || a.oid - b.oid);
+      if (!ready.length) out.push('-- WARNING: dependency cycle among functions and views; emitting in name order — restore may fail');
+      for (const n of batch) { ordered.push(n); emitted.add(n.id); remaining.delete(n.id); }
     }
-    for (const f of ordered) { out.push(f.def.trim() + ';'); counts.functions += 1; }
+    for (const n of ordered) {
+      if (n.kind === 'fn') {
+        out.push(n.def.trim() + ';');
+        counts.functions += 1;
+      } else {
+        out.push(`create or replace view ${quoteIdent(schema)}.${quoteIdent(n.sort)} as\n${n.definition};`);
+        counts.views += 1;
+      }
+    }
     // Function EXECUTE ACLs. CREATE FUNCTION defaults to EXECUTE for PUBLIC,
     // which would silently undo every `revoke execute` this schema applies
     // (see 20261114000400_restrict_trigger_functions_execute). Recreate the
@@ -283,38 +475,17 @@ export async function dumpDatabase(connectionString, { schema = 'public', log = 
     out.push('');
     out.push('-- end of AutoDine logical backup');
 
+    // Financial spot checks, measured inside this same snapshot so the
+    // manifest's expectations describe exactly the bytes being written.
+    const financialSpotChecks = await financialSpotChecksOn(
+      client, schema, new Set(tables.rows.map((t) => t.relname)));
+
     await client.query('commit');
-    return { sql: out.join('\n') + '\n', counts };
+    return { sql: out.join('\n') + '\n', counts, financialSpotChecks };
   } catch (err) {
     await client.query('rollback').catch(() => {});
     throw err;
   } finally {
     await client.end().catch(() => {});
   }
-}
-
-function renderValue(value, type) {
-  if (value === null || value === undefined) return 'null';
-  if (type === 'boolean') return value ? 'true' : 'false';
-  if (/^(smallint|integer|bigint|numeric|real|double precision|oid)/.test(type)) return String(value);
-  if (type.endsWith('[]')) return `${quoteLit(arrayText(value))}::${type}`;
-  if (type === 'json' || type === 'jsonb') return `${quoteLit(JSON.stringify(value))}::${type}`;
-  if (type === 'bytea') return `${quoteLit(Buffer.isBuffer(value) ? '\\x' + value.toString('hex') : String(value))}::bytea`;
-  // everything else round-trips via its text output
-  const text = value instanceof Date ? value.toISOString() : String(value);
-  return `${quoteLit(text)}::${type}`;
-}
-
-function arrayText(value) {
-  // pg driver parses arrays into JS arrays; re-render as Postgres array literal
-  const enc = (v) => {
-    if (v === null) return 'NULL';
-    if (typeof v === 'boolean') return v ? 'true' : 'false';
-    if (typeof v === 'number') return String(v);
-    if (v instanceof Date) return '"' + v.toISOString() + '"';
-    const s = String(v);
-    return '"' + s.replaceAll('\\', '\\\\').replaceAll('"', '\\"') + '"';
-  };
-  const inner = (arr) => '{' + arr.map((item) => (Array.isArray(item) ? inner(item) : enc(item))).join(',') + '}';
-  return Array.isArray(value) ? inner(value) : String(value);
 }

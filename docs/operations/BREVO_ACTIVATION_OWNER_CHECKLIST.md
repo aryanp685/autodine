@@ -68,63 +68,28 @@ empty), email rate limit 2/hour, `mailer_autoconfirm` off, redirects allow only
   - Host = `smtp-relay.brevo.com` · Port = `587`
   - Username = Brevo **SMTP login** (A3) · Password = Brevo **SMTP key** (A3)
     — *not* the `xkeysib-` API key. Save.
-  - **Brevo Authorized IPs (learned the hard way, 2026-11-18):** Brevo →
-    Settings → SMTP & API → SMTP → **Authorized IPs** must **allow all IPs
-    / be deactivated** for this project. Supabase Auth sends from
-    Supabase's cloud egress IPs (no fixed address exists to whitelist);
-    with the restriction on, every Auth mail fails at the relay with
-    `525 5.7.1 Unauthorized IP address` (GoTrue 500 on /signup + /resend,
-    signup rolled back, nothing stamped). The SMTP key stays the gate.
-    Since 2026-11-18 the app also raises an operator incident
-    (`signup_confirmation_email_failed` and siblings — owner/manager ops
-    incident surface + `[autodine:alert]` logs) on the first such
-    failure, so a recurrence is visible immediately instead of silent;
-    do not re-enable the IP block to "test" this.
 - [ ] C3. **Authentication → Rate Limits**: set the email-sent limit to
   **30/hour** (the custom-SMTP starting ceiling).
 - [ ] C4. *Optional polish:* **Authentication → Emails → Templates** — paste
   `docs/operations/email-templates/confirmation.html` and `recovery.html`
   (never edit `{{ .ConfirmationURL }}`). Supabase defaults also work.
 
-## Step D — deployment + webhook
+## Step D — deployment gate (needs your explicit approval)
 
-- [x] D1. ✅ **Done (2026-11-18, owner-approved).** Brevo commits pushed to
-  `arena/2670dd12-autodine` (remote tip `ab541ee`), PR **#191** open (not
-  merged), Preview deployment `dpl_GnLaaimCs8H3DnUAr5UC7LBWr8M2` **READY**.
-  Branch alias confirmed live:
-  `new-git-arena-2670dd12-autodine-iamjarvis9896-3988s-projects.vercel.app`.
-  Vercel **Deployment Protection stays ON**; the owner generated a
-  **Protection Bypass for Automation** secret (value owner-held only).
-- [x] D2. ✅ **Webhook created by owner 2026-11-18; Brevo test event
-  returned HTTP 200** — the correct-secret path through Deployment
-  Protection (bypass header + bearer credential + receiver processing)
-  is proven live. Remaining: controlled email tests (Step E).
-  Configuration used (for the record) — **Brevo → Transactional → Settings →
-  Webhooks → Add a new webhook** (newer UI: Settings/Integrations →
-  Webhooks → Create webhook → Transactional). Exact values:
-  - **URL** = `https://new-git-arena-2670dd12-autodine-iamjarvis9896-3988s-projects.vercel.app/api/email/brevo/webhook`
-  - **Custom headers — BOTH are required** (Brevo supports sending several):
-    1. `x-vercel-protection-bypass` = your Vercel Protection Bypass for
-       Automation secret (lets Brevo's POST through Vercel's SSO wall;
-       without it the app is never reached — verified by agent probe).
-    2. `Authorization` = `Bearer <the A4 secret>` (identical value to B4 /
-       `BREVO_WEBHOOK_SECRET`). If the form instead offers an
-       Authentication method, choose **Bearer/Token** with the same value
-       and keep header 1 as a custom header. Never put either secret in
-       the URL.
-  - **Events** (dashboard labels): Delivered, Hard bounce, Soft bounce,
-    Deferred, Blocked, Spam, Invalid email, Unsubscribed — plus *Error*
-    and *Sent* if offered. (API names, if you create it via API instead:
-    `delivered`, `hardBounce`, `softBounce`, `deferred`, `blocked`,
-    `spam`, `invalid`, `unsubscribed`, `request`. Note: the API enum has
-    `invalid`, not `invalidEmail`, and no `error` — both payload kinds
-    are still classified by the receiver.)
-  - **Batched webhooks: OFF.** The receiver accepts one event object per
-    POST; a batched array is refused (400) by design.
-  - Save/Activate, then use Brevo's **Send test** (if offered) — the
-    delivery log should show **HTTP 200**. A 401 means header 2's value
-    differs from B4; a Vercel login/401 page means header 1 is missing
-    or wrong.
+The Brevo code (including the webhook route) is currently **uncommitted** on
+branch `arena/2670dd12-autodine`, and Vercel env vars only take effect on new
+deployments. Nothing can send or receive until you approve one of:
+
+- [ ] D1. Approve committing + pushing this branch so Vercel builds a Preview
+  (no merge, no Production deploy), **or** approve a manual Preview redeploy
+  once the branch is pushed by you.
+- [ ] D2. After the Preview exists: **Brevo → Settings → Webhooks → Add a
+  transactional webhook**:
+  - URL = `https://new-git-arena-2670dd12-autodine-iamjarvis9896-3988s-projects.vercel.app/api/email/brevo/webhook`
+    (confirm the exact branch-alias host in Vercel after D1)
+  - Auth = **Bearer token**, value = the A4 secret (same as B4)
+  - Events: `delivered`, `hardBounce`, `softBounce`, `deferred`, `spam`,
+    `blocked`, `error`, `invalidEmail`, `unsubscribed`
 
 ## Step E — tell the agent "Preview configured"
 

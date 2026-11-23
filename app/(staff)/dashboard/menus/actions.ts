@@ -1281,7 +1281,7 @@ export async function generateTranslationsAction(payload: {
   targets: { id: string; kind: 'item' | 'category' }[];
 }): Promise<TranslateResult[]> {
   const ctx = await currentRestaurant();
-  const language: LanguageCode = payload?.language === 'mr' ? 'mr' : 'hi';
+  const language: LanguageCode = payload?.language === 'gu' ? 'gu' : payload?.language === 'ta' ? 'ta' : payload?.language === 'te' ? 'te' : payload?.language === 'mr' ? 'mr' : 'hi';
   const wanted = (payload?.targets ?? [])
     .map((entry) => ({
       id: String(entry?.id ?? '').trim(),
@@ -1372,7 +1372,8 @@ export async function saveTranslationsAction(formData: FormData): Promise<void> 
   const ctx = await currentRestaurant();
   if (!ctx) fail('You need to be signed in to edit the menu.');
 
-  const language: LanguageCode = String(formData.get('language') ?? '') === 'mr' ? 'mr' : 'hi';
+  const raw = String(formData.get('language') ?? '');
+  const language: LanguageCode = raw === 'gu' ? 'gu' : raw === 'ta' ? 'ta' : raw === 'te' ? 'te' : raw === 'mr' ? 'mr' : 'hi';
 
   let rows: { id: string; kind: 'item' | 'category'; name: string; description: string }[] = [];
   try {
@@ -1447,7 +1448,7 @@ export async function saveTranslationsAction(formData: FormData): Promise<void> 
   }
 
   ok(
-    `Saved ${saved} ${saved === 1 ? 'translation' : 'translations'} in ${language === 'mr' ? 'Marathi' : 'Hindi'}.` +
+    `Saved ${saved} ${saved === 1 ? 'translation' : 'translations'} in ${language === 'gu' ? 'Gujarati' : language === 'ta' ? 'Tamil' : language === 'te' ? 'Telugu' : language === 'mr' ? 'Marathi' : 'Hindi'}.` +
       (skipped > 0 ? ` ${skipped} skipped — not on your menu any more.` : '')
   );
 }

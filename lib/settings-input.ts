@@ -41,8 +41,18 @@ export const MAX_NAME_LENGTH = 80;
 export const MAX_TAGLINE_LENGTH = 120;
 export const MAX_ADDRESS_LENGTH = 200;
 export const MAX_PHONE_LENGTH = 24;
+export const MAX_BILL_FOOTER_LENGTH = 240;
 
-export type SettingsField = 'name' | 'tagline' | 'address' | 'phone' | 'gstin' | 'slug' | 'taxRate';
+export type SettingsField =
+  | 'name'
+  | 'tagline'
+  | 'address'
+  | 'phone'
+  | 'gstin'
+  | 'fssaiNumber'
+  | 'billFooterNote'
+  | 'slug'
+  | 'taxRate';
 
 export type DetailsValue = {
   name: string;
@@ -50,6 +60,8 @@ export type DetailsValue = {
   address: string | null;
   phone: string | null;
   gstin: string | null;
+  fssaiNumber: string | null;
+  billFooterNote: string | null;
   slug: string;
 };
 
@@ -90,6 +102,8 @@ export function validateDetails(raw: {
   address?: unknown;
   phone?: unknown;
   gstin?: unknown;
+  fssaiNumber?: unknown;
+  billFooterNote?: unknown;
   slug?: unknown;
 }): DetailsResult {
   const name = clean(raw.name);
@@ -143,6 +157,24 @@ export function validateDetails(raw: {
     };
   }
 
+  const fssaiNumber = clean(raw.fssaiNumber).replace(/\s+/g, '');
+  if (fssaiNumber && !/^[0-9]{14}$/.test(fssaiNumber)) {
+    return {
+      ok: false,
+      field: 'fssaiNumber',
+      message: 'FSSAI license number must be exactly 14 digits, or left blank.',
+    };
+  }
+
+  const billFooterNote = clean(raw.billFooterNote);
+  if (billFooterNote.length > MAX_BILL_FOOTER_LENGTH) {
+    return {
+      ok: false,
+      field: 'billFooterNote',
+      message: `Keep the bill footer note under ${MAX_BILL_FOOTER_LENGTH} characters.`,
+    };
+  }
+
   // The slug is normalised rather than rejected: an owner typing "My Cafe!"
   // means my-cafe, and refusing that would be a puzzle rather than a rule.
   const slug = slugify(clean(raw.slug));
@@ -169,7 +201,62 @@ export function validateDetails(raw: {
       address: address || null,
       phone: phone || null,
       gstin: gstin || null,
+      fssaiNumber: fssaiNumber || null,
+      billFooterNote: billFooterNote || null,
       slug,
+    },
+  };
+}
+
+export type BillingDefaultsResult =
+  | {
+      ok: true;
+      value: {
+        serviceChargeBps: number;
+        packagingChargePaise: number;
+        deliveryChargePaise: number;
+        roundOffEnabled: boolean;
+      };
+    }
+  | { ok: false; message: string };
+
+export function parseBillingDefaults(raw: {
+  serviceChargePercent?: unknown;
+  packagingChargeRupees?: unknown;
+  deliveryChargeRupees?: unknown;
+  roundOffEnabled?: unknown;
+}): BillingDefaultsResult {
+  const svcText = String(raw.serviceChargePercent ?? '0').trim().replace(/%/g, '');
+  if (!/^\d+(\.\d{1,2})?$/.test(svcText)) {
+    return { ok: false, message: 'Service charge must be a percentage from 0 to 20.' };
+  }
+  const serviceChargeBps = Math.round(Number(svcText) * 100);
+  if (!Number.isFinite(serviceChargeBps) || serviceChargeBps < 0 || serviceChargeBps > 2000) {
+    return { ok: false, message: 'Service charge must be between 0% and 20%.' };
+  }
+
+  const pkgNum = Number(String(raw.packagingChargeRupees ?? '0').trim());
+  if (!Number.isFinite(pkgNum) || pkgNum < 0 || pkgNum > 500) {
+    return { ok: false, message: 'Default packaging charge must be between ₹0 and ₹500.' };
+  }
+  const packagingChargePaise = Math.round(pkgNum * 100);
+
+  const delNum = Number(String(raw.deliveryChargeRupees ?? '0').trim());
+  if (!Number.isFinite(delNum) || delNum < 0 || delNum > 1000) {
+    return { ok: false, message: 'Default delivery charge must be between ₹0 and ₹1,000.' };
+  }
+  const deliveryChargePaise = Math.round(delNum * 100);
+
+  const roundOffEnabled =
+    raw.roundOffEnabled === true || raw.roundOffEnabled === 'on' || raw.roundOffEnabled === 'true';
+
+  return {
+    ok: true,
+    value: {
+      serviceChargeBps,
+      packagingChargePaise,
+      deliveryChargePaise,
+      roundOffEnabled,
     },
   };
 }

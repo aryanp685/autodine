@@ -1,0 +1,444 @@
+name: Staging B2 backup and disposable restore
+
+# Manually dispatched, staging-only rehearsal of the backup path:
+#
+#   disposable PostgreSQL 17  <-  decrypt + restore + verify
+#        ^                                   |
+#        |                          download newest object
+#   Backblaze B2 (bucket, region: environment-designated)
+#        ^
+#   encrypted backup taken from the designated STAGING Supabase project
+#
+# Registration and dispatch
+# ------------------------
+# GitHub registers manual workflows from the DEFAULT BRANCH. Until this file
+# is merged to `main`, it is dispatchable only when a registration patch that
+# adds this exact file is applied to `main`. Dispatching requires explicit
+# owner authorization; dispatching reads STAGING data, creates a real B2
+# object and may incur charges. No remote pruning is ever performed here.
+#
+# Exact-code / ref validation
+# ---------------------------
+# The `ref` input accepts a full 40-character lowercase hex commit SHA only
+# (branch names, tags and short SHAs are refused). When empty, it resolves to
+# the commit this workflow runs at (for the default-branch registration, the
+# default-branch tip). The `exact-code-gate` job then fetches EXACTLY that
+# commit and refuses to proceed unless the fetched tree carries, byte for
+# byte, the audited V3 staging implementation pinned below (every file
+# first-party code would execute, plus package.json / package-lock.json).
+# After the gate passes, the rehearsal job checks out that exact SHA and runs
+# whatever it contains. If the ref does not contain the V3 implementation —
+# for example today's `main`, which lacks `validate-staging-source.mjs` and
+# has older backup scripts — the gate fails closed BEFORE any credential is
+# materialized anywhere. The gate job holds no environment, secret or
+# variable.
+#
+# When the pinned implementation changes, the manifest below (and the
+# `staging-rehearsal-wiring.test.mjs` guard that re-derives it from the tree)
+# must be regenerated in the SAME change. Never edit the manifest by hand.
+#
+# Environment gate and secrets
+# ----------------------------
+# The rehearsal job binds the protected `backup-staging` GitHub Environment
+# and consumes ONLY these environment secrets:
+#
+#   STAGING_AUTODINE_BACKUP_SOURCE_URL   designated staging read connection
+#   STAGING_AUTODINE_BACKUP_PASSPHRASE   backup encryption passphrase
+#   STAGING_B2_REGION                    staging bucket region
+#   STAGING_B2_BUCKET                    staging bucket (never a production one)
+#   STAGING_B2_ACCESS_KEY_ID             staging B2 application keyID
+#   STAGING_B2_SECRET_ACCESS_KEY         staging B2 application key
+#
+# and ONLY these environment variables:
+#
+#   AUTODINE_STAGING_PROJECT_REF         20-char ref of the designated staging project
+#   AUTODINE_STAGING_B2_BUCKET           the same staging bucket name, designated again
+#   AUTODINE_PRODUCTION_B2_BUCKETS       JSON array of production bucket names (refusal list)
+#
+# No production secret name is referenced, `secrets: inherit` is never used,
+# and no value is printed, artifacted or passed to a step that does not need
+# it. The preflight step checks PRESENCE with GitHub boolean expressions —
+# the secret or variable VALUES never enter that step at all; it reports the
+# NAMES of anything missing and fails closed. The semantic check
+# (validate-staging-source.mjs) then proves the source URL targets the
+# designated staging project and the staging bucket, is not loopback, and is
+# not a production bucket — failing closed otherwise.
+#
+# Fallback posture (verified, with limits): GitHub falls back to a
+# repository-scoped secret/variable of the SAME NAME when the environment
+# does not define one. The names are uniquely STAGING_-prefixed and the
+# owner must not create repository copies; presence checks cannot distinguish
+# the two scopes, so the semantic validator and the production-bucket
+# refusal list are the second, independent layer. The workflow does NOT fall
+# back to: any unprefixed/production secret name, `.env` files (no backup
+# script loads one — guarded by test), a B2 endpoint override (not wired;
+# only official backblazeb2.com endpoints are accepted by the client), a
+# scratch/expected-ref opt-in, or any other environment (exactly one
+# `environment:` declaration exists, `backup-staging`).
+#
+# A 40-character `ref` that does not contain the V3 implementation is the
+# ONLY thing this workflow rehearses; see the gate. DO NOT dispatch without
+# explicit owner authorization. The PostgreSQL service is a disposable
+# loopback container; the restore target is loopback-only by guard and the
+# restore scripts refuse anything else.
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Full 40-character lowercase hex commit SHA of the audited implementation. Empty = the commit this workflow runs at. Anything else fails closed.'
+        required: false
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: staging-b2-rehearsal
+  cancel-in-progress: false
+
+jobs:
+  exact-code-gate:
+    name: exact-code gate (fail closed, no credentials)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      REF: ${{ inputs.ref || github.sha }}
+    steps:
+      - name: Require a full lowercase commit SHA
+        run: |
+          if ! [[ "$REF" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::inputs.ref must be a full 40-character lowercase hex commit SHA — branch names, tags and short SHAs are refused"
+            exit 1
+          fi
+      - name: Fetch the requested commit (no tags, depth 1)
+        run: |
+          set -euo pipefail
+          gate_dir="$RUNNER_TEMP/exact-code-gate"
+          rm -rf "$gate_dir"
+          mkdir -p "$gate_dir"
+          cd "$gate_dir"
+          git init -q .
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --no-tags --depth=1 origin "$REF"
+          fetched="$(git rev-parse FETCH_HEAD)"
+          if [ "$fetched" != "$REF" ]; then
+            echo '::error::the fetch returned a different commit than requested — refusing to proceed'
+            exit 1
+          fi
+          echo "GATE_DIR=$gate_dir" >> "$GITHUB_ENV"
+      - name: Verify the audited V3 staging implementation byte for byte
+        run: |
+          # --- exact-code-gate BEGIN
+          set -euo pipefail
+          cd "$GATE_DIR"
+          cat > expected.txt <<'V3_MANIFEST'
+          100644 blob bd40bdf9b1a64b367b76ea7676af05f25fd6a887	.github/actions/postgres-client/action.yml
+          100755 blob 35cfbb3dee583e2b9d87e9a14e23ca65941f2642	.github/actions/postgres-client/install-client.sh
+          100755 blob ff890e80ccd94b353e96ef903884d68a589ce78f	.github/actions/postgres-client/verify-client.sh
+          100644 blob d7defa59ed60dc1187f348771265c56fd06bddd9	package-lock.json
+          100644 blob 5a2efd247bf1da0cdf1790161f33f2bd905501c1	package.json
+          100644 blob cf5326d1ada5681e5b4af4895be3d8da96a2b51d	scripts/backup/b2-owner-checklist.test.mjs
+          100644 blob 5b657cc7577aaa63ba0ba8cf284f6d52c51bd7c3	scripts/backup/b2-upload.test.mjs
+          100644 blob 8fce2f5b0a7890174d84660f306c3fc2d0755ccf	scripts/backup/backup-logical.mjs
+          100644 blob 31850aef84926d2e1f161a66312cedfa2134317d	scripts/backup/backup-mode.test.mjs
+          100644 blob 045f016307b163395790fb3dcc1d49c7e762623c	scripts/backup/backup-source.test.mjs
+          100644 blob 7e4e0df3e49f16dfac4103e1fef114342af575de	scripts/backup/check-dr-objectives.mjs
+          100644 blob 4094d3fca9da88e65b7c5511a2a2bd0a216d75c5	scripts/backup/check-dr-objectives.test.mjs
+          100644 blob 5144b57ed7c8f1164eee9aca6a9a44ecf8af7b57	scripts/backup/compare-rehearsal-manifests.mjs
+          100644 blob 9fdcef5533f5f48732bb009822804e2a582f8c0d	scripts/backup/compare-rehearsal-manifests.test.mjs
+          100644 blob ce0c9d19878d841b58ed084442b01094487356fb	scripts/backup/download-b2.mjs
+          100644 blob cb7893470016c166ccb0e906ac7aa6a3d7ed89d0	scripts/backup/dump-order.test.mjs
+          100644 blob 56c8cbcfc852b0c8d033030a4cff07e0da85b685	scripts/backup/lib-b2-read.mjs
+          100644 blob 644ca4d7fc3b425780436d0f92b75837b39b94da	scripts/backup/lib-b2.mjs
+          100644 blob aa0899f196e7278a3be10f6a0bd05e63541e7f23	scripts/backup/lib-backup-mode.mjs
+          100644 blob b99e1d42f44d9a872d0d72598ed61a28584d72f7	scripts/backup/lib-backup-source.mjs
+          100644 blob 8094474fe5d4323013fa76dd0576e58a82201469	scripts/backup/lib-crypto.mjs
+          100644 blob 389754287f3a7ddbfd3b5a8379b1d31eca9d0f31	scripts/backup/lib-dump.mjs
+          100644 blob c30afd406a996b289bf3bf0511bf3c96ad6355bf	scripts/backup/lib-pg-client.mjs
+          100644 blob 5b10a49ae6355b516945e4601215723721f8f82f	scripts/backup/lib-pg-client.test.mjs
+          100644 blob 24049caa0cd1e6b8a6a98f3ee61c47f0ae6c0057	scripts/backup/lib-restore-target.mjs
+          100644 blob 22c8f72f2cb18f9c6197c15035bf341c425b71ba	scripts/backup/lib-schedule.mjs
+          100644 blob 509327306305dc972777f5f77b6e1b19373d10e0	scripts/backup/passphrase-contract.test.mjs
+          100644 blob d091edbb3fa5c2dfe09c1c6ef40f74e8c5d03818	scripts/backup/postgres-client-action.test.mjs
+          100644 blob 5450afbaa6db794f11dda52e4b015559439c54bc	scripts/backup/postgres-client-env.test.mjs
+          100644 blob 2096f69334b2861b746b3e48bd0ba6f5263912b4	scripts/backup/postgres-client-wiring.test.mjs
+          100644 blob 2dd2cdc1a867088ee810c4e77c272f8e6766ff91	scripts/backup/prepare-disposable-restore.mjs
+          100644 blob 78cdd0ec0a0666bc5fff41828acd02a0a00aadcc	scripts/backup/prune-b2.mjs
+          100644 blob f278c5bfea0b237f5157e86b7f3b1237cbe5946f	scripts/backup/prune-b2.test.mjs
+          100644 blob fd123b1edbf8b8eee10a859c9981327a741ae58b	scripts/backup/restore-logical.mjs
+          100644 blob 2d16fdd496697751e12f8b60a5449ea54594df1e	scripts/backup/restore-target.test.mjs
+          100644 blob 42bd98327de5fcbb4ef4ed8f921c7f7a4a452228	scripts/backup/run-scheduled.mjs
+          100644 blob 8b562420e36088b4240148e2c09c3e0b82a2bb9f	scripts/backup/run-scheduled.test.mjs
+          100644 blob 5c559d087c2cd5cf7ca153ef36d2ba8f18bfc4da	scripts/backup/selftest.mjs
+          100644 blob c47793f88fb2dab104ea8bc617e8fbd9e5537db6	scripts/backup/staging-rehearsal-wiring.test.mjs
+          100644 blob 1e0360e48f9e3d159b7592d8678ab5290effc7ad	scripts/backup/upload-b2.mjs
+          100644 blob 365a07fcc17afd57b8276d60b8c88e6bc4f9da68	scripts/backup/validate-staging-source.mjs
+          100644 blob c6134e56f402d2f9aca0b8dd70de5a8b41a52057	scripts/backup/verify-backup-file.mjs
+          100644 blob 305ea6cbc2816c66efa3c786bdb2677cb90c292c	scripts/backup/verify-backup-file.test.mjs
+          100644 blob 0ba1d432f44f8e2aaa1b683c4ba7b7e9ad5ab61a	scripts/backup/verify-restored-db.mjs
+          100644 blob d185f27eea8210044229e12652ce2ff8a1149b29	scripts/backup/verify-restored-db.test.mjs
+          V3_MANIFEST
+          git ls-tree -r FETCH_HEAD -- scripts/backup .github/actions/postgres-client package.json package-lock.json > actual.txt
+          if diff -q expected.txt actual.txt >/dev/null; then
+            echo 'exact-code gate: the requested ref carries the audited V3 staging implementation (44 files, byte for byte)'
+            exit 0
+          fi
+          echo '::error::exact-code gate REFUSED: the requested ref does not contain the audited V3 staging implementation — refusing before any credential is materialized (paths only below; contents are never printed)'
+          echo '--- missing from the ref:'
+          comm -23 <(cut -f2 expected.txt | LC_ALL=C sort) <(cut -f2 actual.txt | LC_ALL=C sort)
+          echo '--- unexpected in the ref:'
+          comm -13 <(cut -f2 expected.txt | LC_ALL=C sort) <(cut -f2 actual.txt | LC_ALL=C sort)
+          echo '--- changed relative to the audit:'
+          awk -F'\t' 'NR==FNR { e[$2]=$1; next } ($2 in e) && e[$2] != $1 { print "changed: " $2 }' expected.txt actual.txt
+          exit 1
+          # --- exact-code-gate END
+
+  staging-rehearsal:
+    name: staging backup → B2 → disposable restore
+    needs: exact-code-gate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    environment: backup-staging
+    services:
+      drilldb:
+        image: postgres:17
+        env:
+          POSTGRES_DB: drill
+          POSTGRES_PASSWORD: drill-${{ github.run_id }}
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # After the exact-code gate passes, this checks out EXACTLY the
+          # verified commit — the rehearsal never runs anything the gate did
+          # not pin. Empty input resolves to the commit the workflow runs at.
+          ref: ${{ inputs.ref || github.sha }}
+          fetch-depth: 1
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install PostgreSQL 17 client
+        uses: ./.github/actions/postgres-client
+        with:
+          version: '17'
+      - name: Install dependencies
+        run: npm ci
+      - name: Preflight — backup-staging presence check, names only (values never read)
+        env:
+          STAGING_SECRET_STAGING_AUTODINE_BACKUP_PASSPHRASE_SET: ${{ secrets.STAGING_AUTODINE_BACKUP_PASSPHRASE != '' }}
+          STAGING_SECRET_STAGING_AUTODINE_BACKUP_SOURCE_URL_SET: ${{ secrets.STAGING_AUTODINE_BACKUP_SOURCE_URL != '' }}
+          STAGING_SECRET_STAGING_B2_ACCESS_KEY_ID_SET: ${{ secrets.STAGING_B2_ACCESS_KEY_ID != '' }}
+          STAGING_SECRET_STAGING_B2_REGION_SET: ${{ secrets.STAGING_B2_REGION != '' }}
+          STAGING_SECRET_STAGING_B2_SECRET_ACCESS_KEY_SET: ${{ secrets.STAGING_B2_SECRET_ACCESS_KEY != '' }}
+          STAGING_SECRET_STAGING_B2_BUCKET_SET: ${{ secrets.STAGING_B2_BUCKET != '' }}
+          STAGING_VAR_AUTODINE_PRODUCTION_B2_BUCKETS_SET: ${{ vars.AUTODINE_PRODUCTION_B2_BUCKETS != '' }}
+          STAGING_VAR_AUTODINE_STAGING_B2_BUCKET_SET: ${{ vars.AUTODINE_STAGING_B2_BUCKET != '' }}
+          STAGING_VAR_AUTODINE_STAGING_PROJECT_REF_SET: ${{ vars.AUTODINE_STAGING_PROJECT_REF != '' }}
+        run: |
+          set -euo pipefail
+          missing=''
+          for pair in \
+            "STAGING_AUTODINE_BACKUP_PASSPHRASE:${STAGING_SECRET_STAGING_AUTODINE_BACKUP_PASSPHRASE_SET}" \
+            "STAGING_AUTODINE_BACKUP_SOURCE_URL:${STAGING_SECRET_STAGING_AUTODINE_BACKUP_SOURCE_URL_SET}" \
+            "STAGING_B2_ACCESS_KEY_ID:${STAGING_SECRET_STAGING_B2_ACCESS_KEY_ID_SET}" \
+            "STAGING_B2_REGION:${STAGING_SECRET_STAGING_B2_REGION_SET}" \
+            "STAGING_B2_SECRET_ACCESS_KEY:${STAGING_SECRET_STAGING_B2_SECRET_ACCESS_KEY_SET}" \
+            "STAGING_B2_BUCKET:${STAGING_SECRET_STAGING_B2_BUCKET_SET}" \
+            "AUTODINE_PRODUCTION_B2_BUCKETS:${STAGING_VAR_AUTODINE_PRODUCTION_B2_BUCKETS_SET}" \
+            "AUTODINE_STAGING_B2_BUCKET:${STAGING_VAR_AUTODINE_STAGING_B2_BUCKET_SET}" \
+            "AUTODINE_STAGING_PROJECT_REF:${STAGING_VAR_AUTODINE_STAGING_PROJECT_REF_SET}" \
+          ; do
+            name="${pair%%:*}"
+            flag="${pair##*:}"
+            if [ "$flag" != 'true' ]; then missing="${missing} ${name}"; fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::backup-staging is missing required configuration:${missing} (values are never printed; nothing was attempted)"
+            exit 1
+          fi
+          echo 'backup-staging preflight: all six required staging secrets and three required staging variables are set (values never read by this step).'
+      - name: Authentication check (result only, no URI or password output)
+        env:
+          AUTODINE_BACKUP_SOURCE_URL: ${{ secrets.STAGING_AUTODINE_BACKUP_SOURCE_URL }}
+          AUTODINE_STAGING_PROJECT_REF: ${{ vars.AUTODINE_STAGING_PROJECT_REF }}
+        run: |
+          # Prove the credential authenticates BEFORE a long backup is attempted.
+          # The URI is never passed as an argument (it would surface in `ps` and
+          # in any logged error); it is decomposed into PG* variables instead, and
+          # only the result, the project ref and the server version are printed.
+          set -uo pipefail
+          node --input-type=module -e '
+          const raw = process.env.AUTODINE_BACKUP_SOURCE_URL;
+          const expectedRef = process.env.AUTODINE_STAGING_PROJECT_REF;
+          const fail = (why) => { console.error(`::error title=Staging source authentication::${why}`); process.exit(1); };
+          if (!raw) fail("STAGING_AUTODINE_BACKUP_SOURCE_URL is empty in the protected environment");
+          let u;
+          try { u = new URL(raw); } catch { fail("the configured source URL is not a valid URL"); }
+          if (!/^postgres(ql)?:$/.test(u.protocol)) fail("the configured source is not a PostgreSQL URL");
+          if (u.port === "6543") fail("the configured source is the transaction pooler (port 6543); a consistent snapshot is impossible through it");
+          const ref = (u.hostname.match(/^db\.([a-z0-9]+)\.supabase\.co$/) || u.username.match(/^postgres\.([a-z0-9]+)$/) || [])[1] || null;
+          const projectRef = ref || (u.hostname.split(".")[0] || null);
+          console.log(`source project ref: ${projectRef}`);
+          if (expectedRef && projectRef !== expectedRef) {
+            fail(`source project ref ${projectRef} does not match the designated staging project`);
+          }
+          const { spawnSync } = await import("node:child_process");
+          const env = {
+            ...process.env,
+            PGHOST: u.hostname,
+            PGPORT: u.port || "5432",
+            PGUSER: decodeURIComponent(u.username),
+            PGPASSWORD: decodeURIComponent(u.password),
+            PGDATABASE: decodeURIComponent(u.pathname.replace(/^\//, "")) || "postgres",
+            PGSSLMODE: env0("PGSSLMODE") || "require",
+            PGCONNECT_TIMEOUT: "15",
+          };
+          function env0(k) { return process.env[k]; }
+          const psql = process.env.PG_CLIENT_BIN_DIR ? `${process.env.PG_CLIENT_BIN_DIR}/psql` : "psql";
+          const r = spawnSync(psql, ["-X", "-A", "-t", "-v", "ON_ERROR_STOP=1", "-c",
+            "select current_database(), current_user, current_setting('"'"'server_version'"'"'), (select count(*) from pg_extension)"], { env, encoding: "utf8" });
+          if (r.error) fail(`psql could not be executed: ${r.error.code || r.error.message}`);
+          if (r.status !== 0) {
+            const msg = String(r.stderr || "").split("\n")
+              .filter((l) => l && !l.includes("postgres://") && !l.includes("postgresql://"))
+              .slice(0, 2).join(" ").slice(0, 300);
+            fail(`authentication or connection failed: ${msg || `exit ${r.status}`}`);
+          }
+          const [db, user, version, exts] = String(r.stdout).trim().split("|");
+          console.log(`authenticated: database=${db} user=${user} server_version=${version} extensions=${exts}`);
+          '
+      - name: Refuse undesignated source and bucket before connecting
+        env:
+          AUTODINE_BACKUP_SOURCE_URL: ${{ secrets.STAGING_AUTODINE_BACKUP_SOURCE_URL }}
+          B2_BUCKET: ${{ secrets.STAGING_B2_BUCKET }}
+          AUTODINE_STAGING_PROJECT_REF: ${{ vars.AUTODINE_STAGING_PROJECT_REF }}
+          AUTODINE_STAGING_B2_BUCKET: ${{ vars.AUTODINE_STAGING_B2_BUCKET }}
+          AUTODINE_PRODUCTION_B2_BUCKETS: ${{ vars.AUTODINE_PRODUCTION_B2_BUCKETS }}
+        run: node scripts/backup/validate-staging-source.mjs
+      - name: Back up staging, verify locally and upload to B2
+        env:
+          AUTODINE_BACKUP_SOURCE_URL: ${{ secrets.STAGING_AUTODINE_BACKUP_SOURCE_URL }}
+          AUTODINE_BACKUP_PASSPHRASE: ${{ secrets.STAGING_AUTODINE_BACKUP_PASSPHRASE }}
+          B2_REGION: ${{ secrets.STAGING_B2_REGION }}
+          B2_BUCKET: ${{ secrets.STAGING_B2_BUCKET }}
+          B2_ACCESS_KEY_ID: ${{ secrets.STAGING_B2_ACCESS_KEY_ID }}
+          B2_SECRET_ACCESS_KEY: ${{ secrets.STAGING_B2_SECRET_ACCESS_KEY }}
+        run: |
+          # Actions invokes run blocks as `bash -e`, so a failing command aborts
+          # the script immediately. Without an explicit `set +e` the handler
+          # below never runs and the step dies with no reason recorded: that is
+          # exactly what happened in runs #1, #2 and #4.
+          set +e
+          set -uo pipefail
+          dir="$RUNNER_TEMP/autodine-staging-backup"
+          log="$RUNNER_TEMP/autodine-staging-backup.log"
+          mkdir -p "$dir"
+          # Refuse a passphrase that breaks the encryption contract BEFORE the
+          # database or B2 is contacted. The minimum lives in
+          # scripts/backup/lib-crypto.mjs (MIN_PASSPHRASE_LENGTH) and is mirrored
+          # here only as a pre-check: lib-crypto.mjs remains the authority and
+          # refuses the same value later, so the two cannot silently disagree.
+          if [ "${#AUTODINE_BACKUP_PASSPHRASE}" -lt 12 ]; then
+            echo "::error title=Staging rehearsal configuration::STAGING_AUTODINE_BACKUP_PASSPHRASE is shorter than the 12-character minimum enforced by scripts/backup/lib-crypto.mjs. Length only; the value is never read or printed. Nothing was written and no database or B2 connection was attempted."
+            exit 1
+          fi
+          # Runtime failures must be readable without an elevated log viewer.
+          # Only credential LENGTHS are printed, never values.
+
+          node scripts/backup/run-scheduled.mjs --out-dir "$dir" --rpo-minutes 1440 --b2 2>&1 | tee "$log"
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            # Relay the tool's own credential-free reason. Also state each
+            # credential's LENGTH, mirroring exactly what the code enforces
+            # (non-empty; 12+ is documentation, not an enforced rule): a short
+            # value that is nonetheless accepted is worth seeing as a finding.
+            lengths="source_url=${#AUTODINE_BACKUP_SOURCE_URL} passphrase=${#AUTODINE_BACKUP_PASSPHRASE} b2_key=${#B2_ACCESS_KEY_ID} b2_secret=${#B2_SECRET_ACCESS_KEY} bucket=${#B2_BUCKET} region=${#B2_REGION}"
+            reason="$(grep -aoE '(backup|run-scheduled|upload-b2|verify-backup-file)[: ].{0,180}' "$log" | head -n 3 | tr '\n' ' ' | sed -E 's#(postgres(ql)?|https?)://[^ ]*#<url-redacted>#g; s/[A-Za-z0-9+/=_-]{40,}/<redacted>/g' | cut -c1-400 || true) lengths: ${lengths}"
+            echo "::error title=Staging rehearsal failure::exit ${status}: ${reason:-no credential-free reason line found}"
+            {
+              echo "STAGING_FAILURE_REASON<<REASON_EOF"
+              echo "exit ${status}: ${reason:-unknown}"
+              echo "REASON_EOF"
+            } >> "$GITHUB_ENV"
+            exit "$status"
+          fi
+      - name: Download newest B2 artifact and verify integrity
+        env:
+          B2_REGION: ${{ secrets.STAGING_B2_REGION }}
+          B2_BUCKET: ${{ secrets.STAGING_B2_BUCKET }}
+          B2_ACCESS_KEY_ID: ${{ secrets.STAGING_B2_ACCESS_KEY_ID }}
+          B2_SECRET_ACCESS_KEY: ${{ secrets.STAGING_B2_SECRET_ACCESS_KEY }}
+        run: |
+          set -o pipefail
+          mkdir -p "$RUNNER_TEMP/autodine-staging-download"
+          node scripts/backup/download-b2.mjs --out-dir "$RUNNER_TEMP/autodine-staging-download" | tee "$RUNNER_TEMP/autodine-staging-download/download-report.json"
+      - name: Restore and verify in disposable PostgreSQL
+        env:
+          AUTODINE_BACKUP_PASSPHRASE: ${{ secrets.STAGING_AUTODINE_BACKUP_PASSPHRASE }}
+          AUTODINE_RESTORE_TARGET_URL: postgresql://postgres:drill-${{ github.run_id }}@127.0.0.1:5432/drill
+        run: |
+          set -euo pipefail
+          dir="$RUNNER_TEMP/autodine-staging-download"
+          mapfile -t artifacts < <(find "$dir" -maxdepth 1 -type f -name '*.enc')
+          if [ "${#artifacts[@]}" -ne 1 ]; then echo '::error::Expected exactly one downloaded artifact'; exit 1; fi
+          artifact="${artifacts[0]}"
+          manifest="$(printf '%s' "$artifact" | sed -E 's/\.(sql\.gz|dump)\.enc$/.manifest.json/')"
+          mapfile -t source_manifests < <(find "$RUNNER_TEMP/autodine-staging-backup" -maxdepth 1 -type f -name '*.manifest.json')
+          if [ "${#source_manifests[@]}" -ne 1 ]; then echo '::error::Expected exactly one newly produced manifest'; exit 1; fi
+          node scripts/backup/compare-rehearsal-manifests.mjs "${source_manifests[0]}" "$manifest"
+          node scripts/backup/verify-backup-file.mjs "$artifact" --manifest "$manifest"
+          node scripts/backup/prepare-disposable-restore.mjs --confirm-disposable
+          start="$(date +%s)"
+          node scripts/backup/restore-logical.mjs --file "$artifact" --confirm-empty-db
+          echo "RESTORE_SECONDS=$(($(date +%s) - start))" >> "$GITHUB_ENV"
+          node scripts/backup/verify-restored-db.mjs --manifest "$manifest" --artifact "$artifact" | tee "$dir/restore-report.json"
+      - name: Sanitized failure diagnostic (no secret access, relays propagated codes only)
+        if: failure()
+        run: |
+          # This step deliberately declares no secrets: step-level secrets are not
+          # inherited, so it CANNOT inspect them. It therefore never claims one is
+          # missing or empty; the step that owns the credential reports its own
+          # scrubbed reason. Here we only relay that pre-scrubbed reason.
+          set -uo pipefail
+          reason="${STAGING_FAILURE_REASON:-no failure code was propagated by the step that owns the credential; see the annotation on that step}"
+          reason="$(printf '%s' "$reason" | tr '\n' ' ' | sed -E 's#(postgres(ql)?|https?)://[^ ]*#<url-redacted>#g; s/[A-Za-z0-9+/=_-]{40,}/<redacted>/g' | cut -c1-600)"
+          {
+            echo '### Failure reason (sanitized)'
+            echo "- ${reason}"
+            echo '- This step holds no secrets, so it never states that a secret is missing; only the owning step can.'
+            echo '- No secret value, database URL or key is included in this annotation.'
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "::error title=Staging rehearsal failure reason::${reason}"
+      - name: Evidence summary
+        if: always()
+        run: |
+          {
+            echo '## Staging B2 rehearsal';
+            echo '- Result: ${{ job.status }}';
+            echo '- Implementation: the exact-code-gated commit checked out by this run';
+            echo '- Restore command duration: '"${RESTORE_SECONDS:-not measured}"' seconds (not end-to-end RTO).';
+            echo '- Synthetic platform scaffold; Auth/Storage and production are not restored.';
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Preserve reports only
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: staging-b2-rehearsal-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/autodine-staging-backup/*.manifest.json
+            ${{ runner.temp }}/autodine-staging-download/download-report.json
+            ${{ runner.temp }}/autodine-staging-download/restore-report.json
+          if-no-files-found: ignore
+          retention-days: 35
+      - name: Remove backup material
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/autodine-staging-backup" "$RUNNER_TEMP/autodine-staging-download"

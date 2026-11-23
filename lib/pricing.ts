@@ -5,18 +5,39 @@
  * restaurant rate. The database remains authoritative: it revalidates the
  * cart, calculates, and stores the order total independently.
  *
- * Tax limitations: a restaurant supplies one basis-point rate, and this
- * helper treats menu prices as tax-exclusive. It does not model per-item
- * rates or interstate IGST. The sample default below is for demos and tests;
- * live cart loaders require an explicit restaurant rate and never substitute
- * that sample. This is implementation behavior, not tax advice or a claim of
- * GST compliance.
+ * Tax modes mirror the approved two-mode GST policy:
+ *   - off: one restaurant rate, added on top of menu prices
+ *   - composition: no tax is charged at all (Bill of Supply)
+ *   - regular: menu prices include GST; the tax is extracted once from the
+ *     document total at the closed 5% or 18% profile
+ *
+ * The helper does not model per-item rates or interstate IGST. The sample
+ * default below is for demos and tests; live cart loaders require an explicit
+ * restaurant rate and never substitute that sample. This is implementation
+ * behavior, not tax advice or a claim of GST compliance.
  */
 
-import { assertValidMoney, applyRate, lineTotal, splitInHalf, type Bps, type Paise } from './money';
+import {
+  BPS_PER_100_PERCENT,
+  assertValidMoney,
+  applyRate,
+  lineTotal,
+  splitInHalf,
+  type Bps,
+  type Paise,
+} from './money';
 
 /** SAMPLE ONLY — see the tax status note above. 500 bps = 5.00%. */
 export const SAMPLE_TAX_RATE_BPS: Bps = 500;
+
+export type GstMode = 'off' | 'composition' | 'regular';
+
+/** What the guest quote needs to price an order the way the till will. */
+export type GstQuote = {
+  mode: GstMode;
+  /** Required in regular mode; null or absent in composition mode. */
+  rateBps?: Bps | null;
+};
 
 /**
  * Require an explicit, valid rate from live restaurant data. The sample rate
@@ -56,22 +77,37 @@ export type OrderTotalsInput = {
   discountPaise?: Paise;
   /** Defaults to the sample rate. Bps, e.g. 500 = 5.00%. */
   taxRateBps?: Bps;
+  /** Defaults to `off`, the historical behaviour. */
+  mode?: GstMode;
 };
 
 export type OrderTotals = {
+  /** The mode these totals were computed under. */
+  mode: GstMode;
   /** Sum of line totals before any discount. */
   subtotalPaise: Paise;
   /** Discount as given, clamped so the taxable amount never goes negative. */
   discountPaise: Paise;
-  /** What tax is actually charged on. subtotal - discount, floored at zero. */
+  /** Taxable value: the base in off mode, the extracted base in regular mode. */
   taxablePaise: Paise;
   taxPaise: Paise;
   /** Split of the tax, for an intra-state (CGST + SGST) invoice. */
   cgstPaise: Paise;
   sgstPaise: Paise;
-  /** What the customer pays. Always exactly taxable + tax. */
+  /** What the customer pays. */
   totalPaise: Paise;
 };
+
+/**
+ * Extract the taxable value from a tax-inclusive amount, mirroring SQL's
+ * `round(total * 10000 / (10000 + rate))` with integer arithmetic.
+ */
+function extractInclusiveTax(inclusivePaise: Paise, rateBps: Bps): Paise {
+  const divisor = BPS_PER_100_PERCENT + rateBps;
+  return Math.floor(
+    (inclusivePaise * BPS_PER_100_PERCENT + Math.floor(divisor / 2)) / divisor
+  );
+}
 
 /**
  * Sum of line totals. Each line is rounded to the paisa before being summed,
@@ -94,7 +130,7 @@ export function computeSubtotal(lines: PriceableLine[]): Paise {
  * caller from activating a guessed policy through this shared helper.
  */
 export function computeOrderTotals(input: OrderTotalsInput): OrderTotals {
-  const { lines, discountPaise = 0, taxRateBps = SAMPLE_TAX_RATE_BPS } = input;
+  const { lines, discountPaise = 0, mode = 'off' } = input;
 
   assertValidMoney(discountPaise);
   if (discountPaise < 0) {
@@ -105,11 +141,47 @@ export function computeOrderTotals(input: OrderTotalsInput): OrderTotals {
   }
 
   const subtotalPaise = computeSubtotal(lines);
-  const taxablePaise = Math.max(subtotalPaise - discountPaise, 0);
-  const taxPaise = applyRate(taxablePaise, taxRateBps);
+  const netPaise = Math.max(subtotalPaise - discountPaise, 0);
+
+  if (mode === 'composition') {
+    return {
+      mode,
+      subtotalPaise,
+      discountPaise,
+      taxablePaise: netPaise,
+      taxPaise: 0,
+      cgstPaise: 0,
+      sgstPaise: 0,
+      totalPaise: netPaise,
+    };
+  }
+
+  if (mode === 'regular') {
+    const rateBps = input.taxRateBps;
+    if (typeof rateBps !== 'number' || !Number.isSafeInteger(rateBps) || rateBps < 0) {
+      throw new TypeError('A Regular GST profile rate is unavailable. Please try again.');
+    }
+    const taxablePaise = extractInclusiveTax(netPaise, rateBps);
+    const taxPaise = netPaise - taxablePaise;
+    const [cgstPaise, sgstPaise] = splitInHalf(taxPaise);
+    return {
+      mode,
+      subtotalPaise,
+      discountPaise,
+      taxablePaise,
+      taxPaise,
+      cgstPaise,
+      sgstPaise,
+      totalPaise: netPaise,
+    };
+  }
+
+  const taxablePaise = netPaise;
+  const taxPaise = applyRate(taxablePaise, input.taxRateBps ?? SAMPLE_TAX_RATE_BPS);
   const [cgstPaise, sgstPaise] = splitInHalf(taxPaise);
 
   return {
+    mode,
     subtotalPaise,
     discountPaise,
     taxablePaise,

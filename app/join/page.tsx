@@ -41,14 +41,14 @@ export default async function JoinIndexPage({
       title="Paste your invitation code"
       lede="Your owner sent a link. If you are reading it out or typing it, the code is the last part of that link — four groups of four characters."
       notes={[
-        <>
+        <span key="single-use">
           <strong>The code is single use.</strong> It stops working once somebody joins with it, or
           when it expires.
-        </>,
-        <>
+        </span>,
+        <span key="ask-owner">
           <strong>No code to hand?</strong> Ask the owner. Every restaurant can create a fresh link
           from Settings → People in a few seconds.
-        </>,
+        </span>,
       ]}
       notesTitle="How this works"
     >

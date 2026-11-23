@@ -309,6 +309,22 @@ export function ReportsScreen({
 
       {blocked && <SignInPrompt reason={blocked} screen="sales report" />}
 
+      {!blocked && outlet?.operatingMode === 'mode_a' ? (
+        <Notice
+          tone="plain"
+          label={`Mode A · Alongside ${outlet.posIntegrationName || 'your existing POS'}`}
+          action={
+            <Link href="/dashboard/settings#settings-operating-mode" className={btn('ghost', 'sm')}>
+              Switch to Mode B
+            </Link>
+          }
+        >
+          Financial settlement stays in your existing POS in Mode A, so this tab is hidden from the
+          staff rail. Use <Link href="/dashboard/orders" className="underline underline-offset-2">Orders</Link> for
+          KOT handoff counts, or switch to Mode B when AutoDine becomes your primary billing system.
+        </Notice>
+      ) : null}
+
       {!blocked && (
         <>
           {/* Two facts stated once, at the top, before any figure is read: the
@@ -487,7 +503,8 @@ export function ReportsScreen({
             <Panel title="How it was paid" meta="Recorded payments">
               {report.methods.length > 0 || totals.unpaidPaise > 0 ? (
                 <>
-                  <table className={tableClass}>
+                  <TableWrap>
+                    <table className={tableClass}>
                     <thead>
                       <tr>
                         <Th>Method</Th>
@@ -520,6 +537,7 @@ export function ReportsScreen({
                       )}
                     </tbody>
                   </table>
+                  </TableWrap>
                   {totals.refundedPaise > 0 && (
                     <p className="mt-2.5 text-[11.5px] text-gink-46">
                       Refunded in this range: <Money value={totals.refundedPaise} />
@@ -638,6 +656,193 @@ export function ReportsScreen({
               )}
             </Card>
           </section>
+
+          {/* ------------------------------------ Billing v2: GST, Z-Report & Register */}
+          {data?.dayClosing ? (
+            <section className="mt-4" aria-labelledby="report-z-closing">
+              <SectionHead
+                title={<span id="report-z-closing">Day-end Z-Report closing</span>}
+                meta={data.dayClosing.businessDate}
+              />
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <Card className="px-4 py-3.5">
+                  <div className="text-[11.5px] font-medium text-gink-46">Expected cash drawer</div>
+                  <div className="mt-1 text-[18px] font-semibold text-gink tabular-nums">
+                    <Money value={data.dayClosing.expectedCashDrawerPaise} />
+                  </div>
+                  <div className="mt-0.5 text-[11.5px] text-gink-46">
+                    Cash <Money value={data.dayClosing.cashCollectedPaise} /> − refunds{' '}
+                    <Money value={data.dayClosing.cashRefundedPaise} />
+                  </div>
+                </Card>
+                <Card className="px-4 py-3.5">
+                  <div className="text-[11.5px] font-medium text-gink-46">UPI &amp; Card</div>
+                  <div className="mt-1 text-[18px] font-semibold text-gink tabular-nums">
+                    <Money value={data.dayClosing.upiCollectedPaise + data.dayClosing.cardCollectedPaise} />
+                  </div>
+                  <div className="mt-0.5 text-[11.5px] text-gink-46">
+                    UPI <Money value={data.dayClosing.upiCollectedPaise} /> · Card{' '}
+                    <Money value={data.dayClosing.cardCollectedPaise} />
+                  </div>
+                </Card>
+                <Card className="px-4 py-3.5">
+                  <div className="text-[11.5px] font-medium text-gink-46">Invoices</div>
+                  <div className="mt-1 text-[18px] font-semibold text-gink tabular-nums">
+                    {data.dayClosing.issuedInvoices} issued
+                  </div>
+                  <div className="mt-0.5 text-[11.5px] text-gink-46">
+                    {data.dayClosing.voidedInvoices} voided · {data.dayClosing.cancelledOrders} cancelled
+                  </div>
+                </Card>
+                <Card className="px-4 py-3.5">
+                  <div className="text-[11.5px] font-medium text-gink-46">Open unpaid today</div>
+                  <div className="mt-1 text-[18px] font-semibold text-gink tabular-nums">
+                    {data.dayClosing.openUnpaidOrders}
+                  </div>
+                  <div className="mt-0.5 text-[11.5px] text-gink-46">
+                    Net billed <Money value={data.dayClosing.netBilledPaise} />
+                  </div>
+                </Card>
+              </div>
+            </section>
+          ) : null}
+
+          {data?.billingSummary ? (
+            <div className="mt-4 grid gap-4 lg:grid-cols-2">
+              <Panel title="GST tax summary" meta="By mode & rate">
+                {data.billingSummary.gstSummary.length > 0 ? (
+                  <TableWrap>
+                  <table className={tableClass}>
+                    <thead>
+                      <tr>
+                        <Th>Mode / Rate</Th>
+                        <Th align="right">Bills</Th>
+                        <Th align="right">Taxable</Th>
+                        <Th align="right">CGST + SGST</Th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.billingSummary.gstSummary.map((row) => (
+                        <Tr key={`${row.mode}-${row.rateBps}`}>
+                          <Td>
+                            {row.mode === 'regular'
+                              ? `Regular ${(row.rateBps / 100).toFixed(0)}%`
+                              : row.mode === 'composition'
+                                ? 'Composition (Bill of Supply)'
+                                : 'Normal (No GST)'}
+                          </Td>
+                          <Td align="right">{row.bills}</Td>
+                          <Td align="right">
+                            <Money value={row.taxablePaise} />
+                          </Td>
+                          <Td align="right">
+                            <Money value={row.cgstPaise + row.sgstPaise} />
+                          </Td>
+                        </Tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  </TableWrap>
+                ) : (
+                  <Empty>No issued invoices in this range.</Empty>
+                )}
+              </Panel>
+
+              <Panel title="Channel mix &amp; audit" meta="Dine-in · Takeaway · Delivery">
+                {data.billingSummary.channels.length > 0 ? (
+                  <TableWrap>
+                  <table className={tableClass}>
+                    <thead>
+                      <tr>
+                        <Th>Channel</Th>
+                        <Th align="right">Orders</Th>
+                        <Th align="right">Billed</Th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.billingSummary.channels.map((ch) => (
+                        <Tr key={ch.channel}>
+                          <Td>
+                            {ch.channel === 'dine_in'
+                              ? 'Dine-in'
+                              : ch.channel === 'takeaway'
+                                ? 'Takeaway'
+                                : 'Delivery'}
+                          </Td>
+                          <Td align="right">{ch.orders}</Td>
+                          <Td align="right">
+                            <Money value={ch.billedPaise} />
+                          </Td>
+                        </Tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  </TableWrap>
+                ) : (
+                  <Empty>No channel orders in this range.</Empty>
+                )}
+                <p className="mt-3 text-[11.5px] leading-[1.5] text-gink-64">
+                  Discounts <Money value={data.billingSummary.adjustments.discountPaise} /> · Charges{' '}
+                  <Money
+                    value={
+                      data.billingSummary.adjustments.serviceChargePaise +
+                      data.billingSummary.adjustments.packagingChargePaise +
+                      data.billingSummary.adjustments.deliveryChargePaise
+                    }
+                  />{' '}
+                  · Complimentary {data.billingSummary.adjustments.complimentaryCount} · Refunds{' '}
+                  <Money value={data.billingSummary.adjustments.refundedPaise} /> · Duplicate reprints{' '}
+                  {data.billingSummary.adjustments.duplicateReprints}
+                </p>
+              </Panel>
+            </div>
+          ) : null}
+
+          {data?.billingSummary && data.billingSummary.billRegister.length > 0 ? (
+            <section className="mt-4" aria-labelledby="report-bill-register">
+              <SectionHead title={<span id="report-bill-register">Bill register</span>} meta="Issued & voided invoices" />
+              <Card className="overflow-hidden">
+                <TableWrap>
+                  <table className={tableClass}>
+                    <thead>
+                      <tr>
+                        <Th>Invoice no.</Th>
+                        <Th>Table / Channel</Th>
+                        <Th>Status</Th>
+                        <Th align="right">Tax</Th>
+                        <Th align="right">Total</Th>
+                        <Th align="right">Prints</Th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.billingSummary.billRegister.map((inv) => (
+                        <Tr key={inv.id}>
+                          <Td>
+                            <Link href={`/invoice/${inv.id}`} className="font-mono font-medium text-gink underline decoration-hair-strong underline-offset-2">
+                              {inv.invoiceNumber}
+                            </Link>
+                          </Td>
+                          <Td>{inv.tableLabel ?? 'Counter'}</Td>
+                          <Td>
+                            <Tag tone={inv.status === 'voided' ? 'failed' : 'live'}>{inv.status}</Tag>
+                          </Td>
+                          <Td align="right">
+                            <Money value={inv.taxPaise} />
+                          </Td>
+                          <Td align="right">
+                            <Money value={inv.totalPaise} />
+                          </Td>
+                          <Td align="right" className="tabular-nums">
+                            {inv.printCount}
+                          </Td>
+                        </Tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </TableWrap>
+              </Card>
+            </section>
+          ) : null}
 
           {/* --------------------------------------------------------- the notes
               Kept, because the difference between the two figures is the thing

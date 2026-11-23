@@ -34,7 +34,7 @@ import { priceCart } from '@/lib/cart-pricing';
 import { filterDishes } from '@/lib/guest-search';
 import { inr } from '@/lib/demo-data';
 import { paiseToRupees, rupeesToPaise } from '@/lib/money';
-import { VegMark } from '@/components/ui';
+import { VegMark, JainMark, AllergenBadge } from '@/components/ui';
 import { CallWaiterButton } from '@/components/CallWaiterButton';
 
 /**
@@ -179,7 +179,7 @@ export function CustomerMenu({
    * translations at all. Priced data (the bar, the cart) reads the ORIGINAL
    * arrays: switching language never changes what is ordered or charged.
    */
-  const language: GuestLanguage = langParam === 'hi' || langParam === 'mr' ? langParam : 'en';
+  const language: GuestLanguage = langParam === 'gu' || langParam === 'ta' || langParam === 'te' || langParam === 'hi' || langParam === 'mr' ? langParam : 'en';
   const originalCategories = data?.categories ?? demoCategories;
   const originalItems = data?.items ?? demoItems;
   const translationsOf = (row: unknown): TranslationMap | undefined =>
@@ -199,12 +199,18 @@ export function CustomerMenu({
     originalItems.some(
       (i) =>
         hasFreshTranslation(translationsOf(i), 'hi', i.name, i.desc) ||
-        hasFreshTranslation(translationsOf(i), 'mr', i.name, i.desc)
+        hasFreshTranslation(translationsOf(i), 'mr', i.name, i.desc) ||
+        hasFreshTranslation(translationsOf(i), 'gu', i.name, i.desc) ||
+        hasFreshTranslation(translationsOf(i), 'ta', i.name, i.desc) ||
+        hasFreshTranslation(translationsOf(i), 'te', i.name, i.desc)
     ) ||
     originalCategories.some(
       (c) =>
         hasFreshTranslation(translationsOf(c), 'hi', c.name, '') ||
-        hasFreshTranslation(translationsOf(c), 'mr', c.name, '')
+        hasFreshTranslation(translationsOf(c), 'mr', c.name, '') ||
+        hasFreshTranslation(translationsOf(c), 'gu', c.name, '') ||
+        hasFreshTranslation(translationsOf(c), 'ta', c.name, '') ||
+        hasFreshTranslation(translationsOf(c), 'te', c.name, '')
     );
   const langHref = (code: GuestLanguage) => {
     const params = new URLSearchParams();
@@ -401,7 +407,7 @@ export function CustomerMenu({
           the menu data, the prices and the cart never change. */}
       {data && hasTranslations && (
         <nav aria-label="Language" className="mt-3 flex items-center gap-1.5">
-          {(['en', 'hi', 'mr'] as GuestLanguage[]).map((code) => (
+          {(['en', 'hi', 'mr', 'gu', 'ta', 'te'] as GuestLanguage[]).map((code) => (
             <Link
               key={code}
               href={langHref(code)}
@@ -635,6 +641,8 @@ export function CustomerMenu({
               <div className="flex min-w-0 flex-1 flex-col">
                 <div className="flex items-center gap-1.5">
                   <VegMark veg={i.veg} />
+                  <JainMark jain={i.jain} />
+                  <AllergenBadge allergens={i.allergens} />
                   <h3
                     className={[
                       'truncate text-[15.5px] font-semibold tracking-[-0.01em] text-gink',
@@ -671,6 +679,7 @@ export function CustomerMenu({
                     src={i.img}
                     name={i.name}
                     size={92}
+                    priority={index === 0}
                     className="w-full transition-transform duration-500 ease-out group-hover:scale-[1.08]"
                   />
                 </div>
@@ -809,7 +818,7 @@ export function ItemSheet({
     demoItems.find((i) => i.id === 'it-butter-chicken')!;
 
   /** The language view: name and description may swap, nothing else does. */
-  const language: GuestLanguage = langParam === 'hi' || langParam === 'mr' ? langParam : 'en';
+  const language: GuestLanguage = langParam === 'gu' || langParam === 'ta' || langParam === 'te' || langParam === 'hi' || langParam === 'mr' ? langParam : 'en';
   const baseTranslations = (baseItem as { translations?: TranslationMap }).translations;
   const item = {
     ...baseItem,
@@ -1070,6 +1079,10 @@ export function ItemSheet({
                   {variants.length > 0 || groups.length > 0 ? 'Customize' : 'Add to order'}
                 </p>
                 <h2 className="mt-1 text-[23px] leading-tight font-semibold tracking-[-0.02em]">{item.name}</h2>
+                <div className="mt-1 flex items-center gap-1.5">
+                  <JainMark jain={item.jain} />
+                  <AllergenBadge allergens={item.allergens} />
+                </div>
               </div>
               <Link
                 href={backHref}

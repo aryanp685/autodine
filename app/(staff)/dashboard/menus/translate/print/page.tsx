@@ -35,7 +35,7 @@ export default async function PrintTranslatePage({
   searchParams: Promise<{ lang?: string }>;
 }) {
   const { lang } = await searchParams;
-  const language: GuestLanguage = lang === 'mr' ? 'mr' : lang === 'hi' ? 'hi' : 'en';
+  const language: GuestLanguage = lang === 'gu' ? 'gu' : lang === 'ta' ? 'ta' : lang === 'te' ? 'te' : lang === 'mr' ? 'mr' : lang === 'hi' ? 'hi' : 'en';
   const data = await getTranslateData();
 
   const tName = (name: string, description: string, translations?: TranslationMap) =>
@@ -50,7 +50,7 @@ export default async function PrintTranslatePage({
           ← Back to the translator
         </Link>
         <div className="flex items-center gap-2">
-          {(['en', 'hi', 'mr'] as GuestLanguage[]).map((code) => (
+          {(['en', 'hi', 'mr', 'gu', 'ta', 'te'] as GuestLanguage[]).map((code) => (
             <Link
               key={code}
               href={`/dashboard/menus/translate/print?lang=${code}`}

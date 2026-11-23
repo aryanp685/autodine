@@ -1,18 +1,29 @@
-# Production migration manifest — 2026-11-14 (all 92 files accounted for)
+# Production migration manifest — 2026-11-14 (all 104 files accounted for; updated 2026-11-19)
 
-**Generated from `supabase/migrations/` on branch `arena/9b120325-autodine`.**
+**Generated from `supabase/migrations/` on branch `arena/9b120325-autodine`;
+extended 2026-11-16 on `arena/2670dd12-autodine`; extended 2026-11-19 on
+`arena/bbf0f31b-autodine`.**
 Purpose: nothing reaches production without appearing in this table with a
 classification and the probe that confirms (or refutes) its presence. Counts:
-**76 legacy-rollout-scope · 9 branch set (pending owner authorization B1) ·
-7 GST/IRP Phase B (NOT AUTHORIZED)**. Zero duplicate versions (checked
-2026-11-14). The release-prep document
+**76 legacy-rollout-scope · 12 branch set (B1 authorized 2026-11-20 — includes 3
+QR/reliability migrations now on hosted) ·
+7 GST/IRP Phase B (NOT AUTHORIZED) · 1 scoped ACL revision
+(`20261116000100`, pending its own authorization)** — plus three local
+remediation migrations added 2026-11-19 (`20261119000100`–`20261119000300`),
+plus one announcement claim-recovery (`20261119000400`), plus two QR
+migrations (`20261118002200` staff boundary F-01/F-02/F-03 + `20261118002300`
+owner management), three of the six branch set now on hosted (announcement
+recovery + QR pair, see rows). Zero duplicate versions (checked 2026-11-14;
+rechecked 2026-11-16 at 93/93 and 2026-11-19 at 104/104, rechecked 2026-11-20
+post-B1 at 104/104). The release-prep document
 (`docs/production-release-prep-2026-11-14.md`) binds this manifest into the
 ordered release sequence.
 
 **Evidence boundary:** "Reported applied" means the 2026-11-12 hand-off report
-records the legacy rollout as completed and production ledger listing ended at
-`20261112000100` (a listing boundary, **not** a completeness proof). Only the
-A1 probe (owner-run, read-only) can confirm at release time. Nothing here
+records the legacy rollout as completed. The A1 ledger + catalog-effect
+probes were executed read-only against production on 2026-11-16 (72/92 repo
+versions present at that time; see the probed rows below) and supersede the
+reported-applied assumption for the flagged files. Nothing here
 authorizes any application. GST/IRP files are not to be applied in any form
 without separate written authorization each.
 
@@ -86,22 +97,26 @@ without separate written authorization each.
 | `20261110000600` | `staff_finance_boundaries` | Legacy rollout scope — reported applied 2026-11-12; re-probe via A1 |  |
 | `20261110000700` | `restaurants_member_only` | Legacy rollout scope — reported applied 2026-11-12; re-probe via A1 | Batch B — apply only after app deploy |
 | `20261110000800` | `remove_order_submission_caps` | Legacy rollout scope — reported applied 2026-11-12; re-probe via A1 | removes guest order-submission caps (AGENTS.md) |
-| `20261110000851` | `payment_audit_provider_actor` | Legacy rollout scope — reported applied 2026-11-12; re-probe via A1 |  |
+| `20261110000851` | `payment_audit_provider_actor` | Legacy rollout scope — reported applied 2026-11-12; re-probe via A1 | **PROBED 2026-11-16 (prod, read-only): EFFECT ABSENT** — `payment_audit_events.actor_id` still NOT NULL, no FK to `profiles`; live settlement defect persists. Apply candidate (before `20261110000950`); pre-apply orphan-`actor_id` data preflight required (file validates FK and fails closed) |
 | `20261110000900` | `converge_qr_verification_attempts` | Legacy rollout scope — reported applied 2026-11-12; re-probe via A1 |  |
-| `20261110000950` | `online_payment_attempt_uniqueness` | Legacy rollout scope — reported applied 2026-11-12; re-probe via A1 |  |
+| `20261110000950` | `online_payment_attempt_uniqueness` | Legacy rollout scope — reported applied 2026-11-12; re-probe via A1 | **PROBED 2026-11-16: EFFECT PARTIAL** — hosted `begin/settle_online_payment` are older bodies (signatures identical; begin lacks the per-order pending guard, settle lacks the stale-balance guard; bodies 3540/2480 vs repo 4300/3427). `CREATE OR REPLACE` — no duplicate-object risk. Apply candidate after `20261110000851` (settle inserts NULL actor) |
 | `20261110001000` | `account_subscriptions` | Legacy rollout scope — reported applied 2026-11-12; re-probe via A1 |  |
 | `20261110001100` | `subscription_billing` | Legacy rollout scope — reported applied 2026-11-12; re-probe via A1 |  |
-| `20261110001210` | `checkout_outstanding_guard` | Legacy rollout scope — reported applied 2026-11-12; re-probe via A1 |  |
-| `20261110001220` | `revoke_client_bypass_privileges` | Legacy rollout scope — reported applied 2026-11-12; re-probe via A1 |  |
+| `20261110001210` | `checkout_outstanding_guard` | Legacy rollout scope — reported applied 2026-11-12; re-probe via A1 | **RESOLVED 2026-11-16: EFFECT PRESENT, behaviour-identical.** Full `pg_get_functiondef` diff vs the repo file: signature, `SECURITY DEFINER`, `search_path=public, pg_temp`, volatility, auth/role guards (`owner/manager/cashier`, 42501/P0002), write-gate, both outstanding-balance guards and error texts, close update and receipt call are statement-for-statement identical. Only differences: function COMMENT wording and inline body comments (no behaviour). Grants end-state identical (anon: none; authenticated + service_role: EXECUTE; the repo revoke list does not touch service_role's explicit grant). **No reconciliation migration needed; excluded from the apply batch to avoid a needless production write.** Optional ledger-parity application is owner-discretionary and changes only the comment |
+| `20261110001220` | `revoke_client_bypass_privileges` | Legacy rollout scope — reported applied 2026-11-12; re-probe via A1 | **PROBED 2026-11-16: EFFECT PARTIAL — DO NOT APPLY VERBATIM.** TRUNCATE/REFERENCES/TRIGGER already revoked on tables, but `MAINTAIN` remains for `anon`+`authenticated` on **17 tables** (D2 confirmed) and in `postgres` default ACLs; `supabase_admin` defaults untouched (owner-operation scope). Two live sequences (`restaurant_invoice_share_audit_id_seq`, `subscription_receipt_seq`) grant client USAGE/SELECT/UPDATE; source verification (2026-11-16) shows both are consumed only inside SECURITY DEFINER functions, so the sequence revoke is safe — but production should apply the scoped revision `20261116000100` (below) instead of this file, which stays in the chain for local/staging parity |
 | `20261112000100` | `schedule_subscription_expiry` | Legacy rollout scope — reported applied 2026-11-12; re-probe via A1 |  |
 | `20261112000200` | `immutable_restaurant_account_link` | Branch set — apply only with B1 (release prep §2) | P0 security — effect absent in prod (D1) |
 | `20261112000300` | `report_sales_export_authorization` | Branch set — apply only with B1 (release prep §2) | staging-applied 2026-11-15; prod unverified |
 | `20261112000400` | `bound_subscription_history` | Branch set — apply only with B1 (release prep §2) |  |
-| `20261112000500` | `serialize_outlet_creation` | Branch set — apply only with B1 (release prep §2) |  |
-| `20261112000600` | `serialize_subscription_payments` | Branch set — apply only with B1 (release prep §2) |  |
-| `20261112000700` | `serialize_subscription_expiry` | Branch set — apply only with B1 (release prep §2) |  |
+| `20261112000500` | `role_scoped_order_reads` | main (PR #191 main-merge reconciliation, 2026-11-16) — staff-access boundary | NOT AUTHORIZED for hosted application by this merge; arrived via main merge |
+| `20261112000501` | `serialize_outlet_creation` | Branch set — apply only with B1 (release prep §2) |  |
+| `20261112000600` | `cap_subscription_history_ceiling` | main (PR #191 main-merge reconciliation, 2026-11-16) — subscription boundary | NOT AUTHORIZED for hosted application by this merge; arrived via main merge |
+| `20261112000601` | `serialize_subscription_payments` | Branch set — apply only with B1 (release prep §2) |  |
+| `20261112000700` | `order_line_edit_boundary` | main (PR #191 main-merge reconciliation, 2026-11-16) — order-line boundary | NOT AUTHORIZED for hosted application by this merge; arrived via main merge |
+| `20261112000701` | `serialize_subscription_expiry` | Branch set — apply only with B1 (release prep §2) |  |
 | `20261113000100` | `gst_two_mode` | GST/IRP Phase B — NOT AUTHORIZED |  |
-| `20261114000100` | `gst_b2b_einvoice_readiness` | GST/IRP Phase B — NOT AUTHORIZED |  |
+| `20261114000100` | `owner_manager_subscription_reads` | main (PR #191 main-merge reconciliation, 2026-11-16) — subscription boundary | NOT AUTHORIZED for hosted application by this merge; arrived via main merge |
+| `20261114000101` | `gst_b2b_einvoice_readiness` | GST/IRP Phase B — NOT AUTHORIZED |  |
 | `20261114000200` | `irp_reconciliation` | GST/IRP Phase B — NOT AUTHORIZED |  |
 | `20261114000300` | `gst_mode_gates` | GST/IRP Phase B — NOT AUTHORIZED |  |
 | `20261114000400` | `restrict_trigger_functions_execute` | GST/IRP Phase B — NOT AUTHORIZED | Phase B5 — EXECUTE revoke; independent hardening, still NOT AUTHORIZED (Phase B) |
@@ -110,6 +125,25 @@ without separate written authorization each.
 | `20261115000100` | `fix_redeem_staff_invite_status_returns` | Branch set — apply only with B1 (release prep §2) | P0 auth — invite single-use fix |
 | `20261115000200` | `owner_billing_configuration_guard` | Branch set — apply only with B1 (release prep §2) | P0 security — owner-only tax/GSTIN trigger (PR #181 content, renumbered) |
 | `20261115000300` | `audit_restaurant_account_reassignment` | Branch set — apply only with B1 (release prep §2) | P0 security — account-reassignment audit ledger |
+| `20261118000100` | `merge_boundary_gst_order_line_edits` | PR #191 main-merge reconciliation (2026-11-16) | Re-asserts main's order-line edit boundary (owner/manager/cashier only; Kitchen 42501) on the GST replacement; NOT AUTHORIZED for hosted application by this merge |
+| `20261116000100` | `revoke_client_maintain_privileges` | Scoped ACL revision — NOT AUTHORIZED (own decision; production substitute for `20261110001220`, see its probed row) | Added 2026-11-16 after production catalog probes: completes the MAINTAIN/default-ACL scope 01220 misses in the production-shaped catalog, with fail-closed post-revoke verification; sequence revokes justified by definer-only consumption (verified in source). Locally replay-tested; never applied to any hosted project |
+| `20261119000100` | `restore_receipt_helper_boundary` | Local remediation — NOT AUTHORIZED for hosted application | Restores the P8 boundary loosened by `20261114000101`: revokes EXECUTE on `issue_closed_session_receipt(uuid,jsonb)` from public/anon/authenticated/service_role, so settlement continues to go through `close_order_session_and_issue_receipt`. Verified by `supabase/checks/07_p8_close_settlement.sql` in the local harness |
+| `20261119000200` | `new_outlet_tax_default` | Local remediation — NOT AUTHORIZED for hosted application | Owner decision (2026-11-19): new restaurants start at `tax_rate_bps = 0` instead of the sample 500 bps; existing rows are unchanged and the owner sets a rate explicitly |
+| `20261119000300` | `public_guest_gst_quote` | Local remediation — NOT AUTHORIZED for hosted application | Adds the guest-only `public_restaurant_gst(text)` projection (mode plus the closed Regular profile rate, never tenant identity) so the cart quote matches `place_public_order` in off, composition and regular modes |
+| `20261118002200` | `qr_code_staff_boundary` | Branch set — P0 QR security (F-01/F-02/F-03) | **APPLIED 2026-11-20 via B1:** autodinetest `20261120190508_qr_code_staff_boundary` + autodine-production `20261120190546_qr_code_staff_boundary` — fixes F-01/F-02 via `has_restaurant_role` + `is_member`, F-03 via `table_qr_codes_one_active_per_table` + `pg_advisory_xact_lock`, heals duplicates, re-asserts RLS. Verified: index present, 4 functions present, `is_member` policy active, both projects `ACTIVE_HEALTHY`. |
+| `20261118002300` | `qr_owner_management` | Branch set — QR owner management completeness | **APPLIED 2026-11-20 via B1:** autodinetest `20261120190520_qr_owner_management` + autodine-production `20261120190553_qr_owner_management` — `restore_table_qr_code` + `delete_table_safe` (archive vs delete, owner/manager only, advisory-locked). Verified: both functions present with correct grants, health green. |
+| `20261119000400` | `announcement_claim_recovery` | Branch set — announcement delivery reliability (order claim stale-expiry + waiter-call poll index) | Added 2026-11-19: fixes `claim_kitchen_order_announcement` to expire stale `kitchen_announcement_claims` (>2 min) before INSERT so a crashed device does not hold the announcement forever; mirrors waiter-call API re-queue of `announcement_status='claimed'` >2 min; adds `table_waiter_calls_announcement_claimed_idx` for efficient poll. Applied to hosted autodine-production (20261119101116) and autodinetest (20261119101121). `migrations:verify` 104/104; `sql:check` DDL parses. |
+| `20261121000100` | `item_allergens_jain` | Mainline — menu item allergen/Jain flags | Added on main and applied on hosted production (`20261121000100`). |
+| `20261121000200` | `upi_ref_at_mark_paid` | Mainline — required UPI reference at Mark Paid | Added on main and applied on hosted production (`20261121000200`). |
+| `20261122000100` | `single_counter_payment_function` | Mainline — drop five-argument `record_counter_payment` overload | Forward-only overload fix applied on main and hosted production (`20261122000100`). |
+| `20261122000200` | `announcement_claim_and_table_delete_fixes` | Mainline — `delete_table_safe` write gate + waiter-call history + claim recovery | Forward-only function redefinitions applied on main and hosted production (`20261122000200`). |
+| `20261123000100` | `billing_v2_foundation` | Billing Spec v2.0 | Added 2026-11-23: FSSAI/bill footer/default charges/round-off on `restaurants`; takeaway/delivery channels, discounts, complimentary, charges, round-off on `orders`/`order_sessions`; `create_counter_order`, `apply_order_billing_adjustment`, `record_split_counter_payments`, `record_counter_refund`, `restaurant_invoice_reprints`, `record_invoice_reprint`, `report_billing_summary`, `report_day_end_closing`. Locally replay-tested on embedded PostgreSQL 17. |
+| `20261123000200` | `waiter_coupons_split_bill` | Billing Spec v2.0 / Features — NOT AUTHORIZED for hosted application yet | Added 2026-11-23: extends `member_role` with `'waiter'` + table confirm / waiter-call / counter-order permissions; `restaurant_coupons` + `upsert_restaurant_coupon` / `toggle_restaurant_coupon` / `apply_coupon_to_order`; `order_sessions` split tracking + `split_order_session_for_billing` RPC. Locally replay-tested on embedded PostgreSQL 17. |
+| `20261123000300` | `print_devices_and_einvoice_irp` | Billing Spec v2.0 / Printing & Devices + IRP persistence — NOT AUTHORIZED for hosted application yet | Added 2026-11-23: `restaurant_printers` + printer CRUD/status RPCs; `ack_no`/`ack_date`/`signed_qr_payload`/`irp_generated_at`/`irp_cancelled_at` on `restaurant_invoices` + RPC-scoped `restaurant_invoices_immutable` + `complete_restaurant_invoice_irp` & `cancel_restaurant_invoice_irp`. Locally replay-tested on embedded PostgreSQL 17. |
+| `20261123000400` | `operating_modes_kot_handoff` | Compatible Operating Paths (Mode A alongside POS / Mode B primary OS) — NOT AUTHORIZED for hosted application yet | Added 2026-11-23: `operating_mode` (`mode_a` / `mode_b`) & `pos_integration_name` on `restaurants`; owner/manager-scoped `restaurant_pos_integrations` webhook settings; `kot_handoff_status`/`kot_handoff_at`/`kot_handoff_by`/`kot_handoff_ref` on `orders` + `save_restaurant_operating_mode` & `record_order_kot_handoff` RPCs. Locally replay-tested on embedded PostgreSQL 17. |
+| `20261123000500` | `order_reliability_and_traceability` | Phase 1 Order Reliability & Recovery — NOT AUTHORIZED for hosted application yet | Added 2026-11-23: `orders.counter_idempotency_key` + `create_counter_order(..., p_idempotency_key)` deduplication; `recover_public_order_by_attempt` RPC for duplicate-free guest reconnect recovery; immutable `order_status_events` table + trigger recording `placed`, `confirmed`, `prep_changed`, `cancelled`, `payment_changed`, and `kot_handoff`. |
+| `20261123000600` | `staff_billing_settings_reads` | Staff billing settings reads — grants authenticated staff SELECT on billing display columns of `public.restaurants` (fssai_number, bill_footer_note, default_service_charge_bps, default_packaging_charge_paise, default_delivery_charge_paise, round_off_enabled). | Added 2026-11-23. |
+| `20261122190000` | `verification_session_id_repair` | Repair schema drift on `table_verification_sessions` — production table was created without the `id` column (a `create table if not exists` silently skipped it), so guest checkout failed with 42703; this adds the missing column + default. | Repaired on prod 2026-11-22 (commit `ee887cc`). |
 
 ## Owner-operation (never applied automatically — separate on purpose)
 
@@ -125,10 +159,13 @@ without separate written authorization each.
   exactly what A1 re-probes. Two of these carry release-critical behaviour:
   `20261109001000_operational_readiness` (health goes green) and
   `20261110000700_restaurants_member_only` (Batch B; only after app deploy).
-- **Branch set (9):** the forward migrations this cycle adds on top of the
+- **Branch set (12):** the forward migrations this cycle adds on top of the
   boundary. Apply in filename order, only under B1 authorization, per release
   prep §2. `20261112000300_report_sales_export_authorization` is already applied
   on **staging only** (2026-11-15 rehearsal); production presence is unverified.
+  `20261119000400_announcement_claim_recovery` + `20261118002200_qr_code_staff_boundary`
+  + `20261118002300_qr_owner_management` are now on both hosted projects as of
+  2026-11-20 B1 (see rows) — tracked here for 104/104 completeness.
 - **GST/IRP Phase B (7):** `20261113000100` → `20261114000600` (B1–B7 in
   `docs/gst-irp-production-readiness-2026-11-14.md`). **NOT AUTHORIZED. Do not
   apply.** Note: B5 (`20261114000400_restrict_trigger_functions_execute`) is

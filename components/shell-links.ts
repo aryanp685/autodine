@@ -14,6 +14,8 @@
  * live floor, menu is what is for sale, business is what it added up to.
  */
 
+import type { OperatingMode } from '@/lib/operating-mode';
+
 export type DashboardSection =
   | 'overview'
   | 'menus'
@@ -45,52 +47,92 @@ export type ShellLink = {
    * a typed address behaves the same as a hidden link.
    */
   roles?: readonly string[];
+  /**
+   * Destinations belonging to Mode B (AutoDine as primary OS: counter POS,
+   * invoices, financial reports). Hidden from the rail in Mode A (alongside
+   * an existing POS), though direct URLs continue to render safely.
+   */
+  modeBOperationsOnly?: boolean;
 };
 
 /** Owner and manager: everything the business side owns. */
 const MANAGE = ['owner', 'manager'] as const;
 /** Money at the counter, and the bills it settles. */
 const COUNTER = ['owner', 'manager', 'cashier'] as const;
+/** Service floor: orders, waiter calls, and taking counter/table orders. */
+const FLOOR = ['owner', 'manager', 'cashier', 'waiter'] as const;
 /** The ticket rail. */
 const KITCHEN = ['owner', 'manager', 'kitchen'] as const;
 
 export const DASHBOARD_LINKS: ReadonlyArray<ShellLink> = [
   { key: 'overview', label: 'Overview', href: '/dashboard', group: 'Today', roles: MANAGE },
 
-  { key: 'orders', label: 'Orders', href: '/dashboard/orders', group: 'Service', roles: COUNTER },
-  { key: 'invoices', label: 'Invoices', href: '/dashboard/invoices', group: 'Service', roles: COUNTER },
+  { key: 'orders', label: 'Orders', href: '/dashboard/orders', group: 'Service', roles: FLOOR },
+  {
+    key: 'invoices',
+    label: 'Invoices',
+    href: '/dashboard/invoices',
+    group: 'Service',
+    roles: COUNTER,
+    modeBOperationsOnly: true,
+  },
   { key: 'kitchen', label: 'Kitchen', href: '/kitchen', group: 'Service', roles: KITCHEN },
-  { key: 'counter', label: 'Counter', href: '/cashier', group: 'Service', roles: COUNTER },
+  {
+    key: 'counter',
+    label: 'Counter',
+    href: '/cashier',
+    group: 'Service',
+    roles: FLOOR,
+    modeBOperationsOnly: true,
+  },
 
   { key: 'menus', label: 'Menus', href: '/dashboard/menus', group: 'Menu', roles: MANAGE },
   { key: 'branding', label: 'Branding', href: '/dashboard/branding', group: 'Menu', roles: MANAGE },
   { key: 'import', label: 'Import menu', href: '/dashboard/menus/import', group: 'Menu', roles: MANAGE },
   { key: 'tables', label: 'Tables & QR', href: '/dashboard/tables', group: 'Menu', roles: MANAGE },
 
-  { key: 'reports', label: 'Reports', href: '/dashboard/reports', group: 'Business', roles: MANAGE },
+  {
+    key: 'reports',
+    label: 'Reports',
+    href: '/dashboard/reports',
+    group: 'Business',
+    roles: MANAGE,
+    modeBOperationsOnly: true,
+  },
   { key: 'subscription', label: 'Subscription', href: '/dashboard/subscription', group: 'Business', roles: MANAGE },
   { key: 'settings', label: 'Settings', href: '/dashboard/settings', group: 'Business', roles: MANAGE },
 ];
 
 /**
- * The rail for one person's role.
+ * The rail for one person's role and operating mode.
  *
  * An unknown role (no session, a demo screen, a role added later) gets
- * everything, which is what every screen did before this existed. A kitchen
- * login gets two destinations and no Business group at all, rather than a
- * heading with nothing under it.
+ * everything (respecting Mode A if explicitly active). A kitchen login gets
+ * two destinations and no Business group at all, rather than a heading with
+ * nothing under it.
  */
-export function linksForRole(role: string | null | undefined): ReadonlyArray<ShellLink> {
-  if (!role) return DASHBOARD_LINKS;
-  return DASHBOARD_LINKS.filter((link) => !link.roles || link.roles.includes(role));
+export function linksForRole(
+  role: string | null | undefined,
+  operatingMode?: OperatingMode | null,
+): ReadonlyArray<ShellLink> {
+  return DASHBOARD_LINKS.filter((link) => {
+    if (operatingMode === 'mode_a' && link.modeBOperationsOnly) return false;
+    if (role && link.roles && !link.roles.includes(role)) return false;
+    return true;
+  });
 }
 
 export function groupsForRole(
   role: string | null | undefined,
+  operatingMode?: OperatingMode | null,
 ): ReadonlyArray<{ name: string; links: readonly ShellLink[] }> {
   return SHELL_GROUPS.map((group) => ({
     name: group.name,
-    links: group.links.filter((link) => !role || !link.roles || link.roles.includes(role)),
+    links: group.links.filter((link) => {
+      if (operatingMode === 'mode_a' && link.modeBOperationsOnly) return false;
+      if (role && link.roles && !link.roles.includes(role)) return false;
+      return true;
+    }),
   })).filter((group) => group.links.length > 0);
 }
 

@@ -25,13 +25,18 @@ import type {
   ItemVariant,
   Menu,
   Order,
+  OrderChannel,
   OrderItem,
   OrderSession,
+  OrderStatusEvent,
   RestaurantInvoice,
   RestaurantInvoiceLine,
+  RestaurantInvoiceReprint,
   RestaurantNote,
   RestaurantNoteEvent,
   RestaurantPaymentReceipt,
+  RestaurantPosIntegration,
+  RestaurantPrinter,
   TableWaiterCall,
   PaymentStatus,
   PrepStatus,
@@ -50,17 +55,48 @@ type Table<Row, Rel extends unknown[] = []> = {
   Relationships: Rel;
 };
 
-export type MemberRole = 'owner' | 'manager' | 'kitchen' | 'cashier';
+export type MemberRole = 'owner' | 'manager' | 'kitchen' | 'cashier' | 'waiter';
+
+/** Columns granted to the shared authenticated role on restaurants. */
+type StaffRestaurant = Omit<
+  Restaurant,
+  'plan' | 'plan_status' | 'trial_started_at' | 'plan_started_at' | 'plan_expires_at'
+>;
+
+/** Columns granted to the shared authenticated role on the base order table. */
+type OperationalOrder = Omit<
+  Order,
+  | 'payment_status'
+  | 'subtotal_paise'
+  | 'discount_paise'
+  | 'tax_paise'
+  | 'total_paise'
+  | 'guest_token'
+  | 'cancel_reason'
+  | 'tax_rate_bps_snapshot'
+  | 'confirmed_by'
+  | 'order_session_id'
+  | 'discount_reason'
+  | 'is_complimentary'
+  | 'complimentary_reason'
+  | 'service_charge_paise'
+  | 'packaging_charge_paise'
+  | 'delivery_charge_paise'
+  | 'round_off_paise'
+>;
+
+/** Line-item facts available to all staff; prices use order_items_finance. */
+type OperationalOrderItem = Omit<OrderItem, 'unit_price_paise'>;
 
 export type Database = {
   public: {
     Tables: {
-      restaurants: Table<Restaurant>;
+      restaurants: Table<StaffRestaurant>;
       /**
        * Migration 20261110001000 (Model C). One subscription per account;
        * every restaurant row points at one through `restaurants.account_id`.
-       * Read-only from the app: subscription state changes only through
-       * public.admin_set_subscription(), which is service-role only.
+       * Direct reads are Owner/Manager-only under accounts_owner_manager_read;
+       * subscription state changes only through service-role paths.
        */
       accounts: Table<{
         id: string;
@@ -194,6 +230,7 @@ export type Database = {
         role: MemberRole;
         created_at: string;
       }>;
+      restaurant_printers: Table<RestaurantPrinter>;
       menus: Table<Menu>;
       categories: Table<Category>;
       items: Table<
@@ -221,14 +258,20 @@ export type Database = {
       dining_tables: Table<DiningTable>;
       /** The sitting represented by the consolidated table bill. */
       order_sessions: Table<OrderSession>;
+      /** Append-only order status history (20261121000500). */
+      order_status_events: Table<OrderStatusEvent>;
       /** Per-restaurant GST configuration; one live row, mode 'off' by default. */
       restaurant_gst_config: Table<RestaurantGstConfig>;
+      /** Owner/manager-only POS webhook settings for Mode A KOT handoff. */
+      restaurant_pos_integrations: Table<RestaurantPosIntegration>;
       /** Immutable, sequential customer receipts; rows are written only by RPC. */
       restaurant_invoices: Table<RestaurantInvoice>;
       /** Immutable line snapshots belonging to a receipt. */
       restaurant_invoice_lines: Table<RestaurantInvoiceLine>;
       /** Immutable supplemental receipts for payments received after invoicing. */
       restaurant_payment_receipts: Table<RestaurantPaymentReceipt>;
+      /** Immutable audit log of invoice reprints (20261121000100). */
+      restaurant_invoice_reprints: Table<RestaurantInvoiceReprint>;
       /** Full-document credit/debit notes against GST documents (20261114000500). */
       restaurant_notes: Table<RestaurantNote>;
       /** Append-only issuance/void audit for notes (20261114000500). */
@@ -282,7 +325,7 @@ export type Database = {
         rotated_at: string;
       }>;
       orders: Table<
-        Order,
+        OperationalOrder,
         [
           {
             foreignKeyName: 'order_items_order_id_fkey';
@@ -293,7 +336,7 @@ export type Database = {
           },
         ]
       >;
-      order_items: Table<OrderItem>;
+      order_items: Table<OperationalOrderItem>;
       /**
        * Migration 20261029000100. Staff invitations.
        *
@@ -371,7 +414,7 @@ export type Database = {
         order_id: string;
         restaurant_id: string;
         /** `manual` is internal-only for the table-level Mark Paid action. */
-        method: 'cash' | 'card' | 'upi' | 'online' | 'manual';
+        method: 'cash' | 'card' | 'upi' | 'online' | 'manual' | 'other';
         amount_paise: number;
         status: 'pending' | 'recorded' | 'failed' | 'refunded';
         provider: string | null;
@@ -380,11 +423,112 @@ export type Database = {
         /** The provider's id for the money, e.g. Razorpay pay_.... Migration 00800. */
         provider_payment_ref: string | null;
         idempotency_key: string | null;
+        refund_of_payment_id?: string | null;
+        refund_reason?: string | null;
+        split_label?: string | null;
         created_at: string;
         recorded_at: string | null;
       }>;
     };
-    Views: Record<string, never>;
+    Views: {
+      /** Migration 20261112000500 + 20261121000100. Owner/Manager/Cashier projection; never contains guest_token. */
+      orders_finance: {
+        Row: {
+          id: string;
+          restaurant_id: string;
+          table_id: string | null;
+          code: string;
+          customer_note: string | null;
+          prep_status: PrepStatus;
+          payment_status: PaymentStatus;
+          subtotal_paise: number;
+          discount_paise: number;
+          tax_paise: number;
+          total_paise: number;
+          placed_at: string;
+          updated_at: string;
+          tax_rate_bps_snapshot: number | null;
+          hold_required: boolean;
+          confirmed_at: string | null;
+          table_session_id: string | null;
+          order_session_id: string | null;
+          kitchen_announcement_status: 'announced' | 'failed' | null;
+          kitchen_announcement_at: string | null;
+          kitchen_announcement_error: string | null;
+          order_channel: OrderChannel;
+          discount_reason: string | null;
+          is_complimentary: boolean;
+          complimentary_reason: string | null;
+          service_charge_paise: number;
+          packaging_charge_paise: number;
+          delivery_charge_paise: number;
+          round_off_paise: number;
+          coupon_code: string | null;
+        };
+        Relationships: [];
+      };
+      /** Migration 20261121000200. Restaurant promo / coupon codes. */
+      restaurant_coupons: {
+        Row: {
+          id: string;
+          restaurant_id: string;
+          code: string;
+          description: string;
+          discount_type: 'percent' | 'flat';
+          discount_value: number;
+          min_order_paise: number;
+          max_discount_paise: number | null;
+          max_uses: number | null;
+          uses_count: number;
+          valid_from: string | null;
+          valid_until: string | null;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<{
+          id: string;
+          restaurant_id: string;
+          code: string;
+          description: string;
+          discount_type: 'percent' | 'flat';
+          discount_value: number;
+          min_order_paise: number;
+          max_discount_paise: number | null;
+          max_uses: number | null;
+          uses_count: number;
+          valid_from: string | null;
+          valid_until: string | null;
+          is_active: boolean;
+        }>;
+        Update: Partial<{
+          description: string;
+          discount_type: 'percent' | 'flat';
+          discount_value: number;
+          min_order_paise: number;
+          max_discount_paise: number | null;
+          max_uses: number | null;
+          is_active: boolean;
+        }>;
+        Relationships: [];
+      };
+      /** Migration 20261112000500. Financial line prices for Owner/Manager/Cashier. */
+      order_items_finance: {
+        Row: {
+          id: string;
+          order_id: string;
+          item_id: string | null;
+          name_snapshot: string;
+          unit_price_paise: number;
+          qty: number;
+          variant_snapshot: string | null;
+          addons_snapshot: string[];
+          is_veg: boolean | null;
+          sort_order: number;
+        };
+        Relationships: [];
+      };
+    };
     Functions: {
       /** Migration 20261110001100. The approved monthly price, in paise. */
       plan_price_paise: {
@@ -434,19 +578,22 @@ export type Database = {
         };
         Returns: Record<string, unknown>;
       };
-      /** The owner's own subscription, membership-checked inside the function. */
+      /** Owner/Manager-only account state, role-checked inside the function. */
       account_subscription_state: {
         Args: { p_restaurant_id: string };
         Returns: Record<string, unknown>;
       };
+      /** Owner/Manager-only subscription event history, capped at 50. */
       account_subscription_history: {
         Args: { p_restaurant_id: string; p_limit?: number };
         Returns: Record<string, unknown>[];
       };
+      /** Owner/Manager-only payment amounts and receipt references, capped at 50. */
       account_payment_history: {
         Args: { p_restaurant_id: string; p_limit?: number };
         Returns: Record<string, unknown>[];
       };
+      /** Owner/Manager-only receipt detail. */
       account_receipt: {
         Args: { p_receipt_id: string };
         Returns: Record<string, unknown>;
@@ -915,6 +1062,14 @@ export type Database = {
         Args: { p_table_id: string };
         Returns: undefined;
       };
+      restore_table_qr_code: {
+        Args: { p_table_id: string };
+        Returns: string;
+      };
+      delete_table_safe: {
+        Args: { p_table_id: string };
+        Returns: string;
+      };
       /**
        * Migration 0009. Sales aggregates for one restaurant and one range.
        *
@@ -1232,27 +1387,23 @@ export type Database = {
         Returns: string;
       };
       /**
-       * Migration 20261026001200. Plan, trial clock, the write gate and the
-       * feature list in one object. This is what the dashboard's plan line and
-       * every "this plan does not include that" message read. Returns null for
-       * an id the caller cannot resolve through membership (the function is
-       * SECURITY DEFINER but the id always comes from the membership row).
+       * Membership-checked operational entitlement read. Every staff role gets
+       * can_write/read_only/features; only Owner/Manager also receive plan,
+       * trial dates, account id and outlet allowance.
        */
       restaurant_access: {
         Args: { p_restaurant_id: string };
         Returns: {
-          plan: string;
-          status: string;
-          started_at: string;
-          trial_ends_at: string;
-          plan_expires_at: string | null;
-          days_remaining: number;
+          plan?: string;
+          status?: string;
+          trial_ends_at?: string | null;
+          plan_expires_at?: string | null;
+          days_remaining?: number;
           can_write: boolean;
           read_only: boolean;
           features: string[];
-          /** Migration 20261110001000 (Model C). Null only before that migration. */
-          account_id: string | null;
-          outlets: {
+          account_id?: string | null;
+          outlets?: {
             used: number;
             limit: number | null;
             unlimited: boolean;
@@ -1272,6 +1423,196 @@ export type Database = {
       restaurant_has_feature: {
         Args: { p_restaurant_id: string; p_feature: string };
         Returns: boolean;
+      };
+      /** Migration 20261121000100 (Billing Spec v2.0), updated 20261121000500 (idempotency). */
+      create_counter_order: {
+        Args: {
+          p_restaurant_id: string;
+          p_channel: string;
+          p_table_id?: string | null;
+          p_lines?: unknown;
+          p_note?: string | null;
+          p_customer_name?: string | null;
+          p_customer_phone?: string | null;
+          p_idempotency_key?: string | null;
+        };
+        Returns: Json;
+      };
+      apply_order_billing_adjustment: {
+        Args: {
+          p_order_id: string;
+          p_discount_paise?: number | null;
+          p_discount_reason?: string | null;
+          p_service_charge_paise?: number | null;
+          p_packaging_charge_paise?: number | null;
+          p_delivery_charge_paise?: number | null;
+          p_round_off?: boolean | null;
+          p_is_complimentary?: boolean | null;
+          p_complimentary_reason?: string | null;
+        };
+        Returns: Json;
+      };
+      record_split_counter_payments: {
+        Args: {
+          p_order_id: string;
+          p_splits: unknown;
+          p_idempotency_key: string;
+        };
+        Returns: Json;
+      };
+      record_counter_refund: {
+        Args: {
+          p_payment_id: string;
+          p_amount_paise: number;
+          p_reason: string;
+          p_idempotency_key: string;
+        };
+        Returns: Json;
+      };
+      record_invoice_reprint: {
+        Args: {
+          p_invoice_id: string;
+          p_format?: string;
+        };
+        Returns: Json;
+      };
+      report_billing_summary: {
+        Args: {
+          p_restaurant_id: string;
+          p_from: string;
+          p_to: string;
+          p_timezone?: string;
+        };
+        Returns: Json;
+      };
+      report_day_end_closing: {
+        Args: {
+          p_restaurant_id: string;
+          p_date?: string;
+          p_timezone?: string;
+        };
+        Returns: Json;
+      };
+      /** Migration 20261121000200 (Waiter, Coupons, Split Bill). */
+      upsert_restaurant_coupon: {
+        Args: {
+          p_restaurant_id: string;
+          p_code: string;
+          p_discount_type: string;
+          p_discount_value: number;
+          p_min_order_paise?: number;
+          p_max_discount_paise?: number | null;
+          p_max_uses?: number | null;
+          p_valid_from?: string | null;
+          p_valid_until?: string | null;
+          p_description?: string;
+          p_is_active?: boolean;
+        };
+        Returns: Json;
+      };
+      toggle_restaurant_coupon: {
+        Args: {
+          p_coupon_id: string;
+          p_is_active: boolean;
+        };
+        Returns: boolean;
+      };
+      apply_coupon_to_order: {
+        Args: {
+          p_order_id: string;
+          p_code?: string | null;
+        };
+        Returns: Json;
+      };
+      split_order_session_for_billing: {
+        Args: {
+          p_source_session_id: string;
+          p_order_ids?: string[] | null;
+          p_item_splits?: unknown;
+        };
+        Returns: Json;
+      };
+      upsert_restaurant_printer: {
+        Args: {
+          p_restaurant_id: string;
+          p_printer_id?: string | null;
+          p_name?: string | null;
+          p_role?: string;
+          p_printer_type?: string;
+          p_connection_type?: string;
+          p_paper_width?: string;
+          p_bridge_printer_name?: string | null;
+          p_network_host?: string | null;
+          p_network_port?: number | null;
+          p_is_default?: boolean;
+          p_auto_print_on_close?: boolean;
+        };
+        Returns: RestaurantPrinter;
+      };
+      delete_restaurant_printer: {
+        Args: { p_printer_id: string };
+        Returns: boolean;
+      };
+      record_restaurant_printer_status: {
+        Args: {
+          p_printer_id: string;
+          p_status: string;
+          p_error?: string | null;
+        };
+        Returns: RestaurantPrinter;
+      };
+      complete_restaurant_invoice_irp: {
+        Args: {
+          p_invoice_id: string;
+          p_provider: string;
+          p_outcome: string;
+          p_irn?: string | null;
+          p_ack_no?: string | null;
+          p_ack_date?: string | null;
+          p_signed_qr_payload?: string | null;
+          p_request_sha256?: string | null;
+          p_response_sha256?: string | null;
+          p_error_code?: string | null;
+          p_error_message?: string | null;
+        };
+        Returns: Json;
+      };
+      cancel_restaurant_invoice_irp: {
+        Args: {
+          p_invoice_id: string;
+          p_provider: string;
+          p_reason_code: string;
+          p_remark: string;
+          p_cancelled_at?: string | null;
+        };
+        Returns: Json;
+      };
+      /** Migration 20261121000400 (Mode A / Mode B operating paths). */
+      save_restaurant_operating_mode: {
+        Args: {
+          p_restaurant_id: string;
+          p_operating_mode: string;
+          p_pos_integration_name?: string | null;
+          p_webhook_url?: string | null;
+          p_webhook_secret?: string | null;
+        };
+        Returns: Json;
+      };
+      record_order_kot_handoff: {
+        Args: {
+          p_order_id: string;
+          p_status: string;
+          p_pos_ref?: string | null;
+        };
+        Returns: Json;
+      };
+      /** Migration 20261121000500 (Phase 1 guest attempt recovery). */
+      recover_public_order_by_attempt: {
+        Args: {
+          p_slug: string;
+          p_guest_token: string;
+        };
+        Returns: Json;
       };
     };
     Enums: {

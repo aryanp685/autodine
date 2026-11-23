@@ -3,10 +3,21 @@
  * Offline release-readiness verifier — fail-closed, read-only, no network.
  *
  * Verifies the repository is in the state the 2026-11-14 release preparation
- * documents assume. It does NOT connect to any hosted service, does NOT
+ * documents assumed. It does NOT connect to any hosted service, does NOT
  * authorize a release, and deliberately fails if the GST/IRP authorization
  * boundary drifts. Exits 0 only when every invariant holds; prints one line
  * per check with a fixed vocabulary. Run: `npm run verify:release`.
+ *
+ * 2026-11-21 cleanup note: the 2026-11-14 release-preparation documents this
+ * verifier reads (docs/migration-manifest-2026-11-14.md,
+ * docs/gst-irp-production-readiness-2026-11-14.md,
+ * docs/production-release-prep-2026-11-14.md, docs/owner-action-register-2026-11-14.md,
+ * docs/owner-closure-package-2026-11-14.md, docs/credential-exposure-remediation-2026-11-14.md,
+ * docs/execution-report-2026-11-14.md) were removed in the 2026-11-21 cleanup.
+ * Missing documents now surface as named FAIL lines (exit 1) instead of an
+ * unhandled exception — the gate fails closed by design and is NOT cleared by
+ * editing this script. Restoring the evidence (or formally re-drawing the
+ * release boundary) is an owner decision.
  */
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -18,13 +29,31 @@ const check = (name, ok, detail = '') => {
   if (ok) notes.push(`ok ${name}`);
   else problems.push(`FAIL ${name}${detail ? ': ' + detail : ''}`);
 };
-const read = (p) => readFileSync(join(root, p), 'utf8');
+// Missing documents yield '' (every content assertion below then fails
+// closed with a named FAIL line) rather than an unhandled exception.
+const read = (p) => {
+  try {
+    return readFileSync(join(root, p), 'utf8');
+  } catch {
+    return '';
+  }
+};
 
-// 1. Migration inventory: exactly 92 files, unique 14-digit versions.
+// 1. Migration inventory: exactly 113 files, unique 14-digit versions.
+// 98 at the 2026-11-14 baseline, plus three 2026-11-19 remediation migrations
+// (receipt-helper ACL restore, new-outlet 0% tax default, guest GST quote
+// projection) plus one announcement claim-recovery (20261119000400) plus two
+// QR migrations (20261118002200 staff boundary F-01/F-02/F-03, 20261118002300 owner management),
+// plus mainline 20261121000100/200 and 20261122000100/200,
+// plus Billing Spec v2.0 foundation (20261123000100), waiter/coupons/split-bill (20261123000200),
+// Printing & Devices + IRP persistence (20261123000300), Mode A/B operating paths (20261123000400),
+// and Phase 1 Order Reliability & Traceability (20261123000500),
+// plus staff billing settings reads (20261123000600) and the
+// verification-session id drift repair (20261122190000).
 const migDir = join(root, 'supabase/migrations');
 const migFiles = readdirSync(migDir).filter((f) => f.endsWith('.sql')).sort();
 const versions = migFiles.map((f) => f.slice(0, 14));
-check('migration_count_92', migFiles.length === 92, `found ${migFiles.length}`);
+check('migration_count_115', migFiles.length === 115, `found ${migFiles.length}`);
 check('migration_versions_unique', new Set(versions).size === versions.length);
 check('migration_versions_14_digit', versions.every((v) => /^[0-9]{14}$/.test(v)));
 
@@ -33,12 +62,12 @@ check('owner_operation_present', existsSync(join(root, 'supabase/owner-operation
 check('owner_operation_not_in_migrations', !migFiles.includes('20261110000501_revoke_supabase_admin_client_defaults.sql'));
 
 // 3. GST/IRP Phase B (B1–B7) exist and are documented as NOT AUTHORIZED.
-const GST_B = ['20261113000100_gst_two_mode.sql','20261114000100_gst_b2b_einvoice_readiness.sql','20261114000200_irp_reconciliation.sql','20261114000300_gst_mode_gates.sql','20261114000400_restrict_trigger_functions_execute.sql','20261114000500_credit_debit_notes.sql','20261114000600_einvoice_issuance_profile.sql'];
+const GST_B = ['20261113000100_gst_two_mode.sql','20261114000101_gst_b2b_einvoice_readiness.sql','20261114000200_irp_reconciliation.sql','20261114000300_gst_mode_gates.sql','20261114000400_restrict_trigger_functions_execute.sql','20261114000500_credit_debit_notes.sql','20261114000600_einvoice_issuance_profile.sql'];
 for (const f of GST_B) check(`gst_irp_present:${f.slice(0,14)}`, migFiles.includes(f));
 const manifest = existsSync(join(root, 'docs/migration-manifest-2026-11-14.md')) ? read('docs/migration-manifest-2026-11-14.md') : '';
 const manifestVersions = new Set([...manifest.matchAll(/`([0-9]{14})`/g)].map((m) => m[1]));
 const actualVersions = new Set(versions);
-check('manifest_tracks_all_92', actualVersions.size === manifestVersions.size && [...actualVersions].every((v) => manifestVersions.has(v)),
+check('manifest_tracks_all_115', actualVersions.size === manifestVersions.size && [...actualVersions].every((v) => manifestVersions.has(v)),
   `manifest ${manifestVersions.size} versions vs actual ${actualVersions.size}`);
 check('manifest_marks_gst_irp_unauthorized', manifest.includes('NOT AUTHORIZED') && manifest.includes('GST/IRP'));
 check('gst_irp_plan_unauthorized', read('docs/gst-irp-production-readiness-2026-11-14.md').includes('NOT AUTHORIZED'));

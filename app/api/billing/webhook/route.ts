@@ -28,6 +28,11 @@ import { NextResponse } from 'next/server';
 
 import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import { isSupabaseAdminConfigured } from '@/lib/supabase/env';
+import {
+  CASHFREE_PROVIDER_ID,
+  parseCashfreeWebhookPayload,
+  verifyCashfreeWebhookSignature,
+} from '@/lib/billing/cashfree';
 import { billingWebhookSecret, BILLING_PROVIDER_ENV } from '@/lib/billing/provider';
 import {
   parseBillingEvent,
@@ -53,13 +58,13 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   // 2. The exact bytes that were signed.
   const rawBody = await request.text();
+  const headerMap = Object.fromEntries(request.headers.entries());
 
   // 3. Signature and freshness.
-  const verification = verifyWebhookHeaders({
-    rawBody,
-    headers: Object.fromEntries(request.headers.entries()),
-    secret,
-  });
+  const isCashfree = providerName === CASHFREE_PROVIDER_ID;
+  const verification = isCashfree
+    ? verifyCashfreeWebhookSignature({ rawBody, headers: headerMap, secret })
+    : verifyWebhookHeaders({ rawBody, headers: headerMap, secret });
   if (!verification.ok) {
     return NextResponse.json(GENERIC_FAILURE, { status: 400 });
   }
@@ -71,7 +76,9 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json(GENERIC_FAILURE, { status: 400 });
   }
 
-  const event = parseBillingEvent(payload);
+  const event = isCashfree
+    ? parseCashfreeWebhookPayload(payload, rawBody)
+    : parseBillingEvent(payload);
   if (!event) {
     return NextResponse.json(GENERIC_FAILURE, { status: 400 });
   }

@@ -95,6 +95,7 @@ function signedIn(
       slug: 'maddi',
       role,
       outlets: [{ id: 'restaurant-1', name: 'Maddi', role }],
+      entitlement: null,
       access: null,
     },
   };
@@ -185,6 +186,26 @@ describe('getOrdersScreenData', () => {
     expect(mocks.reportLoader).not.toHaveBeenCalled();
   });
 
+  it('loads operational state for report-backed orders without losing finance fields', async () => {
+    const fake = fakeSupabase({ orders: [{
+      id: 'order-finance', updated_at: NOW.toISOString(), hold_required: true,
+      confirmed_at: null, kitchen_announcement_status: 'failed',
+    }] });
+    mocks.staff.result = signedIn('owner', fake.client);
+    mocks.reportLoader.mockResolvedValue({
+      timezone: TZ, range: resolveRange('today', TZ, NOW), ordersTruncated: false,
+      report: { orders: [{ id: 'order-finance', totalPaise: 12500 }] },
+    });
+
+    const result = await getOrdersScreenData({}, NOW);
+
+    expect(result?.orders[0]).toMatchObject({
+      id: 'order-finance', totalPaise: 12500, updatedAt: NOW.toISOString(),
+      holdRequired: true, confirmedAt: null, kitchenAnnouncementStatus: 'failed',
+    });
+    expect(fake.calls[0]?.filters).toContainEqual({ method: 'eq', column: 'restaurant_id', value: 'restaurant-1' });
+  });
+
   it.each(['owner', 'manager'] as const)('%s keeps the full report-backed order data', async (role) => {
     const fake = fakeSupabase({});
     const fullOrder: ReportOrderRow = {
@@ -222,7 +243,14 @@ describe('getOrdersScreenData', () => {
       canExport: true,
       orders: [fullOrder],
     });
-    expect(fake.from).not.toHaveBeenCalled();
+    expect(fake.calls).toHaveLength(1);
+    expect(fake.calls[0]).toMatchObject({
+      table: 'orders',
+      selection: 'id, updated_at, hold_required, confirmed_at, kitchen_announcement_status',
+    });
+    expect(fake.calls[0]?.filters).toContainEqual({
+      method: 'eq', column: 'restaurant_id', value: 'restaurant-1',
+    });
   });
 
   it('does not run an order or report query for a role denied by the route layout', async () => {

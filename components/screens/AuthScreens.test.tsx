@@ -34,7 +34,7 @@ describe('sign in', () => {
   const html = renderToStaticMarkup(<LoginScreen />);
 
   it('keeps the sign-in form focused with a separate desktop overview', () => {
-    expect(html).toContain('Sign in to your restaurant');
+    expect(html).toMatch(/Sign in to your\s*<em[^>]*>restaurant<\/em>/);
     expect(html).toContain('name="email"');
     expect(html).toContain('name="password"');
     expect(html).toContain('type="submit"');

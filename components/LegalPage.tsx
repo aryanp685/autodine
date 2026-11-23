@@ -18,11 +18,15 @@ export function LegalPage({
   title,
   lede,
   children,
+  address,
+  phone,
 }: {
   kicker: string;
   title: string;
   lede: string;
   children: ReactNode;
+  address?: string;
+  phone?: string;
 }) {
   return (
     <div className="min-h-screen bg-ink text-cream antialiased">
@@ -53,7 +57,7 @@ export function LegalPage({
         <div className="mt-12 space-y-10">{children}</div>
       </main>
 
-      <SiteFooter fineRight="Product preview" />
+      <SiteFooter fineRight="Product preview" address={address} phone={phone} />
     </div>
   );
 }

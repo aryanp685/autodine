@@ -157,9 +157,15 @@ export function Dashboard({
         meta={venueMeta || undefined}
         actions={
           <>
-            <BtnLink href="/cashier" tone="ghost">
-              Open the counter
-            </BtnLink>
+            {outlet?.operatingMode === 'mode_a' ? (
+              <BtnLink href="/dashboard/orders" tone="ghost">
+                Orders &amp; KOT handoff
+              </BtnLink>
+            ) : (
+              <BtnLink href="/cashier" tone="ghost">
+                Open the counter
+              </BtnLink>
+            )}
             <BtnLink href="/kitchen" tone="primary">
               Open the kitchen board
             </BtnLink>
@@ -168,6 +174,29 @@ export function Dashboard({
       />
 
       {blocked && <SignInPrompt reason={blocked} screen="dashboard" />}
+
+      {!blocked && outlet?.operatingMode === 'mode_a' ? (
+        <Notice
+          tone="plain"
+          label={
+            <Tag tone="live">
+              Mode A · Alongside {outlet.posIntegrationName || 'existing POS'}
+            </Tag>
+          }
+          action={
+            <Link
+              href="/dashboard/settings#settings-operating-mode"
+              className="text-[12.5px] font-medium text-gink-64 underline decoration-hair-strong underline-offset-[3px] hover:text-gink hover:decoration-gink"
+            >
+              Operating path
+            </Link>
+          }
+        >
+          AutoDine is running QR ordering and the kitchen board alongside your existing billing
+          software. Billing, GST receipts, and financial reports are hidden from the rail until you
+          switch to Mode B.
+        </Notice>
+      ) : null}
 
       {/*
         The plan, on the first screen, because it is the one fact that changes
@@ -468,6 +497,7 @@ export function Dashboard({
                             table={session.table}
                             outstandingPaise={session.outstandingPaise}
                             gstMode={data.gstMode}
+                            printers={data.printers}
                           />
                         </div>
                       ) : null}
@@ -526,6 +556,57 @@ export function Dashboard({
       </section>
 
       <div className="mt-5">
+        {live && !blocked && data?.orderHealth ? (
+          <div className="mb-5">
+            <Panel
+              data-order-health-panel
+              title="Order reliability & delays"
+              meta={
+                data.orderHealth.flaggedCount > 0
+                  ? `${data.orderHealth.flaggedCount} need attention · ${data.orderHealth.delayedCount} delayed`
+                  : 'All open orders on track'
+              }
+              action={
+                <BtnLink href="/dashboard/orders?status=delayed" tone="ghost" size="sm">
+                  View alerts
+                </BtnLink>
+              }
+            >
+              {data.orderHealth.flaggedOrders.length > 0 ? (
+                <ul className="m-0 flex list-none flex-col divide-y divide-hair p-0">
+                  {data.orderHealth.flaggedOrders.slice(0, 6).map((item) => (
+                    <li
+                      key={item.orderId}
+                      className="flex flex-wrap items-center justify-between gap-3 py-2.5"
+                    >
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        <Link
+                          href={`/bill/${item.orderId}`}
+                          className="text-[13px] font-semibold text-gink underline decoration-hair-strong underline-offset-2"
+                        >
+                          {item.code}
+                        </Link>
+                        <span className="text-[12.5px] text-gink-64">{item.tableLabel}</span>
+                        <Tag tone="due">{item.summary ?? 'Needs attention'}</Tag>
+                      </div>
+                      <Link
+                        href={`/bill/${item.orderId}`}
+                        className="text-[12.5px] font-medium text-gink-64 underline decoration-hair-strong underline-offset-2 hover:text-gink"
+                      >
+                        Inspect trace →
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="m-0 text-[12.5px] text-gink-64">
+                  No stalled tickets, unconfirmed tables, or failed kitchen alerts today.
+                </p>
+              )}
+            </Panel>
+          </div>
+        ) : null}
+
         <Panel
           /* "Orders today" is the label on the first-row card; this is the
              five most recent, so it says that. */

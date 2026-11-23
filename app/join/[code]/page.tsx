@@ -44,13 +44,13 @@ function Shell({
       lede={lede}
       action={action}
       notes={[
-        <>
+        <span key="one-link">
           <strong>One link, one person.</strong> It stops working after it is used, or when it expires.
-        </>,
-        <>
+        </span>,
+        <span key="own-login">
           <strong>Your own login.</strong> The kitchen, the counter and the office do not share a
           password: each person signs in with their own.
-        </>,
+        </span>,
       ]}
       notesTitle="How this works"
     >

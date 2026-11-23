@@ -97,6 +97,46 @@ export function VegMark({ veg, size = 14 }: { veg: boolean | null; size?: number
   );
 }
 
+export function JainMark({ jain, size = 14 }: { jain: boolean | null; size?: number }) {
+  if (jain === null) return null;
+  return (
+    <span
+      data-jain={jain ? 'jain' : 'non'}
+      className={[
+        'inline-grid shrink-0 place-items-center rounded-[3px] border-[1.5px] bg-transparent',
+        jain ? 'border-[#1a7f37]' : 'border-[#9b2c2c]',
+      ].join(' ')}
+      style={{ width: size, height: size }}
+      title={jain ? 'Jain' : 'Non-Jain'}
+      aria-label={jain ? 'Jain' : 'Non-Jain'}
+    >
+      <span
+        aria-hidden="true"
+        className="block rounded-full"
+        style={{
+          width: Math.max(4, Math.round(size * 0.42)),
+          height: Math.max(4, Math.round(size * 0.42)),
+          background: jain ? '#1a7f37' : '#9b2c2c',
+        }}
+      />
+    </span>
+  );
+}
+
+export function AllergenBadge({ allergens }: { allergens: string[] | null }) {
+  const hasAllergens = allergens != null && allergens.length > 0;
+  if (!hasAllergens) return null;
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {allergens.map((a) => (
+        <span key={a} className="g-badge px-2 py-0.5 text-[11px]">
+          {a}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 /**
  * An amount of money.
  *

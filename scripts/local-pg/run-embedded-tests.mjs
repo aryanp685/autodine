@@ -239,7 +239,7 @@ try {
     select
       to_regprocedure('public.open_table_session(text,text)') is not null as has_open_table_session,
       to_regprocedure('public.place_public_order(text,jsonb,text,text,uuid,text)') is not null as has_place_public_order,
-      to_regprocedure('public.close_order_session_and_issue_receipt(uuid)') is not null as has_receipt_function,
+      to_regprocedure('public.close_order_session_and_issue_receipt(uuid,jsonb)') is not null as has_receipt_function,
       exists (select 1 from information_schema.columns where table_schema='public' and table_name='orders' and column_name='total_paise') as has_order_total
   `);
   const missing = Object.entries(keyObjects.rows[0]).filter(([, present]) => !present).map(([name]) => name);

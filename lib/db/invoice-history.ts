@@ -29,6 +29,7 @@ export type InvoiceHistoryResult =
   | { ok: false; reason: 'unconfigured' | 'signed-out' | 'no-membership' | 'role-denied' };
 
 function positiveMoney(value: unknown): number | null {
+  if (typeof value !== 'number' && (typeof value !== 'string' || !value.trim())) return null;
   const parsed = typeof value === 'number' ? value : Number(value);
   return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : null;
 }
@@ -42,7 +43,7 @@ function toHistoryRow(
   const totalPaise = positiveMoney(totals.total_paise);
   return {
     sessionId: session.id,
-    tableLabel,
+    tableLabel: invoice?.table_label_snapshot ?? tableLabel,
     openedAt: session.opened_at,
     closedAt: session.closed_at ?? session.opened_at,
     invoice: invoice ? {
@@ -86,9 +87,11 @@ export async function getInvoiceHistory(): Promise<InvoiceHistoryResult> {
   if (!sessionRows.length) return { ok: true, rows: [] };
 
   const sessionIds = sessionRows.map((session) => session.id);
-  const tableIds = [...new Set(sessionRows.map((session) => session.table_id))];
+  const tableIds = [...new Set(sessionRows.map((session) => session.table_id).filter((id): id is string => Boolean(id)))];
   const [tablesResult, invoicesResult] = await Promise.all([
-    supabase.from('dining_tables').select('id, label').eq('restaurant_id', restaurantId).in('id', tableIds),
+    tableIds.length
+      ? supabase.from('dining_tables').select('id, label').eq('restaurant_id', restaurantId).in('id', tableIds)
+      : Promise.resolve({ data: [], error: null }),
     supabase
       .from('restaurant_invoices')
       .select('id, restaurant_id, order_session_id, invoice_number, financial_year, sequence_number, document_type, irp_status, status, issued_at, issued_by, table_label_snapshot, session_opened_at, session_closed_at, seller_snapshot, customer_snapshot, totals_snapshot, payment_snapshot, source_order_ids, supersedes_invoice_id, voided_at, voided_by, void_reason, created_at')
@@ -110,7 +113,11 @@ export async function getInvoiceHistory(): Promise<InvoiceHistoryResult> {
   return {
     ok: true,
     rows: sessionRows.map((session) =>
-      toHistoryRow(session, labels.get(session.table_id) ?? null, invoices.get(session.id)),
+      toHistoryRow(
+        session,
+        (session.table_id ? labels.get(session.table_id) : null) ?? null,
+        invoices.get(session.id),
+      ),
     ),
   };
 }

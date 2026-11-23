@@ -27,6 +27,33 @@ const outdated: TranslationMap = {
   hi: { ...fresh.hi!, sourceHash: 'deadbeef' },
 };
 
+const freshGu: TranslationMap = {
+  gu: {
+    name: 'પનીર ટિક્કા',
+    description: 'સ્કેવર પર ગ્રીલ્ડ પનીર।',
+    approved: true,
+    sourceHash: hash,
+  },
+};
+
+const freshTa: TranslationMap = {
+  ta: {
+    name: 'பனீர் திக்கா',
+    description: 'கட்டிக் கிடக்கும் பனீர்।',
+    approved: true,
+    sourceHash: hash,
+  },
+};
+
+const freshTe: TranslationMap = {
+  te: {
+    name: 'పనీరు టిక్కా',
+    description: 'గ్రిల్ చేయబడిన పనీరు।',
+    approved: true,
+    sourceHash: hash,
+  },
+};
+
 describe('sourceHash', () => {
   it('is stable for the same source and changes when the source does', () => {
     expect(sourceHash('Paneer Tikka', 'Cottage cheese on skewers.')).toBe(hash);
@@ -61,6 +88,27 @@ describe('the fallback rule', () => {
     );
   });
 
+  it('shows the Gujarati translation when it is approved and matches the source', () => {
+    expect(translatedName(freshGu, 'gu', 'Paneer Tikka', 'Cottage cheese on skewers.')).toBe('પનીર ટિક્કા');
+    expect(translatedDescription(freshGu, 'gu', 'Paneer Tikka', 'Cottage cheese on skewers.')).toBe(
+      'સ્કેવર પર ગ્રીલ્ડ પનીર।'
+    );
+  });
+
+  it('shows the Tamil translation when it is approved and matches the source', () => {
+    expect(translatedName(freshTa, 'ta', 'Paneer Tikka', 'Cottage cheese on skewers.')).toBe('பனீர் திக்கா');
+    expect(translatedDescription(freshTa, 'ta', 'Paneer Tikka', 'Cottage cheese on skewers.')).toBe(
+      'கட்டிக் கிடக்கும் பனீர்।'
+    );
+  });
+
+  it('shows the Telugu translation when it is approved and matches the source', () => {
+    expect(translatedName(freshTe, 'te', 'Paneer Tikka', 'Cottage cheese on skewers.')).toBe('పనీరు టిక్కా');
+    expect(translatedDescription(freshTe, 'te', 'Paneer Tikka', 'Cottage cheese on skewers.')).toBe(
+      'గ్రిల్ చేయబడిన పనీరు।'
+    );
+  });
+
   it('shows the original when the translation was never approved', () => {
     expect(translatedName(unapproved, 'hi', 'Paneer Tikka', 'Cottage cheese on skewers.')).toBe('Paneer Tikka');
   });
@@ -73,6 +121,9 @@ describe('the fallback rule', () => {
   it('keeps hasFreshTranslation honest for the switcher decision', () => {
     expect(hasFreshTranslation(fresh, 'hi', 'Paneer Tikka', 'Cottage cheese on skewers.')).toBe(true);
     expect(hasFreshTranslation(fresh, 'mr', 'Paneer Tikka', 'Cottage cheese on skewers.')).toBe(false);
+    expect(hasFreshTranslation(freshGu, 'gu', 'Paneer Tikka', 'Cottage cheese on skewers.')).toBe(true);
+    expect(hasFreshTranslation(freshTa, 'ta', 'Paneer Tikka', 'Cottage cheese on skewers.')).toBe(true);
+    expect(hasFreshTranslation(freshTe, 'te', 'Paneer Tikka', 'Cottage cheese on skewers.')).toBe(true);
     expect(hasFreshTranslation(outdated, 'hi', 'Paneer Tikka', 'NEW description')).toBe(false);
     expect(isFresh(undefined, 'x', '')).toBe(false);
   });

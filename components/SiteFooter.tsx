@@ -49,6 +49,8 @@ type Props = {
   scope?: string;
   fineLeft?: string;
   fineRight?: string;
+  address?: string;
+  phone?: string;
 };
 
 export function SiteFooter({
@@ -56,7 +58,10 @@ export function SiteFooter({
   scope = 'Sample restaurant content. No live payments or subscriptions.',
   fineLeft = 'AutoDine · Product preview',
   fineRight = 'Not for live restaurant operations',
+  address,
+  phone,
 }: Props = {}) {
+  const contact = [address, phone].filter(Boolean).join(' · ');
   return (
     <footer className="bg-ink text-cream">
       <div className="mx-auto w-full max-w-[1180px] px-5 pt-16 pb-10 sm:px-8">
@@ -66,6 +71,9 @@ export function SiteFooter({
               <BrandLockup size={20} ink="currentColor" dot={BRAND_GREEN} />
             </div>
             <p className="mt-4 max-w-[38ch] text-[13px] leading-[1.6] text-mute">{note}</p>
+            {contact && (
+              <p className="mt-3 max-w-[38ch] text-[13px] leading-[1.6] text-mute">{contact}</p>
+            )}
           </div>
 
           {COLUMNS.map((col) => (

@@ -297,7 +297,13 @@ export async function placeOrderAction(formData: FormData): Promise<void> {
    * silently emptied. The flag is in the address the action wrote, so an old
    * link, a bookmark or a pasted code never carries it.
    */
+  (await cookies()).set('autodine_guest_token', guestToken, {
+    httpOnly: true,
+    sameSite: 'lax',
+    path: '/',
+    maxAge: 60 * 60 * 24,
+  });
   redirect(
-    `/menu/order?s=${encodeURIComponent(slug)}&code=${encodeURIComponent(code)}&t=${guestToken}&placed=1`
+    `/menu/order?s=${encodeURIComponent(slug)}&code=${encodeURIComponent(code)}&t=${encodeURIComponent(guestToken)}&placed=1`
   );
 }

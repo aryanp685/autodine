@@ -209,7 +209,9 @@ async function openSessionOnScan(cardToken: string, request: NextRequest) {
    * meaning is now explicit: `code` is expected, `revoked` is a dead card, and
    * `limited` is a throttle that the guest is currently told nothing about.
    * See lib/scan-outcome.ts for why that distinction is a bug and not a
-   * nuance, and docs/scan-limit-l1.md for the proposed fix.
+   * nuance, and docs/scan-throttle-coverage.md for the throttle evidence map
+   * (the former docs/scan-limit-l1.md proposal was removed in the
+   * 2026-11-21 cleanup).
    */
   const outcome = scanOutcome(row?.status as string | undefined);
 

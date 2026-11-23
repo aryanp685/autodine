@@ -16,11 +16,16 @@ import type { TeamScreenData } from '@/lib/db/team';
 import type { InviteFlash } from '@/lib/team-invite';
 import { PeoplePanel } from '@/components/owner/PeoplePanel';
 import { OperationsPanel } from '@/components/owner/OperationsPanel';
+import { OperatingModePanel } from '@/components/screens/OperatingModePanel';
+import { PrintingDevicesPanel } from '@/components/screens/PrintingDevicesPanel';
 import { formatTaxPercent, taxExamplePaise } from '@/lib/settings-input';
 import {
+  saveBillingDefaultsAction,
+  saveCouponAction,
   saveDetailsAction,
   saveGuestVerificationAction,
   saveTaxAction,
+  toggleCouponAction,
 } from '@/app/(staff)/dashboard/settings/actions';
 import { GstSettingsPanel } from '@/components/screens/GstSettingsPanel';
 import { inr } from '@/lib/demo-data';
@@ -107,6 +112,9 @@ const SECTIONS = [
   { id: 'settings-money', label: 'Tax and money' },
   { id: 'settings-outlets', label: 'Outlets' },
   { id: 'settings-people', label: 'People' },
+  { id: 'settings-coupons', label: 'Promo codes' },
+  { id: 'settings-printers', label: 'Printing & devices' },
+  { id: 'settings-operating-mode', label: 'Operating path & POS' },
   { id: 'settings-operations', label: 'Operations' },
   { id: 'settings-qr', label: 'Menu QR' },
 ] as const;
@@ -394,6 +402,43 @@ export function SettingsScreen({
                       />
                     </Field>
                   </div>
+
+                  <div className="grid gap-3.5 sm:grid-cols-2">
+                    <Field
+                      label="FSSAI license number (optional)"
+                      htmlFor="settings-fssai"
+                      hint="14-digit FSSAI registration number printed on customer bills, tax invoices and PDFs when set."
+                    >
+                      <input
+                        id="settings-fssai"
+                        className={`${inputClass} tabular-nums`}
+                        name="fssaiNumber"
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={14}
+                        defaultValue={details.fssaiNumber ?? ''}
+                        disabled={disabled}
+                        placeholder="11524001000123"
+                      />
+                    </Field>
+
+                    <Field
+                      label="Bill footer / thank-you note (optional)"
+                      htmlFor="settings-bill-footer"
+                      hint="Short message printed at the bottom of 58mm, 80mm, A4 and shared bills (max 240 chars)."
+                    >
+                      <input
+                        id="settings-bill-footer"
+                        className={inputClass}
+                        name="billFooterNote"
+                        type="text"
+                        maxLength={240}
+                        defaultValue={details.billFooterNote ?? ''}
+                        disabled={disabled}
+                        placeholder="Thank you for dining with us! Visit again."
+                      />
+                    </Field>
+                  </div>
                   </FieldGroup>
 
                   <FieldGroup title="The link guests open" hint="One address, one restaurant. It is what the QR below encodes.">
@@ -460,9 +505,17 @@ export function SettingsScreen({
                   bodyClassName="px-5 py-5"
                 >
                   <p className="m-0 max-w-[62ch] text-[12.5px] leading-[1.5] text-gink-46">
-                    The existing per-order tax rate added on top of menu prices. Only the owner can
-                    change this billing setting; AutoDine does not infer a rate.
+                    The per-order rate used while GST is off, added on top of menu prices. Only the
+                    owner can change this billing setting; AutoDine does not infer a rate.
                   </p>
+
+                  {(data?.gst.mode ?? 'off') !== 'off' && (
+                    <Notice tone="due" label="GST billing is active" className="mt-3 mb-0">
+                      {data?.gst.mode === 'regular'
+                        ? 'Regular GST is active: menu prices include GST and this rate is not added to new bills.'
+                        : 'Composition scheme is active: bills of supply charge no GST, and this rate is not added to new bills.'}
+                    </Notice>
+                  )}
 
                   {taxBps === 0 ? (
                     <Notice tone="due" label="Tax is 0%." className="mt-3 mb-0">
@@ -475,16 +528,17 @@ export function SettingsScreen({
                     </Notice>
                   )}
 
-                  <Notice tone="plain" label="GST tax invoices are not enabled" className="mt-3 mb-0">
-                    This bill rate does not activate GST invoicing. GST tax invoices remain unavailable
-                    until approved tax rules are supplied; ordinary receipts and existing billing are unchanged.
+                  <Notice tone="plain" label="This rate is the GST-off rate" className="mt-3 mb-0">
+                    GST invoicing is configured in the GST billing panel below. This rate applies only
+                    while GST is off; once a GST mode is active, that mode&rsquo;s approved rules price
+                    new bills instead.
                   </Notice>
 
                   <form action={saveTaxAction} className="mt-3.5 flex flex-col gap-3">
                     <Field
                       label="Tax rate (%)"
                       htmlFor="settings-tax"
-                      hint={`Up to two decimals, 0 to ${formatTaxPercent(3000)}. Menu prices are treated as tax-exclusive, so tax is added at checkout.`}
+                      hint={`Up to two decimals, 0 to ${formatTaxPercent(3000)}. Used only while GST is off; menu prices are then treated as tax-exclusive and this rate is added at checkout.`}
                     >
                       {/* `w-[180px]!` and not `w-[180px]`: the kit input is
                           `w-full`, and Tailwind sorts `.w-[180px]` BEFORE
@@ -522,6 +576,79 @@ export function SettingsScreen({
 
                 {/* ------------------------------------------------------ GST billing */}
                 <GstSettingsPanel gst={data?.gst ?? { ready: false, mode: 'off', regularProfile: 'other_than_specified_premises', gstin: '', legalName: '', tradeName: '', address: '', stateCode: '', pan: '', registrationType: 'regular', compositionAcknowledged: false, specifiedPremisesAttested: false, specifiedPremisesEffectiveFrom: '2025-04-01', offDeclared: false, offDeclaredAt: null, precedingFyTurnoverRupees: '', einvoiceLocation: '', einvoicePincode: '', einvoiceHsnSac: '', configVersion: 0, updatedAt: null }} disabled={disabled} />
+
+                {/* ------------------------------------ Default charges & round-off */}
+                <Panel
+                  title="Bill charges & round-off"
+                  meta={data?.billingDefaults?.roundOffEnabled ? 'Auto round-off ON' : 'Defaults'}
+                  bodyClassName="px-5 py-5"
+                >
+                  <p className="m-0 max-w-[62ch] text-[12.5px] leading-[1.5] text-gink-46">
+                    Optional default charges applied to new counter orders (cashier can override per
+                    bill) and automatic integer-rupee round-off. Owner-only.
+                  </p>
+                  <form action={saveBillingDefaultsAction} className="mt-4 flex flex-col gap-3.5">
+                    <div className="grid gap-3.5 sm:grid-cols-3">
+                      <Field label="Service charge (%)" htmlFor="settings-svc-charge" hint="Optional dine-in charge (0–20%).">
+                        <input
+                          id="settings-svc-charge"
+                          name="serviceChargePercent"
+                          type="text"
+                          inputMode="decimal"
+                          defaultValue={formatTaxPercent(data?.billingDefaults?.serviceChargeBps ?? 0)}
+                          disabled={disabled || data?.role !== 'owner'}
+                          className={`${inputClass} tabular-nums`}
+                        />
+                      </Field>
+                      <Field label="Packaging charge (₹)" htmlFor="settings-pkg-charge" hint="Default for takeaway & delivery.">
+                        <input
+                          id="settings-pkg-charge"
+                          name="packagingChargeRupees"
+                          type="number"
+                          min={0}
+                          max={500}
+                          step="1"
+                          defaultValue={paiseToRupees(data?.billingDefaults?.packagingChargePaise ?? 0)}
+                          disabled={disabled || data?.role !== 'owner'}
+                          className={`${inputClass} tabular-nums`}
+                        />
+                      </Field>
+                      <Field label="Delivery charge (₹)" htmlFor="settings-del-charge" hint="Default for delivery orders.">
+                        <input
+                          id="settings-del-charge"
+                          name="deliveryChargeRupees"
+                          type="number"
+                          min={0}
+                          max={1000}
+                          step="1"
+                          defaultValue={paiseToRupees(data?.billingDefaults?.deliveryChargePaise ?? 0)}
+                          disabled={disabled || data?.role !== 'owner'}
+                          className={`${inputClass} tabular-nums`}
+                        />
+                      </Field>
+                    </div>
+                    <label className="flex items-start gap-2.5 rounded-[var(--p-r-control)] border border-hair bg-paper-deep px-3 py-2.5 text-[12.5px] leading-[1.5]">
+                      <input
+                        type="checkbox"
+                        name="roundOffEnabled"
+                        defaultChecked={data?.billingDefaults?.roundOffEnabled ?? false}
+                        disabled={disabled || data?.role !== 'owner'}
+                        className="mt-0.5"
+                      />
+                      <span>
+                        <span className="font-medium text-gink">Auto round-off net bill to nearest ₹1</span>
+                        <span className="mt-0.5 block text-[11.5px] text-gink-46">
+                          Round-off (−₹0.50 to +₹0.50) is printed as a separate line on bills and invoices.
+                        </span>
+                      </span>
+                    </label>
+                    <div>
+                      <SubmitButton pendingLabel="Saving defaults…" disabled={disabled || data?.role !== 'owner'} tone="solid">
+                        Save charges &amp; rounding
+                      </SubmitButton>
+                    </div>
+                  </form>
+                </Panel>
 
                 {/* ------------------------------------------- how guests verify */}
                 <Panel
@@ -724,14 +851,206 @@ export function SettingsScreen({
               />
             </PageSection>
 
-            {/* ---------------------------------------------------------- operations */}
+            {/* -------------------------------------------------------------- coupons */}
             <PageSection
               n="05"
+              id="settings-coupons"
+              title="Promo codes"
+              meta="Create restaurant coupons for counter billing with minimum order and cap rules"
+            >
+              <Panel
+                title="Coupons & promo codes"
+                meta={`${(data?.coupons ?? []).filter((c) => c.isActive).length} active`}
+              >
+                <form action={saveCouponAction} className="grid gap-3 sm:grid-cols-2">
+                  <Field label="Promo code" htmlFor="coupon-code" hint="Letters, numbers, - or _ (e.g. WELCOME10).">
+                    <input
+                      id="coupon-code"
+                      name="code"
+                      type="text"
+                      required
+                      maxLength={24}
+                      disabled={disabled}
+                      placeholder="WELCOME10"
+                      className={`${inputClass} uppercase font-mono`}
+                    />
+                  </Field>
+                  <Field label="Short note (optional)" htmlFor="coupon-desc">
+                    <input
+                      id="coupon-desc"
+                      name="description"
+                      type="text"
+                      maxLength={120}
+                      disabled={disabled}
+                      placeholder="10% off welcome offer"
+                      className={inputClass}
+                    />
+                  </Field>
+                  <Field label="Discount type" htmlFor="coupon-type">
+                    <select id="coupon-type" name="discountType" defaultValue="percent" disabled={disabled} className={inputClass}>
+                      <option value="percent">Percentage (%)</option>
+                      <option value="flat">Flat amount (₹)</option>
+                    </select>
+                  </Field>
+                  <Field label="Value (% or ₹)" htmlFor="coupon-value">
+                    <input
+                      id="coupon-value"
+                      name="discountValue"
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      required
+                      disabled={disabled}
+                      placeholder="10"
+                      className={`${inputClass} tabular-nums`}
+                    />
+                  </Field>
+                  <Field label="Min order (₹, optional)" htmlFor="coupon-min">
+                    <input
+                      id="coupon-min"
+                      name="minOrderRupees"
+                      type="number"
+                      step="1"
+                      min="0"
+                      disabled={disabled}
+                      placeholder="299"
+                      className={`${inputClass} tabular-nums`}
+                    />
+                  </Field>
+                  <Field label="Max discount cap (₹, optional)" htmlFor="coupon-cap">
+                    <input
+                      id="coupon-cap"
+                      name="maxDiscountRupees"
+                      type="number"
+                      step="1"
+                      min="1"
+                      disabled={disabled}
+                      placeholder="150"
+                      className={`${inputClass} tabular-nums`}
+                    />
+                  </Field>
+                  <Field label="Max total uses (optional)" htmlFor="coupon-uses">
+                    <input
+                      id="coupon-uses"
+                      name="maxUses"
+                      type="number"
+                      step="1"
+                      min="1"
+                      disabled={disabled}
+                      placeholder="100"
+                      className={`${inputClass} tabular-nums`}
+                    />
+                  </Field>
+                  <Field label="Expires on (optional)" htmlFor="coupon-until">
+                    <input
+                      id="coupon-until"
+                      name="validUntil"
+                      type="date"
+                      disabled={disabled}
+                      className={inputClass}
+                    />
+                  </Field>
+                  <div className="sm:col-span-2">
+                    <SubmitButton tone="solid" disabled={disabled} pendingLabel="Saving…">
+                      Save promo code
+                    </SubmitButton>
+                  </div>
+                </form>
+
+                {(data?.coupons ?? []).length > 0 ? (
+                  <ul className="m-0 mt-4 flex list-none flex-col divide-y divide-hair border-t border-hair p-0">
+                    {(data?.coupons ?? []).map((coupon) => {
+                      const valLabel =
+                        coupon.discountType === 'percent'
+                          ? `${(coupon.discountValue / 100).toFixed(coupon.discountValue % 100 === 0 ? 0 : 2)}% off`
+                          : `₹${(coupon.discountValue / 100).toFixed(0)} off`;
+                      return (
+                        <li key={coupon.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5 text-[12.5px]">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-mono font-semibold text-gink">{coupon.code}</span>
+                              <Tag tone={coupon.isActive ? 'live' : 'neutral'}>
+                                {coupon.isActive ? 'Active' : 'Paused'}
+                              </Tag>
+                              <span className="text-[11.5px] text-gink-64">{valLabel}</span>
+                              {coupon.minOrderPaise > 0 ? (
+                                <span className="text-[11.5px] text-gink-46">
+                                  Min ₹{Math.round(coupon.minOrderPaise / 100)}
+                                </span>
+                              ) : null}
+                              {coupon.maxDiscountPaise ? (
+                                <span className="text-[11.5px] text-gink-46">
+                                  Cap ₹{Math.round(coupon.maxDiscountPaise / 100)}
+                                </span>
+                              ) : null}
+                            </div>
+                            <div className="mt-0.5 text-[11.5px] text-gink-46">
+                              Used {coupon.usesCount}
+                              {coupon.maxUses ? ` / ${coupon.maxUses}` : ''} times
+                              {coupon.description ? ` · ${coupon.description}` : ''}
+                            </div>
+                          </div>
+                          {live && data?.canEdit ? (
+                            <form action={toggleCouponAction}>
+                              <input type="hidden" name="couponId" value={coupon.id} />
+                              <input type="hidden" name="isActive" value={coupon.isActive ? 'false' : 'true'} />
+                              <button type="submit" className={btn('quiet', 'sm')}>
+                                {coupon.isActive ? 'Pause' : 'Activate'}
+                              </button>
+                            </form>
+                          ) : null}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : (
+                  <p className="mt-3 text-[11.5px] text-gink-46">
+                    No promo codes created yet. Create one above to let cashiers apply pre-tax discounts at the counter.
+                  </p>
+                )}
+              </Panel>
+            </PageSection>
+
+            {/* --------------------------------------------------- printing & devices */}
+            <PageSection
+              n="06"
+              id="settings-printers"
+              title="Printing & devices"
+              meta="Thermal bill printers, office A4, and optional Windows Print Bridge pairing"
+            >
+              <PrintingDevicesPanel
+                printers={data?.printers ?? []}
+                canEdit={Boolean(data?.canEdit)}
+                live={live}
+                restaurantName={details.name}
+              />
+            </PageSection>
+
+            {/* --------------------------------------------------- operating path */}
+            <PageSection
+              n="07"
+              id="settings-operating-mode"
+              title="Operating path &amp; POS handoff"
+              meta="Mode A alongside an existing POS, or Mode B as primary OS"
+            >
+              <OperatingModePanel
+                operatingMode={data?.operatingMode ?? outlet?.operatingMode ?? 'mode_b'}
+                posIntegrationName={data?.posIntegrationName ?? outlet?.posIntegrationName ?? ''}
+                posWebhookUrl={data?.posWebhookUrl ?? ''}
+                posWebhookSecretConfigured={Boolean(data?.posWebhookSecretConfigured)}
+                canEdit={Boolean(data?.canEdit)}
+                live={live}
+              />
+            </PageSection>
+
+            {/* ---------------------------------------------------------- operations */}
+            <PageSection
+              n="08"
               id="settings-operations"
               title="Operations"
               meta="Live incidents on this instance — acknowledge, resolve, escalate"
             >
-              <OperationsPanel />
+              <OperationsPanel disabled={!live} />
             </PageSection>
           </div>
 
@@ -862,7 +1181,7 @@ export function SettingsScreen({
               <ul className="m-0 mt-2.5 flex list-none flex-col gap-1.5 p-0">
                 {[
                   'Name and tagline: the top of the guest menu, and the browser tab title.',
-                  'Tax rate: the cart, the checkout total and every order placed from now on.',
+                  'Tax rate: the cart, the checkout total and every GST-off order placed from now on.',
                   'Web address: the QR above and every link to your menu.',
                   'Address, phone and GSTIN: printed on the bill. A bill with either the address or the GSTIN missing says so.',
                 ].map((line) => (

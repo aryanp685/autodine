@@ -15,7 +15,7 @@ on:
         type: string
   push:
     branches:
-      - arena/e9e78732-autodine
+      - main
 
 permissions:
   contents: read
@@ -23,7 +23,7 @@ permissions:
 jobs:
   disposable-supabase:
     if: ${{ github.event_name == 'workflow_dispatch' || !contains(github.event.head_commit.message, '[skip-supabase-e2e]') }}
-    name: 64 hermetic + 49 Supabase-backed E2E, then synthetic load
+    name: 64 hermetic + 49 Supabase-backed E2E, then synthetic load and Kitchen polling
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     env:
@@ -63,7 +63,10 @@ jobs:
         id: supabase-cli
         uses: supabase/setup-cli@v1
         with:
-          version: 2.67.1
+          # 2.99.0 embeds supabase/postgres:17.6.1.106 (plpgsql_check 2.8.11).
+          # 2.67.1 embeds 17.6.1.064, whose preloaded 2.7.11 raises sporadic
+          # "pldbgapi2 call stack" XX000 errors on nested RPCs under load.
+          version: 2.99.0
 
       - name: Start full disposable Supabase stack
         run: supabase start
@@ -122,7 +125,7 @@ jobs:
             cp -R playwright-report test-results/supabase-e2e/integration-html
           fi
 
-      - name: Run 5,000 synthetic guest sessions, orders, app reads, and kitchen Realtime fan-out
+      - name: Run 5,000 synthetic guest sessions, orders, app reads, and Kitchen polling reads
         if: ${{ success() && inputs.integration_grep == '' }}
         env:
           E2E_FIXTURE_ENV_FILE: ${{ runner.temp }}/autodine-e2e-fixtures.env

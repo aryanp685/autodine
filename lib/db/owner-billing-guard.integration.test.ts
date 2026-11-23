@@ -161,7 +161,9 @@ describe.skipIf(!URL_VALUE)('Owner billing configuration guard (disposable Postg
     expect(trigger.tgenabled).toBe('O');
     expect(trigger.prosecdef).toBe(true);
     expect(trigger.proconfig).toContain('search_path=public, pg_temp');
-    expect(trigger.definition).toMatch(/BEFORE UPDATE OF tax_rate_bps, gstin ON public\.restaurants/i);
+    expect(trigger.definition).toMatch(
+      /BEFORE UPDATE OF tax_rate_bps, gstin, default_service_charge_bps, default_packaging_charge_paise, default_delivery_charge_paise, round_off_enabled ON public\.restaurants/i,
+    );
 
     const acl = (await db.query(`
       select count(*)::int n

@@ -13,6 +13,8 @@ vi.mock('@/app/(staff)/dashboard/tables/actions', () => ({
   rotateQrAction: async () => undefined,
   rotateVerificationCodeAction: async () => undefined,
   setTableActiveAction: async () => undefined,
+  restoreQrAction: async () => undefined,
+  deleteTableAction: async () => undefined,
 }));
 
 vi.mock('@/components/owner/CodeExpiry', () => ({

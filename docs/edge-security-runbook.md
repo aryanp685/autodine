@@ -1,15 +1,15 @@
 # AutoDine edge-security review runbook
 
-**Evidence cutoff (Arena's authoritative task date):** 2026-11-06 UTC
-**Status:** review-only guidance; no Vercel Firewall/WAF rule is recommended, created, or changed. This document does not authorize a Production or Preview configuration change.
-**Chronology:** Vercel/PR #184 metadata dated 2026-11-13 is future-dated relative to this cutoff and is not treated as current configuration or readiness evidence; see the [complete report](AUTODINE-COMPLETE-INFRASTRUCTURE-HARDENING-REPORT.md).
-**Related:** [Infrastructure architecture](infrastructure-architecture.md), [complete hardening report](AUTODINE-COMPLETE-INFRASTRUCTURE-HARDENING-REPORT.md), [Feature inventory](../FEATURE-INVENTORY.md), [`AGENTS.md`](../AGENTS.md)
+**Evidence and review date:** 2026-11-06 UTC on active branch `arena/f104d5d8-autodine`, based on `b866601d5b0441b49b1c5aa7c9eb7d26b664d06c` (`main`).
+**Status:** review-only guidance; no Vercel Firewall/WAF rule is recommended, created, or changed. This document does not authorize a Production or Preview configuration change. Release remains **NO-GO**; Production is read-only and Staging is **NO-GO** under `AGENTS.md`.
+**Chronology:** migration versions beginning `20261112` or `20261114` and retained provider metadata dated 2026-11-13 are later than the historical cutoff. They are source/local or timestamped historical observations, not proof of hosted application or database state; see the complete hardening report (removed in the 2026-11-21 cleanup; its dated evidence is summarised in `../RELEASE-BLOCKER-REPORT.md`).
+**Related:** [Infrastructure architecture](infrastructure-architecture.md), the complete hardening report (removed in the 2026-11-21 cleanup), the feature inventory (removed in the 2026-11-21 cleanup), [`AGENTS.md`](../AGENTS.md)
 
 ## 1. Current position
 
-The connected Vercel surfaces identify a project but do not expose the actual Firewall/WAF rule inventory, effective DDoS/bot settings, rate-limit entitlement/rules, request logs, or a reliable traffic baseline. Mark each as **UNVERIFIED**. Do not describe a provider default or a product-plan label as proof of AutoDine's current protection.
+A previous assessment recorded project metadata but did not establish the Firewall/WAF rule inventory, effective DDoS/bot settings, rate-limit entitlement/rules, request logs, or a reliable traffic baseline. None of those provider settings was rechecked in this continuation; mark them **UNVERIFIED**. Do not describe a provider default or a product-plan label as proof of AutoDine's current protection.
 
-No custom rule or threshold can be justified from the available evidence. Do not add a broad `/api`, `/dashboard`, or IP-based limit. Do not use an edge rule to compensate for application/database authorization. Production remains read-only and Staging remains **NO-GO** until the separate approvals and release gates in `AGENTS.md` are satisfied.
+No custom rule or threshold can be justified from the available evidence. Do not add a broad `/api`, `/dashboard`, or IP-based limit. Do not use an edge rule to compensate for application/database authorization. No hosted Production or Staging action was taken here. Keep Production read-only and Staging **NO-GO**; local verification does not clear the release gate or authorize a hosted change.
 
 ## 2. Invariants that must survive any future rule
 
@@ -28,7 +28,7 @@ This table is a starting map from the current source inventory, not a traffic ba
 | Guest order submit (`/menu/checkout` page → `app/menu/checkout/actions.ts`) | Next.js Server Action; database validates tenant, verified session, server-side price, idempotency, and order state. Order submission is intentionally uncapped. | **Explicitly exclude** from order-rate rules. Do not assume a URL-only matcher isolates it from other Server Actions. |
 | `/menu/orders/status` | Token-scoped status POST; GET is rejected; no-store responses. Active guests poll while an order is open. | No low per-IP threshold. Avoid blocking valid retries or multiple guests sharing a venue network. |
 | `/t/[token]` and `/t/[token]/code` | Public QR-card lookup and rotating verification-code flow; session minting/verification has database controls. Forwarded-IP hashes are abuse hints, not identity. | Preserve the existing DB rules; no duplicate guessed edge budget. |
-| `/dashboard/orders`, `/cashier`, `/kitchen` | Authenticated operational views with polling/Realtime fallback. Expected refresh and staff actions can produce bursts. | No broad staff-path limit. Do not treat expected polling or a shared outlet network as abuse. |
+| `/dashboard/orders`, `/cashier`, `/kitchen` | Authenticated operational views. In the current source, the Kitchen screen polls orders and waiter calls every five seconds; raw `orders` and `table_waiter_calls` rows are not subscribed to via Postgres Changes. The source migration that removes those tables from `supabase_realtime` has only been replayed on disposable local PostgreSQL, not a hosted project. | No broad staff-path limit. Do not treat expected polling or a shared outlet network as abuse. Hosted publication state is **UNVERIFIED**. |
 | `/dashboard/reports/export` | Owner/Manager-only route and `report_sales()` RPC; CSV is no-store and the order detail list is bounded. | Candidate for measurement if telemetry later shows resource pressure; role and database controls stay authoritative. No threshold selected. |
 | `/api/tts` | Authenticated kitchen speech route with application-side user/restaurant budget in source; external provider latency/cost. | Measurement candidate only. Verify actual role and shared-budget behavior, traffic, and false positives before proposing any edge control. |
 | `/api/billing/webhook` | Current provider adapter is absent; route fails closed with 503 before consuming the body. Future provider callbacks may retry. | No custom callback block or guessed body limit. Before provider enablement, confirm provider and platform body-size contracts, signature/replay behavior, and callback retry expectations. |
@@ -46,7 +46,7 @@ The following steps require an authorized project owner/operator. They are not c
 3. **Establish a safe baseline.** Collect aggregate path/method/status and latency/rate distributions for representative quiet and meal-time periods. Use provider-safe telemetry; avoid payloads, raw bearer credentials, customer data, or secrets. Include expected QR scans, shared Wi-Fi, guest status polling, kitchen/cashier refresh, report exports, Auth retries, and any provider retries.
 4. **Map real requests.** Trace the actual Server Action request shape and route overlap in a synthetic non-production browser session. Verify what an edge rule would match; do not infer that a page path maps only to one action.
 5. **Check false positives.** Include shared restaurant NAT/Wi-Fi and mobile-carrier NAT, multiple staff screens, guest retries, hidden-tab wakeups, and provider callback retries. Derive thresholds from a measured legitimate envelope and agreed burst allowance; do not invent a number.
-6. **Decide whether an edge control is needed.** First fix application authorization or data-boundary defects in source/database design. An edge rule cannot repair the confirmed broad `authenticated` SELECT permission on `public.orders`.
+6. **Decide whether an edge control is needed.** First fix application authorization or data-boundary defects in source/database design. This checkout contains a role-scoped order-read migration candidate, and it has passed disposable-PostgreSQL role tests; that is repository evidence only. A prior report recorded a broad Production `authenticated` SELECT grant on `public.orders`, but it was not rechecked for this checkout and hosted migration status is **UNVERIFIED**. An edge rule cannot replace the database boundary.
 
 If no reliable baseline, safe route match, owner, and rollback path are available, stop at read-only evidence gathering; do not add a rule.
 
@@ -80,7 +80,7 @@ Vercel's request-header documentation describes proxy-dependent client-IP behavi
 
 ## 7. Cloudflare and additional proxying
 
-No Cloudflare proxy integration was found in repository configuration, and the connected Cloudflare surface is unavailable for this review. Do not change DNS, proxy/orange-cloud state, TLS mode, or nameservers here. If an owner later proposes a proxy, separately validate the supported Vercel proxy mode, client-IP provenance, origin reachability, caching, TLS, and bot/firewall visibility on a non-production hostname before approval.
+No Cloudflare proxy integration or proxy configuration was found in the inspected repository. No Cloudflare hosted DNS/proxy state was queried in this continuation; treat it as **UNVERIFIED**. Do not change DNS, proxy/orange-cloud state, TLS mode, or nameservers here. If an owner later proposes a proxy, separately validate the supported Vercel proxy mode, client-IP provenance, origin reachability, caching, TLS, and bot/firewall visibility on a non-production hostname before approval.
 
 ## 8. Acceptance record
 
@@ -96,4 +96,4 @@ Before recording a future edge change as complete, attach sanitized evidence for
 - [ ] Named rollback owner and exact rollback procedure.
 - [ ] No customer data, secret, request body, or bearer token copied into the report.
 
-Current result: none of these change-acceptance checks has been completed for a custom Vercel Firewall/WAF rule. See the [complete infrastructure hardening report](AUTODINE-COMPLETE-INFRASTRUCTURE-HARDENING-REPORT.md) for all release blockers and evidence limits.
+Current result: none of these change-acceptance checks has been completed for a custom Vercel Firewall/WAF rule. See [`../RELEASE-BLOCKER-REPORT.md`](../RELEASE-BLOCKER-REPORT.md) for all release blockers and evidence limits (the linked consolidated hardening report was removed in the 2026-11-21 cleanup).

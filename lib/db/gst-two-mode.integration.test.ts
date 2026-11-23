@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { beforeAll, beforeEach, afterAll, describe, expect, it } from 'vitest';
 import { Client } from 'pg';
+import { priceCart } from '../cart-pricing';
+import type { GstQuote } from '../pricing';
 const URL_VALUE = process.env.READINESS_DB_URL || '';
 // A test URL is not permission to mutate an arbitrary database.
 if (URL_VALUE) {
@@ -30,18 +32,19 @@ void OTHER_GSTIN;
 
 let db: Client;
 
-async function makeRestaurant(slug: string, user: string): Promise<{ restaurant: string; item: string; gstin: string; pan: string }> {
+async function makeRestaurant(slug: string, user: string, taxRateBps = 0): Promise<{ restaurant: string; item: string; gstin: string; pan: string }> {
   const { gstin, pan } = nextGstin();
   await db.query('insert into profiles(id) values ($1)', [user]);
   const restaurant = (await db.query(
     `insert into restaurants(slug,name,address,tax_rate_bps,guest_verification_mode)
-     values ($1,'GST Test Kitchen','Registered office, Test Lane',0,'scan') returning id`, [slug])).rows[0].id;
+     values ($1,'GST Test Kitchen','Registered office, Test Lane',$2,'scan') returning id`, [slug, taxRateBps])).rows[0].id;
   await db.query(`insert into memberships(restaurant_id,user_id,role) values ($1,$2,'owner')`, [restaurant, user]);
   const menu = (await db.query(`insert into menus(restaurant_id,name,is_published) values($1,'Main',true) returning id`,[restaurant])).rows[0].id;
   const category = (await db.query(`insert into categories(restaurant_id,menu_id,name) values($1,$2,'Mains') returning id`,[restaurant,menu])).rows[0].id;
   // ₹105.00 inclusive at 5% -> ₹100.00 taxable + ₹5.00 GST, exactly.
   const item = (await db.query(`insert into items(restaurant_id,category_id,name,price_paise,is_available) values($1,$2,'Plate',10500,true) returning id`,[restaurant,category])).rows[0].id;
   const table = (await db.query(`insert into dining_tables(restaurant_id,label) values($1,'G1') returning id`,[restaurant])).rows[0].id;
+  await db.query('delete from table_qr_codes where table_id=$1',[table]);
   await db.query(`insert into table_qr_codes(restaurant_id,table_id,public_token) values($1,$2,$3)`,[restaurant,table,randomUUID().replaceAll('-','') + randomUUID().replaceAll('-','')]);
   return { restaurant, item, gstin, pan };
 }
@@ -64,6 +67,27 @@ async function setGstConfig(restaurant: string, config: Record<string, unknown>)
     `insert into public.restaurant_gst_config(restaurant_id,${cols.join(',')}) values ($1,${placeholders})
      on conflict (restaurant_id) do update set ${cols.map((c, i) => `${c}=$${i + 2}`).join(', ')}`,
     [restaurant, ...values]);
+}
+
+/** Reads the guest projection exactly as an anonymous storefront request would. */
+async function readGuestQuote(slug: string, offRateBps: number): Promise<GstQuote> {
+  await db.query('begin');
+  try {
+    await db.query('set local role anon');
+    const { rows } = await db.query(
+      'select mode, rate_bps from public.public_restaurant_gst($1)',
+      [slug]
+    );
+    const row = rows[0] as { mode?: string; rate_bps?: number | null } | undefined;
+    if (!row || (row.mode !== 'off' && row.mode !== 'composition' && row.mode !== 'regular')) {
+      throw new Error(`Unexpected guest GST projection: ${JSON.stringify(row)}`);
+    }
+    if (row.mode === 'composition') return { mode: 'composition', rateBps: null };
+    if (row.mode === 'off') return { mode: 'off', rateBps: offRateBps };
+    return { mode: 'regular', rateBps: Number(row.rate_bps) };
+  } finally {
+    await db.query('rollback');
+  }
 }
 
 async function closeAndIssue(user: string, sitting: string): Promise<string> {
@@ -154,6 +178,79 @@ describe.skipIf(!URL_VALUE)('GST two-mode (disposable PostgreSQL)', () => {
     expect(Number(inv.totals_snapshot.tax_paise)).toBe(0);
     expect(Number(inv.totals_snapshot.total_paise)).toBe(21000);
     expect(inv.irp_status).toBe('not_required');
+  }, 20000);
+
+  it('the guest cart quote matches place_public_order totals in all three GST modes', async () => {
+    async function compare(slug: string, item: string, quote: GstQuote) {
+      expect(await readGuestQuote(slug, 500)).toEqual(quote);
+      const { sitting } = await placeOrder(slug, item, 2);
+      const order = (await db.query(
+        'select subtotal_paise, tax_paise, total_paise from orders where order_session_id=$1',
+        [sitting]
+      )).rows[0];
+      const cart = priceCart(
+        [{ itemId: item, qty: 2 }],
+        [{ id: item, name: 'Plate', pricePaise: 10500, isVeg: null, isAvailable: true }],
+        quote
+      );
+      expect({
+        subtotal: cart.totals.subtotalPaise,
+        tax: cart.totals.taxPaise,
+        total: cart.totals.totalPaise,
+      }).toEqual({
+        subtotal: Number(order.subtotal_paise),
+        tax: Number(order.tax_paise),
+        total: Number(order.total_paise),
+      });
+    }
+
+    // GST off: the legacy rate is added on top of the menu price.
+    const offUser = randomUUID(); const offSlug = `${slugBase}-quote-off-${randomUUID().slice(0,4)}`;
+    const off = await makeRestaurant(offSlug, offUser, 500);
+    await compare(offSlug, off.item, { mode: 'off', rateBps: 500 });
+
+    // Composition: a Bill of Supply, nothing charged beyond the menu total.
+    const cmpUser = randomUUID(); const cmpSlug = `${slugBase}-quote-cmp-${randomUUID().slice(0,4)}`;
+    const cmp = await makeRestaurant(cmpSlug, cmpUser);
+    await setGstConfig(cmp.restaurant, {
+      mode: 'composition', gstin: cmp.gstin, legal_name: 'Guest Quote Composition Co',
+      address: 'Composition Lane, Nagpur', state_code: '27', pan: cmp.pan,
+      registration_type: 'composition', composition_acknowledged: true,
+    });
+    await compare(cmpSlug, cmp.item, { mode: 'composition', rateBps: null });
+
+    // Regular 5%: the menu price includes GST; the quote extracts it once.
+    const regUser = randomUUID(); const regSlug = `${slugBase}-quote-reg-${randomUUID().slice(0,4)}`;
+    const reg = await makeRestaurant(regSlug, regUser);
+    await setGstConfig(reg.restaurant, {
+      mode: 'regular', regular_profile: 'other_than_specified_premises',
+      gstin: reg.gstin, legal_name: 'Guest Quote Regular LLP',
+      address: 'Registered office, Test Lane, Nagpur', state_code: '27', pan: reg.pan,
+      registration_type: 'regular', preceding_fy_turnover_paise: 1_000_000_000,
+    });
+    await compare(regSlug, reg.item, { mode: 'regular', rateBps: 500 });
+
+    // Regular 18%: still the menu price, with a larger extracted tax.
+    const specUser = randomUUID(); const specSlug = `${slugBase}-quote-spec-${randomUUID().slice(0,4)}`;
+    const spec = await makeRestaurant(specSlug, specUser);
+    await setGstConfig(spec.restaurant, {
+      mode: 'regular', regular_profile: 'specified_premises',
+      gstin: spec.gstin, legal_name: 'Guest Quote Specified Pvt Ltd',
+      address: 'Hotel Tower, Test Lane, Nagpur', state_code: '27', pan: spec.pan,
+      registration_type: 'regular', specified_premises_attested: true,
+    });
+    await compare(specSlug, spec.item, { mode: 'regular', rateBps: 1800 });
+  }, 30000);
+
+  it('the guest GST projection reveals nothing for an unknown slug', async () => {
+    await db.query('begin');
+    try {
+      await db.query('set local role anon');
+      const { rows } = await db.query("select * from public.public_restaurant_gst('no-such-slug')");
+      expect(rows).toEqual([]);
+    } finally {
+      await db.query('rollback');
+    }
   }, 20000);
 
   it('18% profile requires the specified-premises attestation and checks state code against GSTIN', async () => {

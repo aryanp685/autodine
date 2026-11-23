@@ -20,9 +20,10 @@ import type { OutletOption } from '../outlets';
 import type { OutletEntitlement } from '../access';
 import { getStaffContextDetailed } from './staff';
 import { loadGstSettings, NOT_READY, type GstSettingsData } from './gst-settings';
-import { canEditSettings } from '../settings-input';
+import { loadRestaurantPrinters, type PrinterSummary } from './printers';
+import { canEditSettings, publicMenuPath } from '../settings-input';
 import { qrSvg, siteOrigin } from '../qr';
-import { publicMenuPath } from '../settings-input';
+import { normalizeOperatingMode, type OperatingMode } from '../operating-mode';
 
 export type SettingsRestaurant = {
   name: string;
@@ -30,7 +31,30 @@ export type SettingsRestaurant = {
   address: string;
   phone: string;
   gstin: string;
+  fssaiNumber?: string;
+  billFooterNote?: string;
   slug: string;
+};
+
+export type BillingDefaultsSettings = {
+  serviceChargeBps: number;
+  packagingChargePaise: number;
+  deliveryChargePaise: number;
+  roundOffEnabled: boolean;
+};
+
+export type RestaurantCouponSummary = {
+  id: string;
+  code: string;
+  description: string;
+  discountType: 'percent' | 'flat';
+  discountValue: number;
+  minOrderPaise: number;
+  maxDiscountPaise: number | null;
+  maxUses: number | null;
+  usesCount: number;
+  validUntil: string | null;
+  isActive: boolean;
 };
 
 export type SettingsScreenData = {
@@ -39,6 +63,8 @@ export type SettingsScreenData = {
   canEdit: boolean;
   details: SettingsRestaurant;
   taxRateBps: number;
+  billingDefaults?: BillingDefaultsSettings;
+  coupons?: RestaurantCouponSummary[];
   /**
    * Migration 20261028000900. How a guest proves they are at a table.
    *
@@ -71,6 +97,12 @@ export type SettingsScreenData = {
   outletEntitlement?: OutletEntitlement | null;
   /** GST configuration, or ready:false when the GST migration is not applied. */
   gst: GstSettingsData;
+  printers?: PrinterSummary[];
+  /** Compatible operating path: Mode A (alongside POS) or Mode B (primary OS). */
+  operatingMode?: OperatingMode;
+  posIntegrationName?: string;
+  posWebhookUrl?: string;
+  posWebhookSecretConfigured?: boolean;
   blocked?: 'signed-out' | 'no-membership';
 };
 
@@ -108,29 +140,68 @@ export async function getSettingsScreenData(): Promise<SettingsScreenData | null
    * for, and a missing-column answer retries without it -- with the mode
    * defaulting to 'code', which is what an unmigrated database enforces anyway.
    */
+  const restaurantColumnsWithMode =
+    'name, tagline, address, phone, gstin, fssai_number, bill_footer_note, slug, timezone, tax_rate_bps, guest_verification_mode, default_service_charge_bps, default_packaging_charge_paise, default_delivery_charge_paise, round_off_enabled, operating_mode, pos_integration_name';
   const restaurantColumns =
+    'name, tagline, address, phone, gstin, fssai_number, bill_footer_note, slug, timezone, tax_rate_bps, guest_verification_mode, default_service_charge_bps, default_packaging_charge_paise, default_delivery_charge_paise, round_off_enabled';
+  const restaurantColumnsPreV2 =
     'name, tagline, address, phone, gstin, slug, timezone, tax_rate_bps, guest_verification_mode';
   const restaurantColumnsLegacy =
     'name, tagline, address, phone, gstin, slug, timezone, tax_rate_bps';
 
-  const firstRestaurantResult = await supabase
+  const zeroRestaurantResult = await supabase
     .from('restaurants')
-    .select(restaurantColumns)
+    .select(restaurantColumnsWithMode)
     .eq('id', restaurantId)
     .maybeSingle();
 
-  const restaurantResult =
+  const firstRestaurantResult =
+    zeroRestaurantResult.error?.code === '42703'
+      ? await supabase
+          .from('restaurants')
+          .select(restaurantColumns)
+          .eq('id', restaurantId)
+          .maybeSingle()
+      : zeroRestaurantResult;
+
+  const secondRestaurantResult =
     firstRestaurantResult.error?.code === '42703'
+      ? await supabase
+          .from('restaurants')
+          .select(restaurantColumnsPreV2)
+          .eq('id', restaurantId)
+          .maybeSingle()
+      : firstRestaurantResult;
+
+  const restaurantResult =
+    secondRestaurantResult.error?.code === '42703'
       ? await supabase
           .from('restaurants')
           .select(restaurantColumnsLegacy)
           .eq('id', restaurantId)
           .maybeSingle()
-      : firstRestaurantResult;
+      : secondRestaurantResult;
 
-  const [menusResult, gst] = await Promise.all([
+  const [menusResult, gst, couponsResult, printers, posIntegrationResult] = await Promise.all([
     supabase.from('menus').select('id, is_published').eq('restaurant_id', restaurantId),
     loadGstSettings(supabase, restaurantId),
+    Promise.resolve(
+      supabase
+        .from('restaurant_coupons')
+        .select('id, code, description, discount_type, discount_value, min_order_paise, max_discount_paise, max_uses, uses_count, valid_until, is_active')
+        .eq('restaurant_id', restaurantId)
+        .order('created_at', { ascending: false }),
+    ).catch(() => ({ data: [], error: null })),
+    loadRestaurantPrinters(supabase, restaurantId),
+    canEditSettings(role)
+      ? Promise.resolve(
+          supabase
+            .from('restaurant_pos_integrations')
+            .select('webhook_url, webhook_secret')
+            .eq('restaurant_id', restaurantId)
+            .maybeSingle(),
+        ).catch(() => ({ data: null, error: null }))
+      : Promise.resolve({ data: null, error: null }),
   ]);
 
   if (restaurantResult.error) {
@@ -179,8 +250,41 @@ export async function getSettingsScreenData(): Promise<SettingsScreenData | null
       address: String(row.address ?? ''),
       phone: String(row.phone ?? ''),
       gstin: String(row.gstin ?? ''),
+      fssaiNumber: String((row as { fssai_number?: string | null }).fssai_number ?? ''),
+      billFooterNote: String((row as { bill_footer_note?: string | null }).bill_footer_note ?? ''),
       slug,
     },
+    billingDefaults: {
+      serviceChargeBps: Number((row as { default_service_charge_bps?: number | null }).default_service_charge_bps ?? 0),
+      packagingChargePaise: Number((row as { default_packaging_charge_paise?: number | null }).default_packaging_charge_paise ?? 0),
+      deliveryChargePaise: Number((row as { default_delivery_charge_paise?: number | null }).default_delivery_charge_paise ?? 0),
+      roundOffEnabled: (row as { round_off_enabled?: boolean | null }).round_off_enabled === true,
+    },
+    coupons: ((couponsResult as { data?: Array<{
+      id: string;
+      code: string;
+      description: string;
+      discount_type: 'percent' | 'flat';
+      discount_value: number;
+      min_order_paise: number;
+      max_discount_paise: number | null;
+      max_uses: number | null;
+      uses_count: number;
+      valid_until: string | null;
+      is_active: boolean;
+    }> | null }).data ?? []).map((c) => ({
+      id: c.id,
+      code: c.code,
+      description: c.description,
+      discountType: c.discount_type,
+      discountValue: Number(c.discount_value ?? 0),
+      minOrderPaise: Number(c.min_order_paise ?? 0),
+      maxDiscountPaise: c.max_discount_paise == null ? null : Number(c.max_discount_paise),
+      maxUses: c.max_uses == null ? null : Number(c.max_uses),
+      usesCount: Number(c.uses_count ?? 0),
+      validUntil: c.valid_until ?? null,
+      isActive: c.is_active === true,
+    })),
     // A database with no rate at all is read as 0, not as the sample 5% in
     // lib/pricing.ts. The sample is a layout number; charging it would be
     // inventing a tax nobody set.
@@ -199,8 +303,24 @@ export async function getSettingsScreenData(): Promise<SettingsScreenData | null
     outlets,
     activeOutletId: restaurantId,
     gst,
+    printers,
+    operatingMode: normalizeOperatingMode(
+      (row as { operating_mode?: string | null }).operating_mode ?? staff.context.operatingMode,
+    ),
+    posIntegrationName: String(
+      (row as { pos_integration_name?: string | null }).pos_integration_name ??
+        staff.context.posIntegrationName ??
+        '',
+    ),
+    posWebhookUrl: String(
+      (posIntegrationResult as { data?: { webhook_url?: string | null } | null })?.data?.webhook_url ?? '',
+    ),
+    posWebhookSecretConfigured: Boolean(
+      (posIntegrationResult as { data?: { webhook_secret?: string | null } | null })?.data
+        ?.webhook_secret,
+    ),
     // The plan lives on the account, so this is the account's allowance and
     // the account's outlet count -- not this outlet's.
-    outletEntitlement: staff.context.access?.outlets ?? null,
+    outletEntitlement: staff.context.entitlement?.outlets ?? null,
   };
 }

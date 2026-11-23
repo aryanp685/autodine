@@ -47,6 +47,7 @@ test.describe('cashier — real database', () => {
     await till.goto(`${BASE}/cashier`);
 
     const row = till.getByRole('button', { name: /Select .*outstanding/ }).first();
+    await expect(till.locator('[data-counter-cta]')).toHaveCount(1);
     await expect(till.locator('[data-counter-cta]')).toBeVisible({ timeout: 45_000 });
 
     // The amount on the settle button is the outstanding the DATABASE holds —
@@ -82,19 +83,22 @@ test.describe('cashier — real database', () => {
     context,
   }) => {
     test.skip(!GUEST_READY, skipUnless(false, 'guest env for the order half'));
-    await placeCounterOrder(context, 'e2e: cash on the counter');
+    const guestUrl = await placeCounterOrder(context, 'e2e: cash on the counter');
+    const code = codeFromOrderUrl(guestUrl);
 
     const till = await signInOwner(context);
     await till.goto(`${BASE}/cashier`);
-    await expect(till.locator('[data-counter-cta]')).toBeVisible({ timeout: 45_000 });
+    await till.getByRole('button', { name: new RegExp(`Select ${code} at`) }).click();
+    await expect(till.locator('[data-counter-cta]')).toHaveCount(1);
+    await expect(till.locator('[data-counter-cta]')).toHaveText('Record cash ₹349');
     await till.locator('[data-counter-cta]').click();
-
-    // The database accepts the payment; the queue re-reads without it and the
-    // screen names what was recorded.
-    await expect(till.getByRole('status').or(till.getByRole('alert')).first()).toBeVisible({
+    await expect(till.getByText(new RegExp(`Cash.*recorded for ${code}`))).toBeVisible({
       timeout: 20_000,
     });
-    await expect(till.locator('[data-counter-cta]')).not.toHaveText(/₹0[^0-9]/);
+
+    const guest = await context.newPage();
+    await guest.goto(guestUrl);
+    await expect(guest.getByText('Paid. Thank you.', { exact: true })).toBeVisible();
   });
 
   test('UPI is recorded by staff only; guests cannot claim an online payment', async ({ context }) => {
@@ -117,6 +121,11 @@ test.describe('cashier — real database', () => {
     // The fixture menu's single dish is ₹349 (zero tax) — the counter CTA
     // must show the database-held outstanding for the order this spec placed.
     await expect(till.locator('[data-counter-cta]')).toHaveText('Record UPI ₹349');
+    await expect(till.locator('[data-counter-cta]')).toBeDisabled();
+    await till.getByPlaceholder('UPI TRN / transaction ID').fill('   ');
+    await expect(till.locator('[data-counter-cta]')).toBeDisabled();
+    await till.getByPlaceholder('UPI TRN / transaction ID').fill(`E2E-UPI-${code}`);
+    await expect(till.locator('[data-counter-cta]')).toBeEnabled();
     await till.locator('[data-counter-cta]').click();
     await expect(till.getByText(new RegExp(`UPI.*recorded for ${code}`))).toBeVisible({ timeout: 20_000 });
 
@@ -132,6 +141,7 @@ test.describe('cashier — real database', () => {
 
     const till = await signInOwner(context);
     await till.goto(`${BASE}/cashier`);
+    await expect(till.locator('[data-counter-cta]')).toHaveCount(1);
     await expect(till.locator('[data-counter-cta]')).toBeVisible({ timeout: 45_000 });
 
     // Two taps, one intention — record_payment is idempotent per key, and the
@@ -165,7 +175,9 @@ test.describe('cashier — real database', () => {
 
     const till = await signInOwner(context);
     await till.goto(`${BASE}/dashboard`);
-    const session = till.locator(`[data-active-session="${first?.order_session_id}"]`);
+    // [data-app] keeps the locator on the revealed page: a suspended server
+    // render can leave a hidden streamed copy outside the live app root.
+    const session = till.locator(`[data-app] [data-active-session="${first?.order_session_id}"]`);
     await expect(session).toBeVisible({ timeout: 45_000 });
     await expect(session).toContainText('2 tickets');
     const dashboardTotal = (await session.locator('[data-session-total]').innerText()).trim();
@@ -230,8 +242,8 @@ test.describe('cashier — real database', () => {
     expect(third?.order_session_id).not.toBe(first?.order_session_id);
     expect(third?.session_status).toBe('open');
     await till.goto(`${BASE}/dashboard`);
-    await expect(till.locator(`[data-active-session="${third?.order_session_id}"]`)).toBeVisible({ timeout: 30_000 });
-    await expect(till.locator(`[data-active-session="${first?.order_session_id}"]`)).toHaveCount(0);
+    await expect(till.locator(`[data-app] [data-active-session="${third?.order_session_id}"]`)).toBeVisible({ timeout: 30_000 });
+    await expect(till.locator(`[data-app] [data-active-session="${first?.order_session_id}"]`)).toHaveCount(0);
   });
 
   test('a cancelled order cannot be settled — money for food that will not come', async ({
@@ -242,6 +254,7 @@ test.describe('cashier — real database', () => {
 
     const till = await signInOwner(context);
     await till.goto(`${BASE}/cashier`);
+    await expect(till.locator('[data-counter-cta]')).toHaveCount(1);
     await expect(till.locator('[data-counter-cta]')).toBeVisible({ timeout: 45_000 });
     const rowsBefore = await till.getByRole('button', { name: /Select .*outstanding/ }).count();
 

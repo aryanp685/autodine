@@ -1,4 +1,5 @@
 import { getStaffContextDetailed } from '@/lib/db/staff';
+import { qrSvg } from '@/lib/qr';
 import { publicAssetUrl } from '@/lib/storage/assets';
 import type { RestaurantInvoice, RestaurantInvoiceLine, RestaurantPaymentReceipt } from '@/lib/db/types';
 
@@ -61,9 +62,17 @@ export type ReceiptData = {
   number: string;
   financialYear: string;
   documentType: 'receipt' | 'gst_tax_invoice' | 'bill_of_supply';
-  /** e-Invoice state. B2C documents in this build are always 'not_required'. */
+  /** e-Invoice state. */
   irpStatus: GstIrnStatus;
   irn: string | null;
+  ackNo?: string | null;
+  ackDate?: string | null;
+  signedQrPayload?: string | null;
+  signedQrSvg?: string | null;
+  irpProvider?: string | null;
+  irpGeneratedAt?: string | null;
+  irpCancelledAt?: string | null;
+  irpCancelReason?: string | null;
   /** B2B buyer details, present only on regular GST tax invoices issued for a business customer. */
   recipient: {
     name: string;
@@ -93,11 +102,18 @@ export type ReceiptData = {
     legalName: string | null;
     tradeName: string | null;
     stateCode: string | null;
+    fssaiNumber?: string | null;
+    billFooterNote?: string | null;
+    orderChannel?: string | null;
   };
   totals: {
     subtotalPaise: number;
     ticketDiscountPaise: number;
     billDiscountPaise: number;
+    serviceChargePaise?: number;
+    packagingChargePaise?: number;
+    deliveryChargePaise?: number;
+    roundOffPaise?: number;
     taxablePaise: number | null;
     taxPaise: number;
     otherChargesPaise: number;
@@ -106,6 +122,7 @@ export type ReceiptData = {
     outstandingPaise: number;
     paymentStatus: 'paid' | 'unpaid';
   };
+  printCount?: number;
   payments: InvoicePaymentData[];
   paymentReceipts: InvoicePaymentReceiptData[];
   shareLinks?: InvoiceShareLinkData[];
@@ -134,6 +151,14 @@ const integer = (value: unknown): number => {
 };
 const nullableInteger = (value: unknown): number | null =>
   value == null ? null : integer(value);
+const signedInteger = (value: unknown): number => {
+  if (value == null) return 0;
+  const parsed = typeof value === 'number' ? value : Number(value);
+  if (!Number.isSafeInteger(parsed)) {
+    throw new Error('The saved receipt contains an invalid round-off value.');
+  }
+  return parsed;
+};
 const requiredText = (value: unknown, field: string): string => {
   const parsed = text(value).trim();
   if (!parsed) throw new Error(`The saved receipt is missing ${field}.`);
@@ -269,6 +294,13 @@ export function parseInvoice(
     documentType: row.document_type,
     irpStatus,
     irn: nullableText(row.irn),
+    ackNo: nullableText(row.ack_no),
+    ackDate: row.ack_date ? formatWhen(row.ack_date, timezone) : null,
+    signedQrPayload: nullableText(row.signed_qr_payload),
+    irpProvider: nullableText(row.irp_provider),
+    irpGeneratedAt: row.irp_generated_at ?? null,
+    irpCancelledAt: row.irp_cancelled_at ? formatWhen(row.irp_cancelled_at, timezone) : null,
+    irpCancelReason: nullableText(row.irp_cancel_reason),
     recipient,
     gst: parseGstSnapshot(row.gst_snapshot),
     status: row.status,
@@ -289,11 +321,18 @@ export function parseInvoice(
       legalName: nullableText(seller.legal_name),
       tradeName: nullableText(seller.trade_name),
       stateCode: nullableText(seller.state_code),
+      fssaiNumber: nullableText(seller.fssai_number),
+      billFooterNote: nullableText(seller.bill_footer_note),
+      orderChannel: nullableText(seller.order_channel),
     },
     totals: {
       subtotalPaise: integer(totals.subtotal_paise),
       ticketDiscountPaise: integer(totals.ticket_discount_paise),
       billDiscountPaise: integer(totals.bill_discount_paise),
+      serviceChargePaise: totals.service_charge_paise != null ? integer(totals.service_charge_paise) : 0,
+      packagingChargePaise: totals.packaging_charge_paise != null ? integer(totals.packaging_charge_paise) : 0,
+      deliveryChargePaise: totals.delivery_charge_paise != null ? integer(totals.delivery_charge_paise) : 0,
+      roundOffPaise: signedInteger(totals.round_off_paise),
       taxablePaise: nullableInteger(totals.taxable_paise),
       taxPaise: integer(totals.tax_paise),
       otherChargesPaise: integer(totals.other_charges_paise),
@@ -314,14 +353,27 @@ export async function getInvoiceData(invoiceId: string): Promise<InvoiceResult> 
   if (!staff.ok) return { ok: false, reason: staff.reason };
   const { supabase, restaurantId, timezone } = staff.context;
 
-  const { data: invoice, error } = await supabase
+  const baseSelect =
+    'id, restaurant_id, order_session_id, invoice_number, financial_year, sequence_number, document_type, status, issued_at, issued_by, table_label_snapshot, session_opened_at, session_closed_at, seller_snapshot, customer_snapshot, totals_snapshot, payment_snapshot, source_order_ids, supersedes_invoice_id, voided_at, voided_by, void_reason, created_at, gst_snapshot, irn, irp_status';
+  const extendedSelect = `${baseSelect}, ack_no, ack_date, signed_qr_payload, irp_provider, irp_generated_at, irp_cancelled_at, irp_cancel_reason`;
+
+  let { data: invoice, error } = await supabase
     .from('restaurant_invoices')
-    .select(
-      'id, restaurant_id, order_session_id, invoice_number, financial_year, sequence_number, document_type, status, issued_at, issued_by, table_label_snapshot, session_opened_at, session_closed_at, seller_snapshot, customer_snapshot, totals_snapshot, payment_snapshot, source_order_ids, supersedes_invoice_id, voided_at, voided_by, void_reason, created_at, gst_snapshot, irn, irp_status'
-    )
+    .select(extendedSelect)
     .eq('id', invoiceId)
     .eq('restaurant_id', restaurantId)
     .maybeSingle();
+
+  if (error && /ack_no|signed_qr_payload|does not exist|schema cache/i.test(error.message)) {
+    const fallback = await supabase
+      .from('restaurant_invoices')
+      .select(baseSelect)
+      .eq('id', invoiceId)
+      .eq('restaurant_id', restaurantId)
+      .maybeSingle();
+    invoice = fallback.data as typeof invoice;
+    error = fallback.error;
+  }
 
   if (error) throw new Error(`Could not load the receipt: ${error.message}`);
   if (!invoice) return { ok: false, reason: 'not-found' };
@@ -357,17 +409,30 @@ export async function getInvoiceData(invoiceId: string): Promise<InvoiceResult> 
     accessCount: Number(link.access_count),
   }));
 
+  const reprintResult = await supabase
+    .from('restaurant_invoice_reprints')
+    .select('copy_number')
+    .eq('invoice_id', invoice.id)
+    .order('copy_number', { ascending: false })
+    .limit(1);
+  const printCount = reprintResult.error ? 0 : Number(reprintResult.data?.[0]?.copy_number ?? 0);
+
+  const parsed = parseInvoice(
+    invoice as unknown as RestaurantInvoice,
+    (lines ?? []) as unknown as RestaurantInvoiceLine[],
+    (paymentReceipts ?? []) as unknown as RestaurantPaymentReceipt[],
+    timezone,
+  );
+  const signedQrSvg = parsed.signedQrPayload ? await qrSvg(parsed.signedQrPayload) : null;
+
   return {
     ok: true,
     role: staff.context.role,
     invoice: {
-      ...parseInvoice(
-        invoice as unknown as RestaurantInvoice,
-        (lines ?? []) as unknown as RestaurantInvoiceLine[],
-        (paymentReceipts ?? []) as unknown as RestaurantPaymentReceipt[],
-        timezone,
-      ),
+      ...parsed,
+      signedQrSvg,
       shareLinks,
+      printCount,
     },
   };
 }

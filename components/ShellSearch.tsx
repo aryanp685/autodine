@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { DASHBOARD_LINKS } from '@/components/shell-links';
+import { linksForRole } from '@/components/shell-links';
+import type { OperatingMode } from '@/lib/operating-mode';
 
 /**
  * "Go to…" — jump to any screen without hunting the rail.
@@ -26,7 +27,15 @@ import { DASHBOARD_LINKS } from '@/components/shell-links';
  * Enter on a highlighted row clicks the anchor it is already sitting on. Same
  * keystrokes, no downsides.
  */
-export function ShellSearch({ onLaunch }: { onLaunch?: () => void }) {
+export function ShellSearch({
+  onLaunch,
+  role,
+  operatingMode,
+}: {
+  onLaunch?: () => void;
+  role?: string | null;
+  operatingMode?: OperatingMode | null;
+}) {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [cursor, setCursor] = useState(0);
@@ -42,16 +51,21 @@ export function ShellSearch({ onLaunch }: { onLaunch?: () => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const optionRefs = useRef<Array<HTMLAnchorElement | null>>([]);
 
+  const availableLinks = useMemo(
+    () => linksForRole(role, operatingMode),
+    [role, operatingMode],
+  );
+
   const results = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    if (!needle) return DASHBOARD_LINKS;
-    return DASHBOARD_LINKS.filter(
+    if (!needle) return availableLinks;
+    return availableLinks.filter(
       (link) =>
         link.label.toLowerCase().includes(needle) ||
         link.group.toLowerCase().includes(needle) ||
         link.href.toLowerCase().includes(needle)
     );
-  }, [query]);
+  }, [availableLinks, query]);
 
   useEffect(() => {
     setCursor(0);
