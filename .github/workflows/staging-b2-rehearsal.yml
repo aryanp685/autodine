@@ -138,7 +138,7 @@ jobs:
           100755 blob 35cfbb3dee583e2b9d87e9a14e23ca65941f2642	.github/actions/postgres-client/install-client.sh
           100755 blob ff890e80ccd94b353e96ef903884d68a589ce78f	.github/actions/postgres-client/verify-client.sh
           100644 blob d7defa59ed60dc1187f348771265c56fd06bddd9	package-lock.json
-          100644 blob 5a2efd247bf1da0cdf1790161f33f2bd905501c1	package.json
+          100644 blob 3e6721213ccdc6b539e98e4038e1bd09499db860	package.json
           100644 blob cf5326d1ada5681e5b4af4895be3d8da96a2b51d	scripts/backup/b2-owner-checklist.test.mjs
           100644 blob 5b657cc7577aaa63ba0ba8cf284f6d52c51bd7c3	scripts/backup/b2-upload.test.mjs
           100644 blob 8fce2f5b0a7890174d84660f306c3fc2d0755ccf	scripts/backup/backup-logical.mjs
