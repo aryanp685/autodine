@@ -1,0 +1,42 @@
+name: tmp-b2-smoke
+on:
+  workflow_dispatch:
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: 24 }
+      - name: Smoke test B2
+        env:
+          B2_BUCKET: ${{ secrets.B2_BUCKET }}
+          B2_REGION: ${{ secrets.B2_REGION }}
+          B2_ENDPOINT: ${{ secrets.B2_ENDPOINT }}
+          B2_ACCESS_KEY_ID: ${{ secrets.B2_ACCESS_KEY_ID }}
+          B2_SECRET_ACCESS_KEY: ${{ secrets.B2_SECRET_ACCESS_KEY }}
+        run: |
+          node --input-type=module - <<'EOF'
+          import { b2ConfigFromEnv, b2ObjectKey, signB2Request, sha256Hex } from './scripts/backup/lib-b2.mjs';
+          const env = process.env;
+          const cfg = b2ConfigFromEnv(env);
+          console.log('config ok:', cfg.ok, 'region:', cfg.region, 'bucket:', cfg.bucket);
+          const access = { accessKeyId: env.B2_ACCESS_KEY_ID, secretAccessKey: env.B2_SECRET_ACCESS_KEY };
+          async function put(name, body, extra = {}) {
+            const key = b2ObjectKey(name);
+            const url = `${cfg.endpoint}/${cfg.bucket}/${key}`;
+            const h = signB2Request({ method: 'PUT', url, payloadHash: sha256Hex(body), ...access, region: cfg.region, extraHeaders: extra });
+            h['content-length'] = String(body.length);
+            const r = await fetch(url, { method: 'PUT', headers: h, body });
+            console.log(`PUT ${name} (${body.length}B) -> ${r.status}`, (await r.text()).slice(0, 300).replace(/\n/g, ' '));
+            return r;
+          }
+          await put('smoke/tiny.txt', Buffer.from('hello world\n'), { 'content-type': 'text/plain' });
+          await put('smoke/1mb.bin', Buffer.alloc(1048576, 7));
+          await put('smoke/2mb.bin', Buffer.alloc(2 * 1048576, 7));
+          await put('smoke/enc.bin', Buffer.alloc(861411, 7));
+          const gu = `${cfg.endpoint}/${cfg.bucket}/${b2ObjectKey('smoke/tiny.txt')}`;
+          const gh = signB2Request({ method: 'GET', url: gu, payloadHash: sha256Hex(Buffer.alloc(0)), ...access, region: cfg.region });
+          const g = await fetch(gu, { method: 'GET', headers: gh });
+          console.log('GET tiny ->', g.status, g.ok ? await g.text() : '');
+          EOF
