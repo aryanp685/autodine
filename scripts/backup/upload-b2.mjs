@@ -103,6 +103,8 @@ try {
   });
   if (!put.ok) {
     process.stderr.write(`upload-b2: PUT failed with HTTP ${put.status}; artifact NOT uploaded\n`);
+    const body = await put.text();
+    if (body) process.stderr.write(`upload-b2: response body: ${body.slice(0, 500)}\n`);
     process.exit(1);
   }
   if (manifest) {
