@@ -93,6 +93,8 @@ async function signedFetch(method, objectKey, body, extraHeaders = {}) {
   const url = `${config.endpoint}/${config.bucket}/${objectKey.split('/').map(encodeURIComponent).join('/')}`;
   const payloadHash = sha256Hex(body ?? Buffer.alloc(0));
   const headers = signB2Request({ method, url, payloadHash, ...access, region: config.region, extraHeaders });
+  // B2 rejects chunked uploads with 400 IncompleteBody — always send an exact Content-Length.
+  if (body !== undefined) headers['content-length'] = String(body.length);
   return fetch(url, { method, headers, body, signal: AbortSignal.timeout(120000) });
 }
 
