@@ -6,8 +6,13 @@
  *   AUTODINE_BACKUP_PASSPHRASE=... \
  *   node scripts/backup/restore-logical.mjs --file backups/autodine-....sql.gz.enc --confirm-empty-db
  *
- * Safety: refuses to run unless the target has zero tables in the restored
- * schema, unless --allow-non-empty is passed. Never prints the target URL.
+ * Safety, in order:
+ *   - refuses to run unless the target has zero tables in the restored
+ *     schema, unless --allow-non-empty is passed;
+ *   - refuses a target that is not a loopback disposable database unless a
+ *     scratch opt-in AND an approved project ref are both present, and
+ *     refuses a Production project outright (see lib-restore-target.mjs);
+ *   - never prints the target URL, the user name or the password.
  * After restore it prints a verification report (table/function/policy counts
  * and row totals) — treat it as a smoke check, not as proof of completeness.
  */
@@ -17,6 +22,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import pg from 'pg';
 import { decryptBuffer, sha256 } from './lib-crypto.mjs';
+import { restoreTargetDecision } from './lib-restore-target.mjs';
+import { resolvePgClient } from './lib-pg-client.mjs';
 
 const args = process.argv.slice(2);
 const opt = {};
@@ -30,6 +37,26 @@ const file = opt.file;
 if (!file) fail('missing --file');
 const targetUrl = process.env.AUTODINE_RESTORE_TARGET_URL || opt['target-url'];
 if (!targetUrl) fail('set AUTODINE_RESTORE_TARGET_URL (never on the command line)');
+
+// Target guard, BEFORE anything is decrypted or connected to.
+//
+// A restore replays a dump into whatever it is pointed at. The hosted drill
+// must only ever reach the runner's own disposable loopback container, so a
+// hosted target needs an explicit scratch opt-in plus an approved project
+// ref, and a Production project is refused outright — no flag unlocks it.
+// The decision names the host and project ref only: never the URL, the
+// user name or the password.
+const targetDecision = restoreTargetDecision({
+  targetUrl,
+  expectedRef: process.env.AUTODINE_RESTORE_EXPECTED_REF,
+  allowScratch: opt['allow-scratch'] === '1' || process.env.AUTODINE_RESTORE_ALLOW_SCRATCH === '1',
+  productionRefs: (process.env.AUTODINE_RESTORE_PRODUCTION_REFS ?? '')
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean),
+});
+if (!targetDecision.allowed) fail(targetDecision.reason);
+process.stderr.write(`restore: target accepted — ${targetDecision.reason}\n`);
 const passphrase = process.env.AUTODINE_BACKUP_PASSPHRASE;
 if (!passphrase) fail('set AUTODINE_BACKUP_PASSPHRASE');
 const confirmEmpty = opt['confirm-empty-db'] === '1' || opt['confirm-empty-db'] === true;
@@ -62,7 +89,16 @@ try {
     try {
       const dumpPath = path.join(tmp, 'restore.dump');
       writeFileSync(dumpPath, plaintext);
-      execFileSync('pg_restore', ['--no-owner', `--schema=${schema}`, '--dbname', targetUrl, dumpPath], { stdio: ['ignore', 'ignore', 'inherit'] });
+      // Resolve pg_restore to the binary that will actually run.
+      //
+      // The reader must be the same major version as the writer: a dump
+      // written by a newer pg_dump carries an archive format an older
+      // pg_restore refuses outright. The runner image ships an older
+      // client that can shadow the pinned one on PATH, so when the
+      // composite action has pinned a directory the absolute path of the
+      // VERIFIED binary is used and the version is re-checked here.
+      const pgRestore = resolvePgClient('pg_restore', { required: true });
+      execFileSync(pgRestore.path, ['--no-owner', `--schema=${schema}`, '--dbname', targetUrl, dumpPath], { stdio: ['ignore', 'ignore', 'inherit'] });
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }

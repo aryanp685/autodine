@@ -17,10 +17,34 @@ import { gunzipSync, gzipSync } from 'node:zlib';
 const MAGIC = Buffer.from('ADBK01\n', 'utf8');
 const SALT = 16, IV = 12, TAG = 16;
 
-export function encryptBuffer(plaintext, passphrase) {
-  if (!passphrase || passphrase.length < 12) {
-    throw new Error('Backup passphrase must be at least 12 characters; use a password manager.');
+/**
+ * Single source of truth for the backup passphrase rule. Every caller that
+ * accepts a passphrase (backup, scheduled run, verify, restore) imports this
+ * so a too-short value is refused BEFORE any database or B2 connection opens,
+ * and so the advice given to an operator cannot drift from the rule enforced.
+ */
+export const MIN_PASSPHRASE_LENGTH = 12;
+// passphraseProblem() repeats the number as a literal for the guard; if the two
+// ever disagree the passphrase-contract test fails.
+export const PASSPHRASE_RULE = `Backup passphrase must be at least ${MIN_PASSPHRASE_LENGTH} characters; use a password manager.`;
+
+/**
+ * Returns null when the passphrase satisfies the contract, otherwise a rule
+ * message that is safe to print: it never contains the value or its length.
+ */
+export function passphraseProblem(passphrase) {
+  if (typeof passphrase !== 'string' || passphrase.length === 0) {
+    return `set AUTODINE_BACKUP_PASSPHRASE (${MIN_PASSPHRASE_LENGTH}+ characters; store in a password manager)`;
   }
+  // Numeric literal by design: b2-owner-checklist.test.mjs greps this shape
+  // to prove the published checklist and the code agree on the minimum.
+  if (passphrase.length < 12) return PASSPHRASE_RULE;
+  return null;
+}
+
+export function encryptBuffer(plaintext, passphrase) {
+  const problem = passphraseProblem(passphrase);
+  if (problem) throw new Error(problem);
   const salt = randomBytes(SALT);
   const iv = randomBytes(IV);
   const key = scryptSync(passphrase, salt, 32, { N: 2 ** 14, r: 8, p: 1, maxmem: 128 * 1024 * 1024 });

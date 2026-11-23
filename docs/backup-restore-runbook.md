@@ -31,7 +31,11 @@ Until the owner (a) confirms the plan and (b) approves a destination, this runbo
 node scripts/backup/selftest.mjs
 
 # backup (Mode A when pg_dump exists, else built-in Mode B)
-AUTODINE_BACKUP_SOURCE_URL='postgresql://postgres.<ref>:<password>@aws-...pooler.supabase.com:6543/postgres' \
+# The SOURCE must be the SESSION pooler (port 5432) or a direct connection.
+# Never the transaction pooler (6543): Mode A exports a snapshot on one
+# connection and pg_dump imports it on a second, which does not work
+# correctly through transaction-mode pooling. See PRODUCTION-BACKUP-RUNBOOK.md.
+AUTODINE_BACKUP_SOURCE_URL='postgresql://postgres.<ref>:<password>@aws-...pooler.supabase.com:5432/postgres' \
 AUTODINE_BACKUP_PASSPHRASE='<from your password manager>' \
 node scripts/backup/backup-logical.mjs --out-dir /mnt/backups/autodine \
   --keep-daily 14 --keep-weekly 8 --keep-monthly 6
@@ -47,7 +51,7 @@ Never put either URL on a command line (shell history) — always the environmen
 ## Machine-checkable evidence (2026-11-15)
 
 `npm run pitr:check` validates a filled PITR/restore evidence file (see
-`docs/pitr-verification-procedure-2026-11-14.md` addendum (removed in the 2026-11-21 cleanup): template emission, per-field schema
+`docs/pitr-verification-procedure-2026-11-14.md` addendum): template emission, per-field schema
 validation, PITR-chosen consistency rules (p4 measured RPO/RTO, copy destroyed), and SHA-256
 re-verification of an accessible `p3.backup_file`. It never touches a database or the network.
 
@@ -93,17 +97,15 @@ drill.
 
 ## Scheduling
 
-Host cron (operator workstation / a small VM) — use the orchestrator, which
-runs backup → automated recovery check (decrypt + manifest verify of the
-newest artifact) → DR objective check, and exits non-zero with one alert line
-(`BACKUP_ALERT_WEBHOOK`, else `DR_ALERT_WEBHOOK`) on any failure:
+A separately authorized host scheduler may run the orchestrator, which
+performs backup → decryption/manifest verification → DR objective check and
+exits non-zero on failure. Inject credentials through an approved protected
+secret manager or service manager; never put credential values in crontab,
+command arguments, logs or chat. The existing GitHub schedule is 03:17 UTC.
+An independent heartbeat monitor is still needed when a scheduled run never
+starts, and an alert sink must be configured and verified separately.
 
-```cron
-17 3 * * *  cd /opt/autodine && AUTODINE_BACKUP_SOURCE_URL=... AUTODINE_BACKUP_PASSPHRASE=... node scripts/backup/run-scheduled.mjs --out-dir /mnt/backups/autodine --rpo-minutes 1440 >> /var/log/autodine-backup.log 2>&1
-```
-
-**First hosted run (executes immediately once the B2 variables exist):**
-add `--b2` to the same command. The run then ends with the upload stage:
+**For an explicitly authorized hosted backup:** add `--b2` to the command. The run then ends with the upload stage:
 artifact SHA-256 re-checked against its manifest, signed PUT of artifact +
 manifest to the bucket, signed HEAD verification of the remote SHA-256.
 Success prints `B2 upload remotely verified`; missing configuration fails
@@ -119,12 +121,14 @@ Two workflows make the hosted path independent of any one machine:
 - **`.github/workflows/hosted-backup.yml`** — manual dispatch + daily
   03:17 UTC schedule; `contents: read` only; concurrency-guarded; fails
   closed naming any missing secret; runs `run-scheduled.mjs --b2 --prune-b2` and
-  archives the (non-sensitive) manifest as run evidence.
+  archives the manifest as access-controlled run evidence. Populating its
+  repository secrets can enable future scheduled and destructive retention
+  operations; doing so requires separate authorization.
 - **`.github/workflows/hosted-restore-drill.yml`** — manual dispatch only;
   downloads the newest B2 artifact (`download-b2.mjs`, SHA-256 vs manifest
   verified), restores into a disposable `postgres:17` service container,
-  verifies with `verify-restored-db.mjs`, records restore
-  seconds as rehearsal RTO, archives the two JSON reports, and destroys
+  verifies with `verify-restored-db.mjs`, records restore-command seconds
+  (not end-to-end RTO), archives the two JSON reports, and destroys
   the downloaded material in an unconditional cleanup step. The target is
   loopback-only by construction, and the verifier refuses non-loopback
   hosts before connecting.
@@ -205,7 +209,7 @@ is environment-only — `B2_REGION` (e.g. `us-west-004`, endpoint derived as
 `B2_BUCKET`, `B2_ACCESS_KEY_ID` (keyID), `B2_SECRET_ACCESS_KEY`
 (application key) — and no code path
 prints a value; missing configuration reports variable NAMES only
-(`upload-r2.mjs` exit 2, and the offline shape-check in
+(`upload-b2.mjs` exit 2, and the offline shape-check in
 `scripts/verify-external-services-config.mjs`).
 
 ```bash
@@ -214,14 +218,23 @@ node scripts/backup/upload-b2.mjs --file /mnt/backups/autodine/autodine-*.sql.gz
 node scripts/backup/upload-b2.mjs --file <artifact> --dry-run   # local integrity + config check, no network
 ```
 
-**Status (2026-11-16): NOT UPLOADED — no B2 credentials exist** in the repo,
-the operator environment, or any connected tool (checked by variable name /
-presence only). The exact remaining human action: create one private B2
-bucket and a bucket-scoped B2 application key (read/write), then place
-the four variables above in the backup host's secret store (or as the
-GitHub Actions secrets listed below). Cost at AutoDine's scale
-(< 5 GB stored): ≈ $0.01–0.04/month at $6.95/TB/month; the first 10 GB
-are free. **Local drill evidence
+**Current status: real B2 upload and hosted restore remain unverified.**
+The owner reports a bucket and a newly generated replacement key; the key's
+secure configuration, scope, and old-key revocation have not been verified.
+Do not regenerate the replacement unnecessarily or use the exposed old key.
+Use the staging-only Environment procedure in `operations/B2_OWNER_CHECKLIST.md`;
+do not populate scheduled-workflow repository secrets for a staging test.
+Confirm current account-specific pricing and authorize any chargeable action.
+
+Uploads are **not automatically retried**: an interrupted PUT may have
+committed remotely, and repeating it can create another billed B2 version.
+Artifact and manifest PUTs are separate, so a failure can leave a partial
+pair; treat the destination as unverified. An authorized operator must inspect
+the named objects and versions and plan recovery before retrying or deleting.
+Download reads have bounded retry. Neither mock failures nor a HEAD metadata
+check prove a real transfer or version-level idempotency.
+
+**Historical local drill evidence
 (2026-11-16, disposable embedded PostgreSQL, never hosted):** full-chain
 logical restore verified (93 migrations; 48 tables / 59 policies / 162
 functions; schema fingerprint identical); backup selftest ALL CHECKS PASS
@@ -230,7 +243,7 @@ a real artifact + manifest produced from a disposable cluster passed
 `upload-b2 --dry-run` SHA-256/manifest verification and correctly reported
 the four missing config names (B2_ENDPOINT|B2_REGION forms included); disposable cluster and artifacts destroyed
 afterwards. Hosted upload + hosted restore drill remain UNVERIFIED until
-credentials exist.
+the isolated, authorized rehearsal actually succeeds.
 
 ## Remote retention in B2 (implemented 2026-11-16; native lifecycle rules are NOT sufficient)
 
@@ -275,10 +288,14 @@ error). Deletion itself is artifact-first: an artifact-DELETE failure
 leaves the pair intact for a clean re-run, and a manifest-DELETE failure
 is retried once before the run aborts naming the orphaned manifest.
 
-Optional defense-in-depth (owner, at bucket setup): add a B2 lifecycle
-rule on prefix `autodine-backups/` — hide after 400 days, delete 30 days
-after hiding — as a coarse backstop far beyond the 6-month policy horizon.
-It must never be the only retention mechanism.
+**Versioning and cost:** B2's S3 DELETE without a version ID inserts a
+[delete marker](https://www.backblaze.com/apidocs/s3-delete-object); prior
+versions remain stored and may continue to incur charges. This pruner manages
+visible recovery points, **not verified physical reclamation or secure
+permanent erasure**. Review hidden-version usage and any lifecycle or Object
+Lock policy with the owner before applying it; an age rule can remove a
+recovery point still needed by the 14/8/6 plan. Do not claim storage is
+reclaimed based on a successful name-only DELETE.
 
 ### Remote retention — known limitations (P2 observations, accepted)
 
@@ -310,8 +327,14 @@ retention semantics, and none blocks the integrity gate above.
 Residual trust notes: a manifest `createdAt` inside its consistency
 bounds (parseable, not future, not after upload time) is still trusted
 for tier selection — manifests are not cryptographically signed; the
-hash/metadata gate proves the artifact is exactly what the manifest
-describes, and newest-backup protection bounds the blast radius.
+hash/metadata gate checks the artifact against the manifest but does not
+authenticate the manifest itself. An actor able to replace the sidecar can
+alter counts, financial expectations or retention timestamps without
+changing the encrypted artifact. Preserve a trusted, access-controlled
+copy of the original manifest and compare all fields before relying on a
+later restore or retention decision; same-run staging comparison is not a
+cryptographic signature or a substitute for that independent copy.
+Newest-backup protection bounds, but does not eliminate, the blast radius.
 Likewise, an object replaced between its pre-delete HEAD recheck and its
 DELETE (same-key overwrite by a credentialed writer inside that single
 round-trip) cannot be detected by the S3 API available here — S3 offers
@@ -342,7 +365,7 @@ For < 5 GB/month stored: **B2 or R2 ≈ $0.01–0.08/month**. No paid plan is to
 ## Key management
 
 - Passphrase: 20+ random chars from a password manager; never in git, env files committed anywhere, or chat. Rotate yearly; re-encrypt means "take a fresh backup".
-- The manifest is not secret (counts and timestamps only). The `.sql.gz.enc` file is.
+- Manifests contain operational and financial metadata; restrict access and retain a trusted independent copy. The encrypted backup is sensitive too.
 - Restore drills: quarterly; after any schema-migration incident; before declaring a new environment "production-ready".
 
 ## Alerting
