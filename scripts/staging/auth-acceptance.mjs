@@ -116,7 +116,7 @@ for (const role of ['cashier', 'kitchen', 'manager']) {
   const againRow = Array.isArray(again.data) ? again.data[0] : null;
   console.log(`invite-single-use-${role}: received status=${againRow?.status ?? 'none'} error=${again.error?.code ?? 'none'}`);
   check(`invite-single-use-${role}`, !again.error && againRow?.status === 'used');
-  members[role] = { client: memberClient, email, password: memberPw };
+  members[role] = { client: memberClient, email, password: memberPw, role };
 }
 
 // --- 4. report_sales authorization through the real authenticated paths ---
@@ -189,27 +189,35 @@ check('health-endpoint-200-ok', health.status === 200 && healthOk);
 // signed-out (401) by design. Status words and HTTP codes are not secrets;
 // emails and passwords never leave this process.
 async function realtimeAlertStatus(member) {
+  let phase = 'launch';
+  let hasStorage = false;
   const browser = await chromium.launch();
   try {
     const storagePath = '.staging-private/browser-access.json';
-    const hasStorage = await readFile(storagePath, 'utf8').then(() => true, () => false);
+    hasStorage = await readFile(storagePath, 'utf8').then(() => true, () => false);
+    phase = 'context';
     const context = await browser.newContext(hasStorage
       ? { storageState: storagePath, baseURL: base.origin }
       : { baseURL: base.origin });
     const page = await context.newPage();
     if (!hasStorage) {
+      phase = 'share-goto';
       const share = process.env.STAGING_SHARE_URL ? new URL(process.env.STAGING_SHARE_URL) : null;
       if (!share) throw new Error('Staging share access is unavailable for the browser probe.');
       await page.goto(share.href, { waitUntil: 'domcontentloaded', timeout: 60_000 });
     }
+    phase = 'login-goto';
     await page.goto(`${base.origin}/login`);
+    phase = 'login-fill';
     await page.getByLabel('Work email').fill(member.email);
     await page.getByLabel('Password').fill(member.password);
     await page.getByRole('button', { name: 'Sign in' }).click();
     // The staff shell renders for every staff role; waiting for the redirect
     // away from /login proves the cookie session exists without assuming
     // which screen this role lands on.
+    phase = 'login-redirect';
     await page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 20_000 });
+    phase = 'post-alert';
     return await page.evaluate(async () => {
       const response = await fetch('/api/ops/realtime-alert', {
         method: 'POST',
@@ -218,6 +226,14 @@ async function realtimeAlertStatus(member) {
       });
       return response.status;
     });
+  } catch (error) {
+    // The raw error text (Playwright dumps the page URL and sometimes page
+    // content) can embed the share token or a password, which GitHub masks as
+    // *** and hides the diagnosis. Emit phase-level facts only; statuses and
+    // paths are not secrets.
+    const url = (() => { try { return new URL(error?.message.match(/https?:\/\/\S+/)?.[0] ?? base.origin).pathname; } catch { return base.pathname; } })();
+    console.log(`::error::realtime-alert probe failed at phase=${phase} hasStorage=${hasStorage} role=${member.role ?? 'unknown'} contextUrl=${url} errorName=${error?.name ?? 'Error'}`);
+    throw new Error(`realtime-alert probe failed at phase=${phase} (details masked; see phase above)`);
   } finally {
     await browser.close();
   }
