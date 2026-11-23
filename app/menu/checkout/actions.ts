@@ -304,6 +304,6 @@ export async function placeOrderAction(formData: FormData): Promise<void> {
     maxAge: 60 * 60 * 24,
   });
   redirect(
-    `/menu/order?s=${encodeURIComponent(slug)}&code=${encodeURIComponent(code)}&placed=1`
+    `/menu/order?s=${encodeURIComponent(slug)}&code=${encodeURIComponent(code)}&t=${encodeURIComponent(guestToken)}&placed=1`
   );
 }
