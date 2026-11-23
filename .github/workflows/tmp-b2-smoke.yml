@@ -16,6 +16,8 @@ jobs:
           B2_ACCESS_KEY_ID: ${{ secrets.B2_ACCESS_KEY_ID }}
           B2_SECRET_ACCESS_KEY: ${{ secrets.B2_SECRET_ACCESS_KEY }}
         run: |
+          EP="${B2_ENDPOINT:-https://s3.${B2_REGION}.backblazeb2.com}"
+          echo "endpoint host scheme: $(echo "$EP" | sed -E 's#https://s3\.[a-z0-9-]+\.backblazeb2\.com#s3.<region>.backblazeb2.com#')"
           echo "--- curl sigv4 tiny PUT"
           echo -n "hello world" > /tmp/tiny.txt
           curl -s -o /tmp/curl_out.xml -w "curl PUT -> HTTP %{http_code}\n" \
@@ -24,13 +26,11 @@ jobs:
             --user "${B2_ACCESS_KEY_ID}:${B2_SECRET_ACCESS_KEY}" \
             -H "x-amz-content-sha256: $(sha256sum /tmp/tiny.txt | cut -d' ' -f1)" \
             -T /tmp/tiny.txt \
-            "${B2_ENDPOINT}/${B2_BUCKET}/smoke/curl-tiny.txt"
+            "${EP}/${B2_BUCKET}/smoke/curl-tiny.txt"
           head -c 300 /tmp/curl_out.xml; echo
           echo "--- curl sigv4 GET"
           curl -s -o /tmp/curl_get.txt -w "curl GET -> HTTP %{http_code}\n" \
             --aws-sigv4 "aws:amz:${B2_REGION}:s3" \
             --user "${B2_ACCESS_KEY_ID}:${B2_SECRET_ACCESS_KEY}" \
-            "${B2_ENDPOINT}/${B2_BUCKET}/smoke/curl-tiny.txt"
+            "${EP}/${B2_BUCKET}/smoke/curl-tiny.txt"
           head -c 200 /tmp/curl_get.txt; echo
-          echo "--- region echo (safe: bucket region only)"
-          curl -s "https://api.backblazeb2.com/b2api/v2/b2_get_bucket_info" -X POST > /dev/null 2>&1 || true
