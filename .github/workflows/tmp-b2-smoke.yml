@@ -20,13 +20,14 @@ jobs:
           echo "endpoint host scheme: $(echo "$EP" | sed -E 's#https://s3\.[a-z0-9-]+\.backblazeb2\.com#s3.<region>.backblazeb2.com#')"
           echo "--- curl sigv4 tiny PUT"
           echo -n "hello world" > /tmp/tiny.txt
-          curl -s -o /tmp/curl_out.xml -w "curl PUT -> HTTP %{http_code}\n" \
+          curl -sS -v -o /tmp/curl_out.xml -w "curl PUT -> HTTP %{http_code}\n" 2>/tmp/curl_verbose.txt \
             --request PUT \
             --aws-sigv4 "aws:amz:${B2_REGION}:s3" \
             --user "${B2_ACCESS_KEY_ID}:${B2_SECRET_ACCESS_KEY}" \
             -H "x-amz-content-sha256: $(sha256sum /tmp/tiny.txt | cut -d' ' -f1)" \
             -T /tmp/tiny.txt \
-            "${EP}/${B2_BUCKET}/smoke/curl-tiny.txt"
+            "${EP}/${B2_BUCKET}/smoke/curl-tiny.txt" || echo "curl exit code: $?"
+          grep -E '^\*|^< HTTP|^<Code>|Could not|resolve' /tmp/curl_verbose.txt | sed -E 's/(Authorization|amz).*/(redacted)/' | head -12
           head -c 300 /tmp/curl_out.xml; echo
           echo "--- curl sigv4 GET"
           curl -s -o /tmp/curl_get.txt -w "curl GET -> HTTP %{http_code}\n" \
