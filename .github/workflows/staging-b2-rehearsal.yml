@@ -138,7 +138,7 @@ jobs:
           100755 blob 35cfbb3dee583e2b9d87e9a14e23ca65941f2642	.github/actions/postgres-client/install-client.sh
           100755 blob ff890e80ccd94b353e96ef903884d68a589ce78f	.github/actions/postgres-client/verify-client.sh
           100644 blob d7defa59ed60dc1187f348771265c56fd06bddd9	package-lock.json
-          100644 blob 96e1d3d4a4a80943724e8e48c2a5120e1db735c7	package.json
+          100644 blob 5a2efd247bf1da0cdf1790161f33f2bd905501c1	package.json
           100644 blob cf5326d1ada5681e5b4af4895be3d8da96a2b51d	scripts/backup/b2-owner-checklist.test.mjs
           100644 blob 5b657cc7577aaa63ba0ba8cf284f6d52c51bd7c3	scripts/backup/b2-upload.test.mjs
           100644 blob 8fce2f5b0a7890174d84660f306c3fc2d0755ccf	scripts/backup/backup-logical.mjs
@@ -148,7 +148,7 @@ jobs:
           100644 blob 4094d3fca9da88e65b7c5511a2a2bd0a216d75c5	scripts/backup/check-dr-objectives.test.mjs
           100644 blob 5144b57ed7c8f1164eee9aca6a9a44ecf8af7b57	scripts/backup/compare-rehearsal-manifests.mjs
           100644 blob 9fdcef5533f5f48732bb009822804e2a582f8c0d	scripts/backup/compare-rehearsal-manifests.test.mjs
-          100644 blob 26a4587015e89a7031fc1b8e2d835e59c6699751	scripts/backup/download-b2.mjs
+          100644 blob ce0c9d19878d841b58ed084442b01094487356fb	scripts/backup/download-b2.mjs
           100644 blob cb7893470016c166ccb0e906ac7aa6a3d7ed89d0	scripts/backup/dump-order.test.mjs
           100644 blob 56c8cbcfc852b0c8d033030a4cff07e0da85b685	scripts/backup/lib-b2-read.mjs
           100644 blob 644ca4d7fc3b425780436d0f92b75837b39b94da	scripts/backup/lib-b2.mjs
@@ -165,7 +165,7 @@ jobs:
           100644 blob 5450afbaa6db794f11dda52e4b015559439c54bc	scripts/backup/postgres-client-env.test.mjs
           100644 blob 2096f69334b2861b746b3e48bd0ba6f5263912b4	scripts/backup/postgres-client-wiring.test.mjs
           100644 blob 2dd2cdc1a867088ee810c4e77c272f8e6766ff91	scripts/backup/prepare-disposable-restore.mjs
-          100644 blob 1b563be86b5a078611b50e7e2607c5aa4532feff	scripts/backup/prune-b2.mjs
+          100644 blob 78cdd0ec0a0666bc5fff41828acd02a0a00aadcc	scripts/backup/prune-b2.mjs
           100644 blob f278c5bfea0b237f5157e86b7f3b1237cbe5946f	scripts/backup/prune-b2.test.mjs
           100644 blob fd123b1edbf8b8eee10a859c9981327a741ae58b	scripts/backup/restore-logical.mjs
           100644 blob 2d16fdd496697751e12f8b60a5449ea54594df1e	scripts/backup/restore-target.test.mjs

@@ -73,6 +73,27 @@ test('a sha256 mismatch against the manifest fails before decryption', () => {
   assert.match(result.stderr, /sha256 mismatch/i);
 });
 
+test('manifest length, format and exact filename must match the decrypted payload', () => {
+  const name = 'autodine-test-20261114T070000.sql.gz.enc';
+  const file = path.join(DIR, name);
+  const manifestPath = file.replace(/\.sql\.gz\.enc$/, '.manifest.json');
+  const enc = encryptBuffer(Buffer.from(sqlPayload), PASSPHRASE);
+  writeFileSync(file, enc);
+  const base = { format: 'autodine-logical-1', file: name, bytes: Buffer.byteLength(sqlPayload), sha256: sha256(enc) };
+  for (const [change, message] of [
+    [{ bytes: base.bytes + 1 }, /payload length/],
+    [{ bytes: undefined }, /positive integer/],
+    [{ file: undefined }, /name this artifact/],
+    [{ file: `other/${name}` }, /name this artifact/],
+    [{ format: 'pg_dump-custom' }, /format or filename/],
+  ]) {
+    writeFileSync(manifestPath, JSON.stringify({ ...base, ...change }));
+    const result = run(file);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, message);
+  }
+});
+
 test('a missing manifest fails closed', () => {
   const copy = path.join(DIR, 'autodine-test-20261114T060000.sql.gz.enc');
   writeFileSync(copy, encryptBuffer(Buffer.from(sqlPayload, 'utf8'), PASSPHRASE));

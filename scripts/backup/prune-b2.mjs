@@ -124,6 +124,7 @@ export async function listAllRemoteObjects(fetchPage) {
   let token = null;
   for (let page = 0; page < MAX_PAGES; page += 1) {
     const { entries: pageEntries, nextToken, truncated } = await fetchPage(token);
+    if (typeof truncated !== 'boolean') throw new Error('listing has invalid truncation status — aborting');
     entries.push(...pageEntries);
     if (!truncated) return entries;
     if (!nextToken) throw new Error('listing truncated without a continuation token — aborting');
@@ -132,6 +133,15 @@ export async function listAllRemoteObjects(fetchPage) {
     token = nextToken;
   }
   throw new Error(`listing exceeded ${MAX_PAGES} pages — aborting`);
+}
+
+/** A missing, malformed or ambiguous flag must not be treated as a final page. */
+export function parseListingTruncated(xml) {
+  const flags = [...String(xml).matchAll(/<IsTruncated>([^<]*)<\/IsTruncated>/g)];
+  if (flags.length !== 1 || !['true', 'false'].includes(flags[0][1])) {
+    throw new Error('listing has invalid truncation status — aborting');
+  }
+  return flags[0][1] === 'true';
 }
 
 /**
@@ -438,7 +448,7 @@ if (isMain) {
   async function signedFetch(method, urlString, body, timeoutMs = 120000) {
     const payloadHash = sha256Hex(body ?? Buffer.alloc(0));
     const headers = signB2Request({ method, url: urlString, payloadHash, ...access, region: config.region });
-    return fetch(urlString, { method, headers, body, signal: AbortSignal.timeout(timeoutMs) });
+    return fetch(urlString, { method, headers, body, redirect: 'error', signal: AbortSignal.timeout(timeoutMs) });
   }
   const headObject = async (key) => {
     const res = await signedFetch('HEAD', objectUrl(key));
@@ -462,7 +472,7 @@ if (isMain) {
       return {
         entries: parseB2ListXml(xml).map((e) => ({ ...e, size: sizes.get(e.key) ?? null })),
         nextToken: b2ListContinuationToken(xml),
-        truncated: /<IsTruncated>true<\/IsTruncated>/.test(xml),
+        truncated: parseListingTruncated(xml),
       };
     });
 

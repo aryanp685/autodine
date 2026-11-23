@@ -22,7 +22,7 @@
  * On failure, if DR_ALERT_WEBHOOK or BACKUP_ALERT_WEBHOOK is set, a one-line
  * JSON alert is POSTed; alerting never masks the exit code.
  */
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { lstatSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
 const args = process.argv.slice(2);
@@ -41,61 +41,84 @@ if (!backupDir) fail('missing --backup-dir');
 if (!Number.isFinite(rpoMinutes) || rpoMinutes <= 0) fail('missing or invalid --rpo-minutes');
 if (rtoMinutes !== null && (!Number.isFinite(rtoMinutes) || rtoMinutes <= 0)) fail('invalid --rto-minutes');
 
-let names = [];
-try {
-  names = readdirSync(backupDir).filter((f) => /^autodine-.*\.(sql\.gz\.enc|dump\.enc)$/.test(f));
-} catch {
-  fail(`cannot read backup directory: ${backupDir}`);
-}
-
 const notify = async (text) => {
   const hook = process.env.DR_ALERT_WEBHOOK || process.env.BACKUP_ALERT_WEBHOOK;
   if (!hook) return;
   try {
-    await fetch(hook, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: `AutoDine DR objective missed (${new Date().toISOString()}): ${text}`.slice(0, 400) }) });
-  } catch { /* alerting must never mask the exit code */ }
+    const response = await fetch(hook, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: `AutoDine DR objective missed (${new Date().toISOString()}): ${text}`.slice(0, 400) }), signal: AbortSignal.timeout(8000) });
+    if (!response.ok) throw new Error('alert rejected');
+  } catch {
+    // Never log a webhook URL, response body, or exception; preserve the
+    // original objective failure and make failure to alert visible.
+    process.stderr.write('dr-objectives: alert delivery failed\n');
+  }
 };
+
+let names = [];
+let directoryUnreadable = false;
+try {
+  names = readdirSync(backupDir).filter((f) => /^autodine-.*\.(sql\.gz\.enc|dump\.enc)$/.test(f));
+} catch {
+  directoryUnreadable = true;
+}
 
 const result = { backupDir, rpo: null, rto: null, ok: true };
 const problems = [];
 
-if (names.length === 0) {
+if (directoryUnreadable) {
+  result.rpo = { ok: false, reason: 'backup_directory_unreadable' };
+  problems.push('backup directory cannot be read');
+} else if (names.length === 0) {
   result.rpo = { ok: false, reason: 'no_backups_found' };
   problems.push('no autodine-* backups in directory');
 } else {
   let newest = null;
+  let invalidEntry = false;
   for (const name of names) {
     try {
-      const mtime = statSync(path.join(backupDir, name)).mtimeMs;
-      if (!newest || mtime > newest.mtime) newest = { name, mtime };
-    } catch { /* skip unreadable entries */ }
+      const entry = lstatSync(path.join(backupDir, name));
+      if (!entry.isFile() || !Number.isFinite(entry.mtimeMs)) { invalidEntry = true; break; }
+      if (!newest || entry.mtimeMs > newest.mtime) newest = { name, mtime: entry.mtimeMs };
+    } catch { invalidEntry = true; break; }
   }
-  const ageMinutes = (Date.now() - newest.mtime) / 60000;
-  result.rpo = {
-    ok: ageMinutes <= rpoMinutes,
-    newest: newest.name,
-    ageMinutes: Math.round(ageMinutes * 10) / 10,
-    budgetMinutes: rpoMinutes,
-  };
-  if (!result.rpo.ok) problems.push(`newest backup is ${Math.round(ageMinutes)}min old, RPO budget is ${rpoMinutes}min`);
+  if (invalidEntry || !newest) {
+    result.rpo = { ok: false, reason: 'backup_entry_unreadable_or_not_regular' };
+    problems.push('a backup entry is unreadable or not a regular file');
+  } else {
+    const ageMinutes = (Date.now() - newest.mtime) / 60000;
+    if (ageMinutes < 0) {
+      result.rpo = { ok: false, reason: 'backup_timestamp_in_future', newest: newest.name };
+      problems.push('newest backup timestamp is in the future');
+    } else {
+      result.rpo = {
+        ok: ageMinutes <= rpoMinutes,
+        newest: newest.name,
+        ageMinutes: Math.round(ageMinutes * 10) / 10,
+        budgetMinutes: rpoMinutes,
+      };
+      if (!result.rpo.ok) problems.push(`newest backup is ${Math.round(ageMinutes)}min old, RPO budget is ${rpoMinutes}min`);
+    }
+  }
 }
 
 if (restoreReport) {
-  let elapsedMs = null;
+  let elapsedMs;
+  let reportReadable = true;
   try {
     const raw = readFileSync(restoreReport, 'utf8');
     const line = raw.split('\n').find((l) => l.includes('LOCAL_RESTORE_VERIFIED'));
     if (line) {
-      elapsedMs = Number(JSON.parse(line.slice(line.indexOf('{')))?.elapsedMs);
+      elapsedMs = JSON.parse(line.slice(line.indexOf('{')))?.elapsedMs;
     } else {
-      elapsedMs = Number(JSON.parse(raw)?.elapsedMs);
+      elapsedMs = JSON.parse(raw)?.elapsedMs;
     }
   } catch {
+    reportReadable = false;
     result.rto = { ok: false, reason: 'restore_report_unreadable' };
     problems.push('restore report could not be read or parsed');
   }
-  if (elapsedMs !== null) {
-    if (!Number.isFinite(elapsedMs)) {
+  if (reportReadable) {
+    if (typeof elapsedMs !== 'number' || !Number.isFinite(elapsedMs) || elapsedMs < 0) {
       result.rto = { ok: false, reason: 'restore_report_has_no_elapsedMs' };
       problems.push('restore report does not carry elapsedMs');
     } else if (rtoMinutes === null) {

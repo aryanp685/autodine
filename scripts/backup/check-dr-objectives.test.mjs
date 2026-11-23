@@ -1,14 +1,16 @@
 /** Fixture tests for check-dr-objectives.mjs — no database required. */
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, writeFileSync, utimesSync } from 'node:fs';
+import { mkdtempSync, rmSync, symlinkSync, writeFileSync, utimesSync } from 'node:fs';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 
 const DIR = mkdtempSync(path.join(tmpdir(), 'autodine-dr-test-'));
 const SCRIPT = path.resolve('scripts/backup/check-dr-objectives.mjs');
-const run = (args) => spawnSync(process.execPath, [SCRIPT, ...args], { encoding: 'utf8' });
+const run = (args, env = {}) => spawnSync(process.execPath, [SCRIPT, ...args], {
+  encoding: 'utf8', env: { ...process.env, DR_ALERT_WEBHOOK: '', BACKUP_ALERT_WEBHOOK: '', ...env },
+});
 
 before(() => {
   writeFileSync(path.join(DIR, 'autodine-test-20261114T030000.sql.gz.enc'), Buffer.from('fixture'));
@@ -63,4 +65,53 @@ test('an unreadable restore report is reported, not ignored', () => {
   writeFileSync(reportPath, 'not json at all');
   const result = run(['--backup-dir', DIR, '--rpo-minutes', '100000000', '--restore-report', reportPath]);
   assert.equal(result.status, 1);
+});
+
+test('future timestamps and backup-shaped symlinks fail closed', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'autodine-dr-invalid-'));
+  try {
+    const artifact = path.join(dir, 'autodine-future.dump.enc');
+    writeFileSync(artifact, 'synthetic');
+    const future = new Date(Date.now() + 3600_000);
+    utimesSync(artifact, future, future);
+    const futureResult = run(['--backup-dir', dir, '--rpo-minutes', '60']);
+    assert.equal(futureResult.status, 1);
+    assert.equal(JSON.parse(futureResult.stdout).rpo.reason, 'backup_timestamp_in_future');
+    rmSync(artifact);
+    symlinkSync('missing-target', artifact);
+    const badEntry = run(['--backup-dir', dir, '--rpo-minutes', '60']);
+    assert.equal(badEntry.status, 1);
+    assert.equal(JSON.parse(badEntry.stdout).rpo.reason, 'backup_entry_unreadable_or_not_regular');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('missing, null, string and negative durations do not falsely satisfy RTO', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'autodine-dr-duration-'));
+  try {
+    writeFileSync(path.join(dir, 'autodine-good.dump.enc'), 'synthetic');
+    const report = path.join(dir, 'report.json');
+    for (const payload of [{}, { elapsedMs: null }, { elapsedMs: '' }, { elapsedMs: '1' }, { elapsedMs: -1 }]) {
+      writeFileSync(report, JSON.stringify(payload));
+      const result = run(['--backup-dir', dir, '--rpo-minutes', '60', '--restore-report', report, '--rto-minutes', '240']);
+      assert.equal(result.status, 1, JSON.stringify(payload));
+      assert.equal(JSON.parse(result.stdout).rto.reason, 'restore_report_has_no_elapsedMs');
+    }
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('unreadable directory alerts, and rejected or interrupted alerts are visible without disclosing the webhook', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'autodine-dr-alert-'));
+  try {
+    const mock = path.join(dir, 'mock.mjs');
+    writeFileSync(mock, `globalThis.fetch = async () => { if (process.env.MOCK_FAIL === 'throw') throw Error('sensitive URL'); return new Response('', { status: Number(process.env.MOCK_FAIL) }); };`);
+    for (const mode of ['200', '500', 'throw']) {
+      const result = run(['--backup-dir', path.join(dir, 'missing'), '--rpo-minutes', '60'], {
+        NODE_OPTIONS: `--import=${mock}`, DR_ALERT_WEBHOOK: 'https://synthetic.invalid/sentinel-secret', MOCK_FAIL: mode,
+      });
+      assert.equal(result.status, 1);
+      assert.equal(JSON.parse(result.stdout).rpo.reason, 'backup_directory_unreadable');
+      assert.equal(result.stderr.includes('alert delivery failed'), mode !== '200');
+      assert.doesNotMatch(result.stdout + result.stderr, /sentinel-secret|sensitive URL/);
+    }
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });

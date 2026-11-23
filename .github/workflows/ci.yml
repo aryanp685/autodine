@@ -45,14 +45,57 @@ jobs:
       - name: Preview/production isolation self-test
         run: npm run isolation:verify
 
+      # The evidence guards verify the records' cross-branch citations —
+      # files that are merged into `main` but not yet into this branch.
+      # `actions/checkout` fetches one commit by default, so the runner has
+      # no `origin/main` and the guard cannot verify them. This fetches
+      # main's tip: read-only, one commit, the checkout's own credentials.
+      # The guard asserts that this step exists, so the dependency is
+      # stated in code rather than living in a runner's configuration.
+      - name: Fetch main for the evidence guards' cross-branch citations
+        run: git fetch --no-tags --depth=1 "https://github.com/${{ github.repository }}.git" main:refs/remotes/origin/main
+
       - name: Hosted-acceptance and staging guards (offline)
-        run: npm run test:staging:guards
+        run: |
+          set -o pipefail
+          npm run test:staging:guards 2>&1 | tee staging-guards.log
+
+      # The guards' output is the only place the failing assertion is
+      # written. The step log can be unreachable, so the same bytes are
+      # republished as annotations, which the Checks API serves reliably.
+      - name: Surface staging guard failure as an annotation
+        if: failure()
+        run: |
+          node scripts/ci/print-test-failure-annotation.mjs staging-guards.log
+          node scripts/ci/print-error-annotation.mjs staging-guards.log 3500
+
+      # The demo-seed guard is proven against a real PostgreSQL: the seed is
+      # applied to the repository's own schema on a disposable cluster and
+      # must leave every other tenant untouched. The cluster listens on
+      # loopback with a random password and is destroyed when the run ends.
+      - name: Demo-seed isolation (disposable embedded PostgreSQL)
+        run: npm run test:staging:seed-demo-db
 
       - name: Backup pipeline selftest (disposable embedded PostgreSQL)
         run: npm run test:backup
 
       - name: Backup-file and DR objective verifiers (fixtures)
         run: npm run test:dr
+
+      # The runner's image ships a pg_dump 16, which cannot dump the PG
+      # 17 server these suites run against. A suite that silently takes
+      # the custom-format path when a pg_dump is on PATH therefore fails
+      # here and passes on a machine with no client installed. This
+      # re-runs the backup suites with an OLDER client stubbed in front
+      # of PATH, so the runner checks its own independence.
+      - name: Backup suites are independent of the host's PostgreSQL client
+        run: |
+          set -o pipefail
+          npm run test:client-independence 2>&1 | tee client-independence.log
+
+      - name: Surface client-independence failure as an annotation
+        if: failure()
+        run: node scripts/ci/print-error-annotation.mjs client-independence.log 3500
 
       - name: D2 ACL probe (disposable embedded PostgreSQL)
         run: npm run test:d2
@@ -72,25 +115,20 @@ jobs:
       # postgresql-client-17' is the failure signature). The preinstalled
       # pg_dump 16 reports a pgdg24.04 build, so PGDG is the source the
       # image used as well.
+      #
+      # This is the SAME composite action the two hosted workflows use, so
+      # the CI drill, the hosted backup and the hosted restore drill all
+      # pin one PostgreSQL client major version from one implementation.
+      # The action installs the client, verifies the resolved binaries are
+      # really that major version, and puts the PGDG bin directory first on
+      # PATH for every later step — the runner ships a manually installed
+      # pg_dump 16 that can shadow the wrapper.
       - name: Install PostgreSQL 17 client tools (PGDG)
-        run: |
-          set -o pipefail
-          {
-            sudo install -d /usr/share/postgresql-common/pgdg
-            sudo curl --fail --show-error -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
-            echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt noble-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
-            sudo apt-get update
-            sudo DEBIAN_FRONTEND=noninteractive apt-get install -y postgresql-client-17
-            # The runner ships a manually installed pg_dump 16 that shadows
-            # the wrapper in PATH (the drill still saw 16.15 with v17
-            # installed). Put the PGDG v17 bin directory first for every
-            # subsequent step and prove what resolves.
-            echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
-            export PATH="/usr/lib/postgresql/17/bin:$PATH"
-            which -a pg_dump || true
-            pg_dump --version
-            /usr/lib/postgresql/17/bin/pg_dump --version
-          } 2>&1 | tee pg-client-install.log
+        uses: ./.github/actions/postgres-client
+        with:
+          version: '17'
+        env:
+          PG_CLIENT_LOG: pg-client-install.log
 
       - name: Surface PG client install failure as an annotation
         if: failure()

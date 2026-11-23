@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import {
   planRetention, listAllRemoteObjects, buildInventory, executePrune,
-  validateManifestStructure, verifyArtifactCandidate, assertArtifactUnchanged, parseListSizes,
+  validateManifestStructure, verifyArtifactCandidate, assertArtifactUnchanged, parseListSizes, parseListingTruncated,
 } from './prune-b2.mjs';
 import { encryptBuffer, sha256 } from './lib-crypto.mjs';
 
@@ -75,6 +75,15 @@ test('multiple backups on one day are kept or expired together', () => {
   const keptCount = dayOne.filter((k) => keep.some((x) => x.key === k)).length;
   assert.ok(keptCount === 0 || keptCount === 2, 'same-day backups must never be split');
   assert.equal(expire.filter((x) => dayOne.includes(x.key)).length, 2 - keptCount);
+});
+
+test('listing refuses missing, invalid or ambiguous truncation flags before retention', async () => {
+  assert.equal(parseListingTruncated('<IsTruncated>false</IsTruncated>'), false);
+  assert.equal(parseListingTruncated('<IsTruncated>true</IsTruncated>'), true);
+  for (const xml of ['', '<IsTruncated>unknown</IsTruncated>', '<IsTruncated>true</IsTruncated><IsTruncated>false</IsTruncated>']) {
+    assert.throws(() => parseListingTruncated(xml), /invalid truncation/);
+  }
+  await assert.rejects(() => listAllRemoteObjects(async () => ({ entries: [], truncated: undefined })), /invalid truncation/);
 });
 
 test('listing: pagination completes, truncation without token aborts, repeated token aborts, HTTP failure aborts', async () => {
