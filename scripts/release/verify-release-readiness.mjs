@@ -90,11 +90,10 @@ check('billing_sandbox_refuses_production', sb.includes("'production'") && sb.in
 const provider = read('lib/billing/provider.ts');
 check('billing_provider_null_default', provider.includes('getBillingProvider'));
 
-// 7. Release documents exist and report the NO-GO decision honestly.
-for (const doc of ['docs/production-release-prep-2026-11-14.md','docs/owner-action-register-2026-11-14.md','docs/owner-closure-package-2026-11-14.md','docs/migration-manifest-2026-11-14.md','docs/credential-exposure-remediation-2026-11-14.md','docs/execution-report-2026-11-14.md']) {
-  check(`doc_present:${doc.split('/').pop()}`, existsSync(join(root, doc)));
-}
-check('execution_report_no_go', read('docs/execution-report-2026-11-14.md').includes('NO-GO'));
+// 7. Release documents exist. The owner registers, closure package, execution
+// report and credential remediation were moved out of the public repo on
+// 2026-11-24 (archived by the owner); the manifest remains the tracked record.
+check('doc_present:migration-manifest-2026-11-14.md', existsSync(join(root, 'docs/migration-manifest-2026-11-14.md')));
 
 // 8. No GST/IRP object can appear applied: the e2e/test suites must not reference IRP endpoints as enabled.
 const gates = read('docs/gst-irp-production-readiness-2026-11-14.md');
