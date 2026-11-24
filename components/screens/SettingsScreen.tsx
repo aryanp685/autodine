@@ -438,6 +438,23 @@ export function SettingsScreen({
                         placeholder="Thank you for dining with us! Visit again."
                       />
                     </Field>
+
+                    <Field
+                      label="Google reviews link (optional)"
+                      htmlFor="settings-google-review"
+                      hint="Where paid guests are invited to review you on Google. Paste your 'Rate us on Google' link, or your Google Place ID."
+                    >
+                      <input
+                        id="settings-google-review"
+                        className={inputClass}
+                        name="googleReviewUrl"
+                        type="text"
+                        maxLength={500}
+                        defaultValue={details.googleReviewUrl ?? ''}
+                        disabled={disabled}
+                        placeholder="https://g.page/r/…/review  or  ChIJN1t_tLeuEmsR…"
+                      />
+                    </Field>
                   </div>
                   </FieldGroup>
 

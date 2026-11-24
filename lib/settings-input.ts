@@ -42,6 +42,7 @@ export const MAX_TAGLINE_LENGTH = 120;
 export const MAX_ADDRESS_LENGTH = 200;
 export const MAX_PHONE_LENGTH = 24;
 export const MAX_BILL_FOOTER_LENGTH = 240;
+export const MAX_GOOGLE_REVIEW_URL_LENGTH = 500;
 
 export type SettingsField =
   | 'name'
@@ -51,6 +52,7 @@ export type SettingsField =
   | 'gstin'
   | 'fssaiNumber'
   | 'billFooterNote'
+  | 'googleReviewUrl'
   | 'slug'
   | 'taxRate';
 
@@ -62,6 +64,7 @@ export type DetailsValue = {
   gstin: string | null;
   fssaiNumber: string | null;
   billFooterNote: string | null;
+  googleReviewUrl: string | null;
   slug: string;
 };
 
@@ -72,6 +75,57 @@ export type DetailsResult =
 /** Trim, collapse whitespace, and treat blank as absent. */
 function clean(raw: unknown): string {
   return typeof raw === 'string' ? raw.replace(/\s+/g, ' ').trim() : '';
+}
+
+/**
+ * The review invitation's destination, from what an owner pastes.
+ *
+ * Owners have two real shapes in hand: the "Rate us on Google" link their
+ * Google Business Profile emails them (a https google URL), or the bare
+ * Place ID from a support article. Both are accepted and both end up as one
+ * https URL, so every reader opens exactly the same shape.
+ *
+ * Returned: '' means "not a destination we would open" (a validation
+ * failure), null means "feature off", a URL string is the destination.
+ */
+export function normalizeGoogleReviewInput(raw: unknown): string | null {
+  const value = clean(raw);
+  if (!value) return null;
+  if (value.length > MAX_GOOGLE_REVIEW_URL_LENGTH) return '';
+
+  // A bare Place ID: Google issues them as 27-ish characters of
+  // [A-Za-z0-9_-], conventionally starting "Ch". Anything else that fits the
+  // charset is still accepted — Google has varied the length before, and a
+  // wrong-but-plausible ID fails loudly when the guest taps it, which is a
+  // better failure than a rule that rejects real IDs.
+  if (!/^[a-z]+:\/\//i.test(value) && !/^https?:\/\//i.test(value)) {
+    if (!/^[A-Za-z0-9_-]{8,120}$/.test(value)) return '';
+    return `https://search.google.com/local/writereview?placeid=${encodeURIComponent(value)}`;
+  }
+
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return '';
+  }
+  if (url.protocol !== 'https:') return '';
+  // The destination is opened from a guest's paid-order screen. An <a> to
+  // anything non-Google would be a hole a future "paste your tracking link"
+  // bug could hide in, so the host is checked, not trusted.
+  const host = url.hostname.toLowerCase();
+  if (
+    !(
+      host === 'google.com' ||
+      host.endsWith('.google.com') ||
+      host === 'goo.gl' ||
+      host === 'g.page' ||
+      host.endsWith('.g.page')
+    )
+  ) {
+    return '';
+  }
+  return url.toString();
 }
 
 /**
@@ -104,6 +158,7 @@ export function validateDetails(raw: {
   gstin?: unknown;
   fssaiNumber?: unknown;
   billFooterNote?: unknown;
+  googleReviewUrl?: unknown;
   slug?: unknown;
 }): DetailsResult {
   const name = clean(raw.name);
@@ -175,6 +230,16 @@ export function validateDetails(raw: {
     };
   }
 
+  const googleReviewUrl = normalizeGoogleReviewInput(raw.googleReviewUrl);
+  if (typeof googleReviewUrl === 'string' && !googleReviewUrl) {
+    return {
+      ok: false,
+      field: 'googleReviewUrl',
+      message:
+        'That does not look like a Google review link. Paste the link from "Rate us on Google", or your Google Place ID.',
+    };
+  }
+
   // The slug is normalised rather than rejected: an owner typing "My Cafe!"
   // means my-cafe, and refusing that would be a puzzle rather than a rule.
   const slug = slugify(clean(raw.slug));
@@ -203,6 +268,7 @@ export function validateDetails(raw: {
       gstin: gstin || null,
       fssaiNumber: fssaiNumber || null,
       billFooterNote: billFooterNote || null,
+      googleReviewUrl: googleReviewUrl || null,
       slug,
     },
   };

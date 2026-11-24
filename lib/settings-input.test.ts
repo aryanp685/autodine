@@ -237,3 +237,53 @@ describe('parseBillingDefaults', () => {
     ).toBe(false);
   });
 });
+
+describe('validateDetails Google review destination', () => {
+  it('accepts a Google review URL and keeps it as-is', () => {
+    const result = validateDetails({
+      ...good,
+      googleReviewUrl: 'https://g.page/r/AbCdEf12345/review',
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value.googleReviewUrl).toBe('https://g.page/r/AbCdEf12345/review');
+  });
+
+  it('expands a bare Place ID to the writereview URL', () => {
+    const result = validateDetails({ ...good, googleReviewUrl: 'ChIJN1t_tLeuEmsRQu3R8FkOEpA' });
+    expect(result.ok).toBe(true);
+    if (result.ok)
+      expect(result.value.googleReviewUrl).toBe(
+        'https://search.google.com/local/writereview?placeid=ChIJN1t_tLeuEmsRQu3R8FkOEpA',
+      );
+  });
+
+  it('accepts a blank field as feature-off', () => {
+    const result = validateDetails({ ...good, googleReviewUrl: '   ' });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value.googleReviewUrl).toBeNull();
+  });
+
+  it('rejects a non-Google URL', () => {
+    const result = validateDetails({ ...good, googleReviewUrl: 'https://evil.example.com/review' });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.field).toBe('googleReviewUrl');
+  });
+
+  it('rejects an http (insecure) Google URL', () => {
+    const result = validateDetails({ ...good, googleReviewUrl: 'http://google.com/maps' });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.field).toBe('googleReviewUrl');
+  });
+
+  it('rejects text that is neither URL nor Place ID', () => {
+    const result = validateDetails({ ...good, googleReviewUrl: 'find us near the clock tower' });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.field).toBe('googleReviewUrl');
+  });
+
+  it('rejects a value over the length cap', () => {
+    const result = validateDetails({ ...good, googleReviewUrl: `https://google.com/${'x'.repeat(600)}` });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.field).toBe('googleReviewUrl');
+  });
+});

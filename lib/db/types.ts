@@ -53,6 +53,12 @@ export type Restaurant = {
   brand_theme?: unknown | null;
   brand_profile_id?: string | null;
   /**
+   * Migration 20261124040000. Where the paid-guest review invitation opens:
+   * a https Google review URL (a bare Place ID is expanded at save time).
+   * Null means the invitation is off for this restaurant.
+   */
+  google_review_url?: string | null;
+  /**
    * Migration 20261028000900. How a guest proves they are at a table:
    * 'code' (rotating digits, the default), 'scan_confirm' (scan, then one
    * staff tap per sitting) or 'scan'. The last two cannot prove presence and

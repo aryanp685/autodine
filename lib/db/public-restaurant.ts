@@ -41,6 +41,7 @@ export const PUBLIC_RESTAURANT_COLUMNS = [
   'brand_theme_enabled',
   'brand_theme',
   'brand_profile_id',
+  'google_review_url',
 ] as const;
 
 export type PublicRestaurantColumn = (typeof PUBLIC_RESTAURANT_COLUMNS)[number];

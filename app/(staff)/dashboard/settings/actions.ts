@@ -146,6 +146,7 @@ export async function saveDetailsAction(formData: FormData): Promise<void> {
     gstin: postedGstin ?? current.gstin ?? '',
     fssaiNumber: formData.get('fssaiNumber'),
     billFooterNote: formData.get('billFooterNote'),
+    googleReviewUrl: formData.get('googleReviewUrl'),
     slug: formData.get('slug'),
   });
 
@@ -181,6 +182,7 @@ export async function saveDetailsAction(formData: FormData): Promise<void> {
     gstin: role === 'owner' ? parsed.value.gstin : current.gstin,
     fssai_number: parsed.value.fssaiNumber,
     bill_footer_note: parsed.value.billFooterNote,
+    google_review_url: parsed.value.googleReviewUrl,
     ...(slugChanged ? { slug: parsed.value.slug } : {}),
   };
 

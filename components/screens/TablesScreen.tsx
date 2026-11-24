@@ -17,6 +17,7 @@ import { CodeExpiry } from '@/components/owner/CodeExpiry';
 import { ConfirmSubmit } from '@/components/owner/ConfirmSubmit';
 import { SubmitButton } from '@/components/owner/SubmitButton';
 import { Reveal } from '@/components/owner/Reveal';
+import { OpsSurface } from '@/components/owner/OpsSurface';
 import {
   BtnLink,
   Card,
@@ -133,6 +134,7 @@ export function TablesScreen({
 
   return (
     <OwnerPage active="tables" outlet={outlet}>
+      <OpsSurface>
       {/* Everything except the sheet is screen-only. The sheet is print-only.
           Tailwind's `print:` variant is the whole of that rule, so it holds
           without a stylesheet knowing any of these class names. */}
@@ -639,6 +641,7 @@ export function TablesScreen({
           ))}
         </Card>
       </section>
+      </OpsSurface>
     </OwnerPage>
   );
 }

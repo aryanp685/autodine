@@ -9,6 +9,7 @@ import { ReorderOffer } from '@/components/ReorderOffer';
 import { guestBrandStyle, type GuestBrandState } from '@/lib/branding/guest-theme';
 import { OrderStatusRefresh } from '@/components/OrderStatusRefresh';
 import { CallWaiterButton } from '@/components/CallWaiterButton';
+import { GoogleReviewInvite } from '@/components/GoogleReviewInvite';
 import { GUEST_CHANGE_WINDOW_MS, type OrderScreenData } from '@/lib/db/order-screen';
 
 /**
@@ -439,6 +440,20 @@ export function OrderPlacedScreen({
           </section>
         </FadeUp>
       </div>
+
+      {/* The review invitation rides the paid state, not the visit: it appears
+          the moment the bill is settled (OrderStatusRefresh re-renders on the
+          payment flip), never for pending or cancelled orders, and only when
+          this restaurant has set its own Google destination. Same sheet, same
+          link, for every guest -- the rating a guest taps here is a gesture,
+          never a gate. */}
+      {data.prepStatus !== 'cancelled' && data.paymentStatus === 'paid' && data.googleReviewUrl ? (
+        <GoogleReviewInvite
+          orderId={data.id}
+          restaurantName={data.restaurantName}
+          reviewUrl={data.googleReviewUrl}
+        />
+      ) : null}
     </GuestFlow>
   );
 }

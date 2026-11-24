@@ -27,6 +27,7 @@ import {
   Tr,
 } from '@/components/owner/chrome';
 import { SubmitButton } from '@/components/owner/SubmitButton';
+import { OpsSurface } from '@/components/owner/OpsSurface';
 import { ConfirmSubmit } from '@/components/owner/ConfirmSubmit';
 import {
   addAddonAction,
@@ -289,6 +290,7 @@ export function MenuEditorScreen({
 
   return (
     <OwnerPage active="menus" outlet={outlet} wide>
+      <OpsSurface>
       <PageHead
         kicker="Menus"
         title={menuName}
@@ -1478,6 +1480,7 @@ export function MenuEditorScreen({
           </aside>
         </div>
       )}
+      </OpsSurface>
     </OwnerPage>
   );
 }

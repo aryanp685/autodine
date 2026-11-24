@@ -33,6 +33,7 @@ export type SettingsRestaurant = {
   gstin: string;
   fssaiNumber?: string;
   billFooterNote?: string;
+  googleReviewUrl?: string | null;
   slug: string;
 };
 
@@ -141,9 +142,9 @@ export async function getSettingsScreenData(): Promise<SettingsScreenData | null
    * defaulting to 'code', which is what an unmigrated database enforces anyway.
    */
   const restaurantColumnsWithMode =
-    'name, tagline, address, phone, gstin, fssai_number, bill_footer_note, slug, timezone, tax_rate_bps, guest_verification_mode, default_service_charge_bps, default_packaging_charge_paise, default_delivery_charge_paise, round_off_enabled, operating_mode, pos_integration_name';
+    'name, tagline, address, phone, gstin, fssai_number, bill_footer_note, google_review_url, slug, timezone, tax_rate_bps, guest_verification_mode, default_service_charge_bps, default_packaging_charge_paise, default_delivery_charge_paise, round_off_enabled, operating_mode, pos_integration_name';
   const restaurantColumns =
-    'name, tagline, address, phone, gstin, fssai_number, bill_footer_note, slug, timezone, tax_rate_bps, guest_verification_mode, default_service_charge_bps, default_packaging_charge_paise, default_delivery_charge_paise, round_off_enabled';
+    'name, tagline, address, phone, gstin, fssai_number, bill_footer_note, google_review_url, slug, timezone, tax_rate_bps, guest_verification_mode, default_service_charge_bps, default_packaging_charge_paise, default_delivery_charge_paise, round_off_enabled';
   const restaurantColumnsPreV2 =
     'name, tagline, address, phone, gstin, slug, timezone, tax_rate_bps, guest_verification_mode';
   const restaurantColumnsLegacy =
@@ -252,6 +253,7 @@ export async function getSettingsScreenData(): Promise<SettingsScreenData | null
       gstin: String(row.gstin ?? ''),
       fssaiNumber: String((row as { fssai_number?: string | null }).fssai_number ?? ''),
       billFooterNote: String((row as { bill_footer_note?: string | null }).bill_footer_note ?? ''),
+      googleReviewUrl: String((row as { google_review_url?: string | null }).google_review_url ?? ''),
       slug,
     },
     billingDefaults: {

@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -26,6 +26,7 @@ const ROW = {
   brand_theme_enabled: false,
   brand_theme: null,
   brand_profile_id: null,
+  google_review_url: null,
 };
 
 /** Columns that exist on the tenant row and must never reach a guest page. */
@@ -146,7 +147,19 @@ describe('public projection boundary', () => {
   });
 
   it('matches the columns returned by the SQL function exactly', () => {
-    const sql = readFileSync(join(process.cwd(), 'supabase/migrations/20261110000500_public_restaurant_profile.sql'), 'utf8');
+    // The projection is redefined by later migrations (create or replace), so
+    // the test must read the LATEST definition in the chain, not the file
+    // that first introduced it. Filenames sort chronologically.
+    const dir = join(process.cwd(), 'supabase/migrations');
+    const defining = readdirSync(dir)
+      .filter((file) => file.endsWith('.sql'))
+      .filter((file) =>
+        readFileSync(join(dir, file), 'utf8')
+          .toLowerCase()
+          .includes('create or replace function public.public_restaurant_profile'),
+      );
+    expect(defining.length).toBeGreaterThan(0);
+    const sql = readFileSync(join(dir, defining[defining.length - 1]), 'utf8');
     const returns = sql.slice(sql.indexOf('returns table ('), sql.indexOf('language sql'));
     const columns = [...returns.matchAll(/^\s{2}([a-z_]+) [a-z]+,?$/gm)].map((match) => match[1]);
     expect(columns).toEqual([...PUBLIC_RESTAURANT_COLUMNS]);

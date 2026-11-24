@@ -43,6 +43,7 @@ const order = (over: Partial<OrderScreenData> = {}): OrderScreenData => ({
   taxPaise: 5300,
   totalPaise: 111300,
   customerNote: null,
+  googleReviewUrl: null,
   placedAt: '2026-10-21T12:00:00Z',
   lines: [
     {

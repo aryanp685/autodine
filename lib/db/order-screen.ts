@@ -65,6 +65,13 @@ export type OrderScreenData = {
   prepStatus: string;
   paymentStatus: string;
   /**
+   * Migration 20261124040000. Where the review invitation opens once this
+   * order is paid. Null = the restaurant has not set a destination, and the
+   * screen draws nothing — never a generic "search us on Google" link,
+   * because a guest sent searching is a guest whose review is lost.
+   */
+  googleReviewUrl: string | null;
+  /**
    * Migration 20261028000900. The order arrived in a scan-mode restaurant and
    * no human has vouched for the table yet, so it is NOT in the kitchen queue.
    * The screen must say that rather than letting "order placed" imply cooking
@@ -186,6 +193,10 @@ export async function getOrderScreenData(
       brandThemeEnabled: (restaurantResult.data as Record<string, unknown> | null)?.brand_theme_enabled === true,
       brandTheme: (restaurantResult.data as Record<string, unknown> | null)?.brand_theme ?? null,
     },
+    googleReviewUrl:
+      text(
+        (restaurantResult.data as Record<string, unknown> | null)?.google_review_url as unknown,
+      ) || null,
     tableLabel: text(order.table_label) || null,
     prepStatus,
     paymentStatus,
