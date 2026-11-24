@@ -119,7 +119,12 @@ alter table public.orders add constraint orders_math_check check (
 
 grant select (order_channel) on table public.orders to authenticated;
 
-create or replace view public.orders_finance
+-- 20261122230000 (prod waiter_coupons_split_bill) already recreated orders_finance
+-- with the coupon_code column; PostgreSQL cannot alter columns through a view, so
+-- drop and rebuild it here. The waiter-coupons bundle later in this sequence
+-- recreates it again with coupon_id/coupon_code, so this intermediate shape is safe.
+drop view if exists public.orders_finance;
+create view public.orders_finance
 with (security_barrier = true)
 as
 select
