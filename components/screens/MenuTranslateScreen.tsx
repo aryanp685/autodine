@@ -9,6 +9,7 @@
 
 import Link from 'next/link';
 import { OwnerPage, PageHead, btn } from '@/components/owner/chrome';
+import { OpsSurface } from '@/components/owner/OpsSurface';
 import type { OutletBar } from '@/lib/outlets';
 import { TranslationPanel, type TranslateRowModel } from '@/components/TranslationPanel';
 import type { TranslateData } from '@/lib/db/translate';
@@ -44,6 +45,7 @@ export function MenuTranslateScreen({
 
   return (
     <OwnerPage active="menus" outlet={outlet}>
+      <OpsSurface>
       <PageHead
         kicker="AI Menu Studio"
         title="Translate your menu"
@@ -83,6 +85,7 @@ export function MenuTranslateScreen({
           </div>
         </>
       )}
+      </OpsSurface>
     </OwnerPage>
   );
 }

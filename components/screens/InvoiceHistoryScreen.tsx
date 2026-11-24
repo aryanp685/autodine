@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { Notice, OwnerPage, PageHead, btn } from '@/components/owner/chrome';
+import { OpsSurface } from '@/components/owner/OpsSurface';
 import type { InvoiceHistoryRow } from '@/lib/db/invoice-history';
 import { formatBillMoney } from '@/lib/bill';
 import type { OutletBar } from '@/lib/outlets';
@@ -15,6 +16,7 @@ function when(value: string) {
 export function InvoiceHistoryScreen({ rows, outlet, einvoiceFollowUps }: { rows: InvoiceHistoryRow[]; outlet: OutletBar | null; einvoiceFollowUps?: ReactNode }) {
   return (
     <OwnerPage active="invoices" outlet={outlet} signOut wide>
+      <OpsSurface>
       <PageHead
         kicker="Service · closed table sessions"
         title="Invoice history"
@@ -62,6 +64,7 @@ export function InvoiceHistoryScreen({ rows, outlet, einvoiceFollowUps }: { rows
           </table>
         </div>
       )}
+      </OpsSurface>
     </OwnerPage>
   );
 }

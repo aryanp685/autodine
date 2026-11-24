@@ -40,6 +40,7 @@ import {
   sendKotHandoffWebhookAction,
 } from '@/app/(staff)/kitchen/actions';
 import { HeldTableStrip } from '@/components/owner/HeldTableStrip';
+import { OpsSurface } from '@/components/owner/OpsSurface';
 import { cancelStaffOrderAction } from '@/app/orders/actions';
 import { SignInPrompt } from '@/components/SignInPrompt';
 import {
@@ -1605,6 +1606,7 @@ export function Kitchen({
      * audio controls as this page's actions rather than chrome above the shell.
      */
     <OwnerPage active="kitchen" outlet={outlet} signOut={signOut} wide>
+      <OpsSurface>
       <PageHead
         kicker={live ? 'Kitchen · live board' : 'Kitchen · demo mode'}
         title={live ? data?.restaurantName || 'Kitchen' : restaurant.name}
@@ -2396,6 +2398,7 @@ export function Kitchen({
           </section>
         ))}
       </div>
+      </OpsSurface>
     </OwnerPage>
   );
 }

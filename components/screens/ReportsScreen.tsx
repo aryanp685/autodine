@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import type { OutletBar } from '@/lib/outlets';
+import { OpsSurface } from '@/components/owner/OpsSurface';
 import { Money, PaymentPill, PrepPill } from '@/components/ui';
 import { SignInPrompt } from '@/components/SignInPrompt';
 import {
@@ -272,6 +273,7 @@ export function ReportsScreen({
 
   return (
     <OwnerPage active="reports" outlet={outlet} wide>
+      <OpsSurface>
       <PageHead
         kicker="Reports"
         title="Sales"
@@ -876,6 +878,7 @@ export function ReportsScreen({
           </div>
         </>
       )}
+      </OpsSurface>
     </OwnerPage>
   );
 }

@@ -6,6 +6,7 @@ import { dashboardStats, recentOrders, restaurant, sparkline, topItems } from '@
 import { Money, PaymentPill, PrepPill, Sparkline } from '@/components/ui';
 import { SignInPrompt } from '@/components/SignInPrompt';
 import { ChartMotion } from '@/components/owner/ChartMotion';
+import { OpsSurface } from '@/components/owner/OpsSurface';
 import { AutoRefresh } from '@/components/owner/AutoRefresh';
 import {
   BtnLink,
@@ -147,6 +148,7 @@ export function Dashboard({
 
   return (
     <OwnerPage active="overview" outlet={outlet} signOut={!blocked}>
+      <OpsSurface>
         {/* The overview is a read of the database, so it is only as true as the
             last render. This re-renders it on a slow timer while the tab is
             visible and nobody is typing -- see components/owner/AutoRefresh. */}
@@ -670,6 +672,7 @@ export function Dashboard({
         "today, restaurant time" under the title. Both facts are still stated;
         neither is stated twice.
       */}
+      </OpsSurface>
     </OwnerPage>
   );
 }

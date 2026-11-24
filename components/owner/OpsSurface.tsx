@@ -38,7 +38,7 @@ export const OPS_SURFACE_STYLE: CSSProperties = {
   '--p-ink': '#1c2321',
   '--p-ink-80': 'rgba(28, 35, 33, 0.86)',
   '--p-ink-64': 'rgba(28, 35, 33, 0.72)',
-  '--p-ink-46': 'rgba(28, 35, 33, 0.62)',
+  '--p-ink-46': 'rgba(28, 35, 33, 0.66)',
   '--p-ink-28': 'rgba(28, 35, 33, 0.38)',
   '--p-ink-12': 'rgba(28, 35, 33, 0.14)',
   '--p-ink-07': 'rgba(28, 35, 33, 0.07)',

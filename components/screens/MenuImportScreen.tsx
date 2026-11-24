@@ -15,6 +15,7 @@ import { TextImportPanel } from '@/components/TextImportPanel';
 import { cropFromImage } from '@/lib/import/crop';
 import type { OutletBar } from '@/lib/outlets';
 import { Card, OwnerPage, PageHead, btn } from '@/components/owner/chrome';
+import { OpsSurface } from '@/components/owner/OpsSurface';
 
 /**
  * The AI Menu Studio journey, in four words the owner can follow: add the
@@ -218,6 +219,7 @@ export function MenuImportScreen({
 
   return (
     <OwnerPage active="import" outlet={outlet}>
+      <OpsSurface>
       {/* The hero band: the masthead and journey steps on the left, the
           menu-to-storefront showcase on the right. The showcase is a
           demonstration on design-system tokens — flat paper, no gradients. */}
@@ -403,6 +405,7 @@ export function MenuImportScreen({
           </div>
         ))}
       </section>
+      </OpsSurface>
     </OwnerPage>
   );
 }

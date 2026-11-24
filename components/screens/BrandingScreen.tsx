@@ -32,6 +32,7 @@ import {
   inputClass,
 } from '@/components/owner/chrome';
 import { SubmitButton } from '@/components/owner/SubmitButton';
+import { OpsSurface } from '@/components/owner/OpsSurface';
 import { ImagePick } from '@/components/owner/ImagePick';
 import { CopyButton } from '@/components/CopyButton';
 
@@ -102,7 +103,9 @@ export function BrandingScreen({
   if (data?.blocked) {
     return (
       <OwnerPage active="branding" outlet={outlet}>
+  <OpsSurface>
         <SignInPrompt reason={data.blocked} screen="branding screen" />
+  </OpsSurface>
       </OwnerPage>
     );
   }
@@ -119,6 +122,7 @@ export function BrandingScreen({
 
   return (
     <OwnerPage active="branding" outlet={outlet}>
+      <OpsSurface>
       <PageHead
         kicker="Menu branding"
         title={name}
@@ -637,6 +641,7 @@ export function BrandingScreen({
         </Link>
         .
       </Notice>
+      </OpsSurface>
     </OwnerPage>
   );
 }

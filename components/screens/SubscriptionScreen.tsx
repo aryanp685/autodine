@@ -30,6 +30,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 
 import { Notice, OwnerPage, PageHead, SectionHead, Tag, btn } from '@/components/owner/chrome';
+import { OpsSurface } from '@/components/owner/OpsSurface';
 import { SubmitButton } from '@/components/owner/SubmitButton';
 import { formatBillMoney } from '@/lib/bill';
 import { entitlementSummary } from '@/lib/access';
@@ -125,6 +126,7 @@ export function SubscriptionScreen({
 
   return (
     <OwnerPage active="subscription" outlet={outlet} wide>
+      <OpsSurface>
       <PageHead
         kicker="Account · subscription"
         title="Subscription"
@@ -416,6 +418,7 @@ export function SubscriptionScreen({
           </div>
         )}
       </section>
+      </OpsSurface>
     </OwnerPage>
   );
 }
