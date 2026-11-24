@@ -39,7 +39,7 @@ alter table public.restaurants
 -- the drop is a no-op; on a live database the old projection is replaced
 -- atomically inside this migration.
 drop function if exists public.public_restaurant_profile(text);
-create function public.public_restaurant_profile(p_slug text)
+create or replace function public.public_restaurant_profile(p_slug text)
 returns table (
   id uuid,
   slug text,
