@@ -185,7 +185,9 @@ test.describe('cashier — real database', () => {
     // Settlement now records the real counter method: pick one, then mark paid.
     await session.getByRole('radio', { name: 'Cash' }).click();
     await session.getByRole('button', { name: /Mark .* paid/ }).click();
-    await expect(session.getByText('Marked paid (Cash).')).toBeVisible({ timeout: 20_000 });
+    // revalidatePath may replace the block (and its transient status message) as
+    // soon as the action lands, so assert the durable paid state, not the toast.
+    await expect(session.getByText('Paid', { exact: true }).first()).toBeVisible({ timeout: 20_000 });
     await expect(session.getByRole('button', { name: /Close .* issue final receipt/ })).toBeVisible({ timeout: 20_000 });
     await session.getByRole('button', { name: /Close .* issue final receipt/ }).click();
     const confirm = session.getByRole('group', { name: /Confirm checkout/ });
