@@ -95,5 +95,10 @@ comment on function public.public_restaurant_profile(text) is
 revoke all on function public.public_restaurant_profile(text) from public, anon, authenticated;
 grant execute on function public.public_restaurant_profile(text) to anon, authenticated, service_role;
 
+-- Columns added after the 20261114000100 allow-list stay closed by default
+-- until granted. Without this, every staff-side `select *` on restaurants
+-- (settings, dashboards) fails with permission denied for authenticated.
+grant select (google_review_url) on table public.restaurants to authenticated;
+
 comment on column public.restaurants.google_review_url is
   'Where the paid-guest review invitation opens: a https Google review URL, or the writereview URL built from the owner''s Place ID. Blank = feature off for this restaurant.';
