@@ -145,6 +145,8 @@ without separate written authorization each.
 | `20261123000600` | `staff_billing_settings_reads` | Staff billing settings reads — grants authenticated staff SELECT on billing display columns of `public.restaurants` (fssai_number, bill_footer_note, default_service_charge_bps, default_packaging_charge_paise, default_delivery_charge_paise, round_off_enabled). | Added 2026-11-23. |
 | `20261122190000` | `verification_session_id_repair` | Repair schema drift on `table_verification_sessions` — production table was created without the `id` column (a `create table if not exists` silently skipped it), so guest checkout failed with 42703; this adds the missing column + default. | Repaired on prod 2026-11-22 (commit `ee887cc`). |
 | `20261124000100` | `mark_paid_method` | Method-aware manual session settlement — replaces `mark_order_session_paid(uuid)` with `(uuid, p_method, p_upi_ref)` (cash/card/upi; manual legacy default via a one-argument overload), requires the UPI transaction reference for upi, keys manual payments per method, and carries the stated method into `payments`, `payment_audit_events` and the bill. | Added 2026-11-23; applied to staging 2026-11-23. |
+| `20261124020000` | `operational_readiness_settlement_sig` | Align readiness probes with current settlement signatures and service-role-only order placement grants. | Added 2026-11-24. |
+| `20261124030000` | `restore_finance_view_acl` | Restore explicit finance-view ACLs after the Billing v2 drop/rebuild: revoke guest/public/client defaults, grant SELECT only to authenticated and service_role, and retain role-scoped row predicates. | Added 2026-11-24; hosted application pending. |
 
 ## Owner-operation (never applied automatically — separate on purpose)
 

@@ -50,11 +50,12 @@ const read = (p) => {
 // and Phase 1 Order Reliability & Traceability (20261123000500),
 // plus staff billing settings reads (20261123000600), the
 // verification-session id drift repair (20261122190000), and the
-// method-aware manual settlement (20261124000100).
+// method-aware manual settlement (20261124000100), readiness probes (20261124020000),
+// and finance-view ACL repair (20261124030000).
 const migDir = join(root, 'supabase/migrations');
 const migFiles = readdirSync(migDir).filter((f) => f.endsWith('.sql')).sort();
 const versions = migFiles.map((f) => f.slice(0, 14));
-check('migration_count_115', migFiles.length === 116, `found ${migFiles.length}`);
+check('migration_count_118', migFiles.length === 118, `found ${migFiles.length}`);
 check('migration_versions_unique', new Set(versions).size === versions.length);
 check('migration_versions_14_digit', versions.every((v) => /^[0-9]{14}$/.test(v)));
 
@@ -68,7 +69,7 @@ for (const f of GST_B) check(`gst_irp_present:${f.slice(0,14)}`, migFiles.includ
 const manifest = existsSync(join(root, 'docs/migration-manifest-2026-11-14.md')) ? read('docs/migration-manifest-2026-11-14.md') : '';
 const manifestVersions = new Set([...manifest.matchAll(/`([0-9]{14})`/g)].map((m) => m[1]));
 const actualVersions = new Set(versions);
-check('manifest_tracks_all_115', actualVersions.size === manifestVersions.size && [...actualVersions].every((v) => manifestVersions.has(v)),
+check('manifest_tracks_all_118', actualVersions.size === manifestVersions.size && [...actualVersions].every((v) => manifestVersions.has(v)),
   `manifest ${manifestVersions.size} versions vs actual ${actualVersions.size}`);
 
 check('manifest_marks_gst_irp_unauthorized', manifest.includes('NOT AUTHORIZED') && manifest.includes('GST/IRP'));
