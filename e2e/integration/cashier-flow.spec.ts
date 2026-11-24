@@ -182,7 +182,10 @@ test.describe('cashier — real database', () => {
     await expect(session).toContainText('2 tickets');
     const dashboardTotal = (await session.locator('[data-session-total]').innerText()).trim();
 
+    // Settlement now records the real counter method: pick one, then mark paid.
+    await session.getByRole('radio', { name: 'Cash' }).click();
     await session.getByRole('button', { name: /Mark .* paid/ }).click();
+    await expect(session.getByText('Marked paid (Cash).')).toBeVisible({ timeout: 20_000 });
     await expect(session.getByRole('button', { name: /Close .* issue final receipt/ })).toBeVisible({ timeout: 20_000 });
     await session.getByRole('button', { name: /Close .* issue final receipt/ }).click();
     const confirm = session.getByRole('group', { name: /Confirm checkout/ });
