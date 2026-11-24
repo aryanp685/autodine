@@ -138,7 +138,7 @@ jobs:
           100755 blob 35cfbb3dee583e2b9d87e9a14e23ca65941f2642	.github/actions/postgres-client/install-client.sh
           100755 blob ff890e80ccd94b353e96ef903884d68a589ce78f	.github/actions/postgres-client/verify-client.sh
           100644 blob d7defa59ed60dc1187f348771265c56fd06bddd9	package-lock.json
-          100644 blob 5a2efd247bf1da0cdf1790161f33f2bd905501c1	package.json
+          100644 blob 3e6721213ccdc6b539e98e4038e1bd09499db860	package.json
           100644 blob cf5326d1ada5681e5b4af4895be3d8da96a2b51d	scripts/backup/b2-owner-checklist.test.mjs
           100644 blob 5b657cc7577aaa63ba0ba8cf284f6d52c51bd7c3	scripts/backup/b2-upload.test.mjs
           100644 blob 8fce2f5b0a7890174d84660f306c3fc2d0755ccf	scripts/backup/backup-logical.mjs
@@ -173,7 +173,7 @@ jobs:
           100644 blob 8b562420e36088b4240148e2c09c3e0b82a2bb9f	scripts/backup/run-scheduled.test.mjs
           100644 blob 5c559d087c2cd5cf7ca153ef36d2ba8f18bfc4da	scripts/backup/selftest.mjs
           100644 blob c47793f88fb2dab104ea8bc617e8fbd9e5537db6	scripts/backup/staging-rehearsal-wiring.test.mjs
-          100644 blob 1e0360e48f9e3d159b7592d8678ab5290effc7ad	scripts/backup/upload-b2.mjs
+          100644 blob 4deb0fa6dcbd51d7b3132f7c38d003b6b3af2d9a	scripts/backup/upload-b2.mjs
           100644 blob 365a07fcc17afd57b8276d60b8c88e6bc4f9da68	scripts/backup/validate-staging-source.mjs
           100644 blob c6134e56f402d2f9aca0b8dd70de5a8b41a52057	scripts/backup/verify-backup-file.mjs
           100644 blob 305ea6cbc2816c66efa3c786bdb2677cb90c292c	scripts/backup/verify-backup-file.test.mjs
