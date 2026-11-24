@@ -32,7 +32,14 @@ alter table public.restaurants
 -- Rebuild the storefront projection with the destination included. It is the
 -- only guest read of the restaurant (lib/db/public-restaurant.ts), and the
 -- guest order screen may only open what this function chose to return.
-create or replace function public.public_restaurant_profile(p_slug text)
+--
+-- The return row gains a column, so `create or replace` alone is rejected
+-- (42P13, cannot change return type). Drop first — the same forward-only
+-- pattern 20261124000100 used for mark_order_session_paid. On a clean replay
+-- the drop is a no-op; on a live database the old projection is replaced
+-- atomically inside this migration.
+drop function if exists public.public_restaurant_profile(text);
+create function public.public_restaurant_profile(p_slug text)
 returns table (
   id uuid,
   slug text,

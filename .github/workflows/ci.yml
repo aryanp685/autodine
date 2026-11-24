@@ -65,9 +65,7 @@ jobs:
       # republished as annotations, which the Checks API serves reliably.
       - name: Surface staging guard failure as an annotation
         if: failure()
-        run: |
-          node scripts/ci/print-test-failure-annotation.mjs staging-guards.log
-          node scripts/ci/print-error-annotation.mjs staging-guards.log 3500
+        run: node scripts/ci/print-error-annotation.mjs staging-guards.log 3500
 
       # The demo-seed guard is proven against a real PostgreSQL: the seed is
       # applied to the repository's own schema on a disposable cluster and
