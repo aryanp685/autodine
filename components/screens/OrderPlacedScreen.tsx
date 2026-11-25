@@ -452,6 +452,7 @@ export function OrderPlacedScreen({
           orderId={data.id}
           restaurantName={data.restaurantName}
           reviewUrl={data.googleReviewUrl}
+          guestToken={token ?? ''}
         />
       ) : null}
     </GuestFlow>

@@ -973,6 +973,21 @@ export type Database = {
         }[];
       };
       /**
+       * Migration 20261124050000. The in-app review capture behind the Google
+       * review invitation sheet. Validates the guest token against the order,
+       * stores one review per order, and answers like verify_table_qr_with_code
+       * does: a refused save is a normal `{ok:false,error}` row, not a raise.
+       */
+      submit_order_review: {
+        Args: {
+          p_guest_token: string;
+          p_order_id: string;
+          p_rating: number;
+          p_note: string;
+        };
+        Returns: { ok: boolean; error: string | null }[];
+      };
+      /**
        * Migration 20261023000900. The read gate.
        *
        * Resolves a cookie's token against the live database -- expiry,

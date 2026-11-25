@@ -26,7 +26,12 @@ function mount() {
   const root = createRoot(container);
   act(() => {
     root.render(
-      <GoogleReviewInvite orderId={ORDER_ID} restaurantName="Spice Route" reviewUrl={REVIEW_URL} />,
+      <GoogleReviewInvite
+        orderId={ORDER_ID}
+        restaurantName="Spice Route"
+        reviewUrl={REVIEW_URL}
+        guestToken="guest-token-1"
+      />,
     );
   });
   const entry = { root, container };
@@ -125,5 +130,51 @@ describe('GoogleReviewInvite', () => {
     await settle(second.root);
     expect(dialog()).toBeNull();
     second.unmount();
+  });
+
+  it('submits the rating and note, then shows the thank-you state', async () => {
+    const calls: Array<{ body: unknown; url: string }> = [];
+    const originalFetch = window.fetch;
+    window.fetch = (async (url: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({ url: String(url), body: JSON.parse(String(init?.body)) });
+      return new Response(JSON.stringify({ ok: true }), { headers: { 'content-type': 'application/json' } });
+    }) as typeof window.fetch;
+    try {
+      const { root } = mount();
+      await settle(root);
+      const stars = [...(dialog()?.querySelectorAll<HTMLButtonElement>('[role="group"] button') ?? [])];
+      act(() => {
+        stars[4]?.click();
+      });
+      const textarea = dialog()?.querySelector<HTMLTextAreaElement>('textarea');
+      act(() => {
+        textarea?.focus();
+      });
+      if (textarea) {
+        const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
+        setter?.call(textarea, 'The chai was perfect');
+      }
+      act(() => {
+        textarea?.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+      const send = [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find(
+        (button) => button.textContent?.includes('Send review'),
+      );
+      await act(async () => {
+        send?.click();
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      });
+      expect(calls).toHaveLength(1);
+      expect(calls[0].url).toBe('/menu/orders/review');
+      expect(calls[0].body).toEqual({
+        orderId: ORDER_ID,
+        token: 'guest-token-1',
+        rating: 5,
+        note: 'The chai was perfect',
+      });
+      expect(document.body.textContent).toMatch(/thank/i);
+    } finally {
+      window.fetch = originalFetch;
+    }
   });
 });

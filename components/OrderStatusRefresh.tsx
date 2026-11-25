@@ -8,6 +8,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createStatusPoller } from '@/lib/order-status-poller';
 import { readOrderStatus } from '@/components/GuestLiveStatus';
+import { guestStatus } from '@/lib/guest-order-status';
 import type { OrderStatusSnapshot } from '@/lib/guest-order-status';
 
 export function OrderStatusRefresh({ slug, code, token, status, awaitingConfirmation, paymentStatus }: {
@@ -28,6 +29,14 @@ export function OrderStatusRefresh({ slug, code, token, status, awaitingConfirma
           refreshing = true;
           router.refresh();
         }
+      },
+      // A counter-paid order sits at `served` while the bill is still
+      // `pending`, and the ladder calls that terminal. The invite rides the
+      // payment flip, so the loop must live until the money side settles too.
+      shouldStop: snap => {
+        if (snap.status === 'cancelled') return true;
+        return guestStatus({ prepStatus: snap.status, awaitingConfirmation: snap.awaitingConfirmation }).terminal
+          && snap.paymentStatus !== 'pending';
       },
     });
     const onVisible = () => { if (document.visibilityState === 'visible') poller.pollNow(); };

@@ -90,6 +90,13 @@ export type PollerDeps = {
   /** True while the tab is hidden. */
   isHidden?: () => boolean;
   onSnapshot: (snapshot: OrderStatusSnapshot) => void;
+  /**
+   * Whether this read ends the loop. Defaults to the status ladder's terminal
+   * rule. A caller that knows more than the ladder -- the counter-payment
+   * screen, whose order stays `served` while the bill is still `pending` --
+   * keeps the loop alive until the state it is watching has settled.
+   */
+  shouldStop?: (snapshot: OrderStatusSnapshot) => boolean;
   /** The server answered, and the order is not there (any more). */
   onMissing?: () => void;
   onState?: (state: PollerState) => void;
@@ -184,7 +191,10 @@ export function createStatusPoller(deps: PollerDeps): StatusPoller {
       deps.onSnapshot(snapshot);
       emit({ phase: 'live', failures: 0, lastOkAt: Date.parse(snapshot.checkedAt) || now() });
 
-      if (guestStatus({ prepStatus: snapshot.status, awaitingConfirmation: snapshot.awaitingConfirmation }).terminal) {
+      const stop = deps.shouldStop
+        ?? ((snap: OrderStatusSnapshot) =>
+          guestStatus({ prepStatus: snap.status, awaitingConfirmation: snap.awaitingConfirmation }).terminal);
+      if (stop(snapshot)) {
         running = false;
         clear();
         emit({ phase: 'stopped' });

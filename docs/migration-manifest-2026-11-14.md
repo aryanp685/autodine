@@ -148,6 +148,7 @@ without separate written authorization each.
 | `20261124020000` | `operational_readiness_settlement_sig` | Align readiness probes with current settlement signatures and service-role-only order placement grants. | Added 2026-11-24. |
 | `20261124030000` | `restore_finance_view_acl` | Restore explicit finance-view ACLs after the Billing v2 drop/rebuild: revoke guest/public/client defaults, grant SELECT only to authenticated and service_role, and retain role-scoped row predicates. | Added 2026-11-24; hosted application pending. |
 | `20261124040000` | `google_review_invite` | Add `google_review_url` to the `public_restaurant_profile` projection (drop + recreate — the return row gains a column), persist a per-restaurant `google_review_url`, and gate it to https:// prefixes. | Added 2026-11-24; hosted application pending. |
+| `20261124050000` | `order_reviews` | In-app review capture: one row per order (rating 1–5 + optional 500-char note), written only via the SECURITY DEFINER `submit_order_review` RPC that matches the order's `guest_token`; staff reads scoped by memberships. | Added 2026-11-24; hosted application pending. |
 
 ## Owner-operation (never applied automatically — separate on purpose)
 
