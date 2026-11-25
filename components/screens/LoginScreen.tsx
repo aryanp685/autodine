@@ -62,7 +62,7 @@ export function LoginScreen({ error, notice, next }: { error?: string; notice?: 
             </p>
           </div>
 
-          <Link href="/#screens" className="mt-6 inline-flex min-h-11 items-center gap-2.5 text-[13px] font-medium text-white transition-colors hover:text-[var(--auth-accent-bright)]">
+          <Link href="/screens" className="mt-6 inline-flex min-h-11 items-center gap-2.5 text-[13px] font-medium text-white transition-colors hover:text-[var(--auth-accent-bright)]">
             Take a look around <span aria-hidden="true">↗</span>
           </Link>
         </aside>

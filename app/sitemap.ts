@@ -1,6 +1,15 @@
 import type { MetadataRoute } from 'next';
 
-const STATIC_ROUTES: ReadonlyArray<string> = ['/', '/pricing', '/terms', '/privacy'];
+const STATIC_ROUTES: ReadonlyArray<string> = [
+  '/',
+  '/features',
+  '/how-it-works',
+  '/screens',
+  '/trust',
+  '/pricing',
+  '/terms',
+  '/privacy',
+];
 
 /* Built at build time, where there is no request: no cookies(), no headers()
    and no database read. Restaurant menus are reached by scanning a table QR,

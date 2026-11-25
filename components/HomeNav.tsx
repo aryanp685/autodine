@@ -15,19 +15,26 @@ import { AuthHandoffLink } from '@/components/AuthHandoffLink';
 import { BRAND_GREEN } from '@/lib/brand';
 
 const NAV_LINKS = [
-  { label: 'Product', href: '/#product', id: 'product' },
-  { label: 'How it works', href: '/#how', id: 'how' },
-  { label: 'Screens', href: '/#screens', id: 'screens' },
+  { label: 'Product', href: '/features', id: 'product' },
+  { label: 'How it works', href: '/how-it-works', id: 'how' },
+  { label: 'Screens', href: '/screens', id: 'screens' },
+  { label: 'Trust', href: '/trust', id: 'trust' },
   { label: 'Pricing', href: '/pricing', id: 'pricing' },
 ] as const;
 
-export function HomeNav({ activePricing = false }: { activePricing?: boolean } = {}) {
+export function HomeNav({
+  activePricing = false,
+  activePage,
+}: {
+  activePricing?: boolean;
+  activePage?: 'product' | 'how' | 'screens' | 'trust';
+} = {}) {
   const [open, setOpen] = useState(false);
   // The bar sits flush over the hero, then settles into a compact, slightly
   // more opaque pill once the page starts moving. Height only changes by one
   // row so the logo never shifts horizontally.
   const [scrolled, setScrolled] = useState(false);
-  const [active, setActive] = useState<string | null>(activePricing ? 'pricing' : null);
+  const [active, setActive] = useState<string | null>(activePricing ? 'pricing' : (activePage ?? null));
   const reduce = useReducedMotion();
 
   useEffect(() => {
@@ -39,7 +46,7 @@ export function HomeNav({ activePricing = false }: { activePricing?: boolean } =
     const update = () => {
       frame = 0;
       setScrolled(window.scrollY > 14);
-      if (activePricing || sections.length === 0) return;
+      if (activePricing || activePage || sections.length === 0) return;
       let current: string | null = null;
       for (const section of sections) {
         if (section.getBoundingClientRect().top <= 160) current = section.id;
@@ -59,7 +66,7 @@ export function HomeNav({ activePricing = false }: { activePricing?: boolean } =
       window.removeEventListener('scroll', onScroll);
       window.removeEventListener('resize', onScroll);
     };
-  }, [activePricing]);
+  }, [activePage, activePricing]);
 
   return (
     <header className="sticky top-0 z-50 px-3 pt-2.5 sm:px-5" data-scrolled={scrolled ? '' : undefined}>
@@ -183,8 +190,9 @@ export function HomeNav({ activePricing = false }: { activePricing?: boolean } =
             <ul className="flex flex-col">
               {NAV_LINKS.map((link, index) => (
                 <li key={link.id}>
-                  <a
+                  <Link
                     href={link.href}
+                    prefetch={false}
                     aria-current={active === link.id ? 'page' : undefined}
                     onClick={() => setOpen(false)}
                     className="flex items-baseline justify-between rounded-2xl px-4 py-3 text-[15px] text-cream/80 transition-colors duration-300 hover:bg-forest-soft/45 hover:text-cream"
@@ -193,7 +201,7 @@ export function HomeNav({ activePricing = false }: { activePricing?: boolean } =
                     <span aria-hidden="true" className="font-display text-[11px] italic text-mute-dim">
                       0{index + 1}
                     </span>
-                  </a>
+                  </Link>
                 </li>
               ))}
               <li className="mt-1 border-t border-ink-line/70 pt-1">

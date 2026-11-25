@@ -259,7 +259,7 @@ function Hero() {
               <span aria-hidden="true" className="transition-transform duration-300 group-hover:translate-x-0.5 motion-reduce:transition-none">→</span>
             </AuthHandoffLink>
             <Link
-              href="/#how"
+              href="/how-it-works"
               className="group inline-flex min-h-12 items-center justify-center gap-3 rounded-full border border-forest/20 bg-ink-card/70 px-6 text-[14px] font-medium text-forest backdrop-blur-sm transition-colors duration-300 hover:border-forest/35 hover:bg-ink-card focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest"
             >
               <span aria-hidden="true" className="grid size-5 place-items-center rounded-full bg-forest text-white transition-transform duration-300 group-hover:translate-x-0.5 motion-reduce:transition-none">
@@ -439,7 +439,7 @@ function Problem() {
 
 /* ---------------------------------------------------------------- steps */
 
-function Steps() {
+export function Steps() {
   return (
     <section id="how" aria-labelledby="how-heading" className="border-t border-ink-line bg-white py-16 text-cream sm:py-24 lg:py-28">
       <div className="mx-auto max-w-[1180px] px-5 sm:px-8">
@@ -494,7 +494,7 @@ function Steps() {
             <p className="text-[12px] font-semibold text-cream">What you need to get started</p>
             <p className="mt-1.5 max-w-[62ch] text-[12px] leading-relaxed text-mute">Printed table cards, internet access for guests, and a compatible browser on a staff laptop or tablet.</p>
           </div>
-          <Link href="/#screens" className="inline-flex min-h-11 shrink-0 items-center gap-3 rounded-full px-2 text-[13px] font-medium text-forest hover:text-brass-strong focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest">
+          <Link href="/screens" className="inline-flex min-h-11 shrink-0 items-center gap-3 rounded-full px-2 text-[13px] font-medium text-forest hover:text-brass-strong focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest">
             See the screens <span aria-hidden="true" className="transition-transform duration-300 group-hover:translate-x-0.5 motion-reduce:transition-none">↗</span>
           </Link>
         </div>
@@ -514,7 +514,7 @@ function Steps() {
  * JavaScript, or with reduced motion -- SiteMotion only adds `is-live` at
  * 1024px and above, so nothing essential is ever hidden by the effect.
  */
-function ServiceLoop() {
+export function ServiceLoop() {
   return (
     <section
       aria-labelledby="loop-heading"
@@ -618,7 +618,7 @@ function ServiceLoop() {
 
 /* -------------------------------------------------------------- screens */
 
-function Screens() {
+export function Screens() {
   const panels = [
     { kicker: 'Guest menu', title: 'Browse the menu', body: 'Photos, prices and dish details, together on the guest’s phone.' },
     { kicker: 'Kitchen board', title: 'Follow the ticket', body: 'Keep table numbers, dishes and guest notes together. Staff update the ticket as preparation moves forward.' },
@@ -710,7 +710,7 @@ function Screens() {
 
 /* ------------------------------------------------------------- features */
 
-function Features() {
+export function Features() {
   return (
     <section id="product" aria-labelledby="features-heading" className="relative overflow-x-clip border-t border-ink-line bg-ink py-16 sm:py-24 lg:py-28">
       <div className="mx-auto max-w-[1180px] px-5 sm:px-8">
@@ -730,7 +730,7 @@ function Features() {
             <div className="mt-7 max-w-[39ch] border-l-2 border-brass/50 pl-5" data-reveal>
               <p className="text-[13px] leading-relaxed text-mute">Guests order on their phone. Staff prepare, serve and record payment. Each step has its own place.</p>
             </div>
-            <Link href="/#screens" className="mt-7 inline-flex min-h-11 items-center gap-3 rounded-full border border-forest/20 px-5 text-[13px] font-medium text-forest hover:bg-forest-soft focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest">
+            <Link href="/screens" className="mt-7 inline-flex min-h-11 items-center gap-3 rounded-full border border-forest/20 px-5 text-[13px] font-medium text-forest hover:bg-forest-soft focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest">
               Explore the screens <span aria-hidden="true">↗</span>
             </Link>
             <ProductScene />
@@ -782,7 +782,7 @@ function Features() {
  * has to hand over. Every line here is enforced in the product (or stated in
  * the privacy note); none of it is a badge, a percentage or a certification.
  */
-function Trust() {
+export function Trust() {
   return (
     <section
       id="trust"
@@ -834,7 +834,7 @@ function Trust() {
 /* --------------------------------------------------------------- honest */
 
 /** Keep the preview boundary visible without presenting an internal release log. */
-function Honest() {
+export function Honest() {
   return (
     <section id="status" aria-labelledby="status-heading" className="border-t border-ink-line bg-ink py-16 sm:py-24">
       <div className="mx-auto max-w-[1180px] px-5 sm:px-8">
@@ -1011,7 +1011,7 @@ function Close() {
           </div>
 
           <nav aria-label="Footer" className="flex flex-wrap gap-x-8 gap-y-3 text-[12.5px] text-mute">
-            <Link href="/#status" className="transition-colors hover:text-brass-strong focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest">Preview details</Link>
+            <Link href="/trust" className="transition-colors hover:text-brass-strong focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest">Preview details</Link>
             <Link href="/pricing" className="transition-colors hover:text-brass-strong focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest">Pricing</Link>
             <Link href="/login" prefetch={false} className="transition-colors hover:text-brass-strong focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest">Sign in</Link>
             <AuthHandoffLink href="/signup" className="transition-colors hover:text-brass-strong focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest">Create account</AuthHandoffLink>

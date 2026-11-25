@@ -16,9 +16,10 @@ const COLUMNS = [
     title: 'Product',
     items: [
       { label: 'Overview', href: '/' },
-      { label: 'How it works', href: '/#how' },
-      { label: 'The screens', href: '/#screens' },
-      { label: 'What is live', href: '/#status' },
+      { label: 'Features', href: '/features' },
+      { label: 'How it works', href: '/how-it-works' },
+      { label: 'The screens', href: '/screens' },
+      { label: 'Trust & preview', href: '/trust' },
     ],
   },
   {

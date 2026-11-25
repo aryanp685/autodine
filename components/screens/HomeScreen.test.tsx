@@ -55,7 +55,7 @@ describe('home', () => {
     expect(section).toContain('Before service');
     expect(section).toContain('What you need to get started');
     expect(section).toContain('Payment recorded by staff.');
-    expect(section).toContain('href="/#screens"');
+    expect(section).toContain('href="/screens"');
     expect(section).not.toContain('<button');
     expect(section.match(/<h3/g)).toHaveLength(3);
     expect(section).toContain('STEP 01');
@@ -135,7 +135,7 @@ describe('home', () => {
     expect(section.match(/<h3/g)).toHaveLength(4);
     for (const role of ['For your guests','For the kitchen','For the menu manager','For the counter']) expect(section).toContain(role);
     expect(section).toContain('An order placed is not a payment received.');
-    expect(section).toContain('href="/#screens"');
+    expect(section).toContain('href="/screens"');
     expect(section).toContain('motion-safe:hover:');
     expect(section).toContain('data-stagger');
     expect(section).not.toContain('<button');
@@ -166,7 +166,7 @@ describe('home', () => {
     expect(status).not.toContain('things work.');
     expect(home).toContain(`Start your ${TRIAL_DAYS}-day trial`);
     expect(home).toContain('No paid subscription is activated at signup.');
-    expect(home).toContain('href="/#status"');
+    expect(home).toContain('href="/trust"');
   });
 
   it('links every plan card to that plan, not to the top of pricing', () => {

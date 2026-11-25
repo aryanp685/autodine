@@ -19,6 +19,10 @@ describe('sitemap', () => {
     vi.stubEnv('NEXT_PUBLIC_SITE_URL', 'https://autodine.example/');
     expect(sitemap().map((entry) => entry.url)).toEqual([
       'https://autodine.example/',
+      'https://autodine.example/features',
+      'https://autodine.example/how-it-works',
+      'https://autodine.example/screens',
+      'https://autodine.example/trust',
       'https://autodine.example/pricing',
       'https://autodine.example/terms',
       'https://autodine.example/privacy',
@@ -29,6 +33,6 @@ describe('sitemap', () => {
     vi.stubEnv('SITE_URL', '');
     vi.stubEnv('NEXT_PUBLIC_SITE_URL', '');
     vi.stubEnv('VERCEL_PROJECT_PRODUCTION_URL', 'autodine.vercel.app');
-    expect(sitemap()[1]?.url).toBe('https://autodine.vercel.app/pricing');
+    expect(sitemap()[5]?.url).toBe('https://autodine.vercel.app/pricing');
   });
 });
