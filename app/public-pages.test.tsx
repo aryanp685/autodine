@@ -21,6 +21,7 @@ describe('public marketing routes', () => {
       expect(markup).toContain('href="/signup"');
       expect(markup).toContain('Start your trial');
       expect(markup).toContain('data-reveal');
+      expect(markup).toContain('data-public-intro');
       expect(markup).toContain('href="/pricing"');
       expect(markup).toContain('AutoDine');
     });

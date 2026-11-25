@@ -2,6 +2,7 @@ import Image from 'next/image';
 import { HomeNav } from '@/components/HomeNav';
 import { SiteFooter } from '@/components/SiteFooter';
 import { SiteMotion } from '@/components/SiteMotion';
+import { PublicIntroLoader } from '@/components/marketing/PublicIntroLoader';
 import { ButtonLink } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import type { ReactNode } from 'react';
@@ -27,6 +28,7 @@ export function PublicPageShell({
 }) {
   return (
     <div className="public-landing min-h-screen overflow-x-clip bg-ink text-cream antialiased">
+      <PublicIntroLoader />
       <HomeNav activePage={activePage} />
       <main>
         <header className="relative isolate overflow-hidden border-b border-ink-line bg-white">
@@ -39,7 +41,7 @@ export function PublicPageShell({
               className="object-cover object-[68%_48%] opacity-55"
             />
           </div>
-          <div aria-hidden="true" className="absolute inset-0 z-0 bg-[linear-gradient(100deg,rgba(251,250,247,0.96)_0%,rgba(251,250,247,0.84)_54%,rgba(251,250,247,0.48)_100%)]" />
+          <div aria-hidden="true" className="absolute inset-0 z-0 bg-[linear-gradient(100deg,rgba(250,246,240,0.97)_0%,rgba(250,246,240,0.87)_54%,rgba(250,246,240,0.55)_100%)]" />
 
           <div className="relative z-10 mx-auto grid max-w-[1240px] gap-10 px-5 py-14 sm:px-8 sm:py-20 lg:grid-cols-[minmax(0,1.1fr)_minmax(300px,0.7fr)] lg:items-center lg:gap-16 lg:px-10 lg:py-24">
             <div className="max-w-[680px]">
@@ -59,7 +61,7 @@ export function PublicPageShell({
               </div>
             </div>
 
-            <Card className="relative overflow-hidden border-white/90 bg-[#fffdf8]/95 backdrop-blur-sm" data-reveal>
+            <Card className="relative overflow-hidden border-white/90 bg-ink-card/95 backdrop-blur-sm" data-reveal>
               <span aria-hidden="true" className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-brass via-brass/50 to-forest/70" />
               <CardHeader className="pb-4">
                 <p className="text-[10px] font-semibold tracking-[0.16em] text-brass-strong uppercase">Built for service</p>

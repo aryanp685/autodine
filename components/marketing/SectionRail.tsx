@@ -2,15 +2,6 @@
 
 import { useEffect, useState } from 'react';
 
-/**
- * The right-edge index for the landing page.
- *
- * It duplicates nothing: every stop is an existing section id, and the labels
- * are short enough to sit outside the 1116px column instead of over it. The
- * rail is decorative navigation — the same destinations stay in the top bar —
- * so it is hidden below xl rather than compressed into the content.
- */
-
 const SECTIONS = [
   { id: 'how', label: 'How' },
   { id: 'screens', label: 'Screens' },
@@ -20,9 +11,9 @@ const SECTIONS = [
   { id: 'pricing', label: 'Pricing' },
 ] as const;
 
+/** Compact glass index for the landing page. Every stop maps to a real section. */
 export function SectionRail() {
   const [active, setActive] = useState<string | null>(null);
-  const [onDark, setOnDark] = useState(false);
 
   useEffect(() => {
     let frame = 0;
@@ -30,7 +21,6 @@ export function SectionRail() {
       (node): node is HTMLElement => node !== null,
     );
     if (nodes.length === 0) return;
-    const darkBands = [...document.querySelectorAll<HTMLElement>('[data-rail-tone="dark"]')];
 
     const update = () => {
       frame = 0;
@@ -40,12 +30,6 @@ export function SectionRail() {
         if (node.getBoundingClientRect().top <= line) current = node.id;
       }
       setActive(current);
-      setOnDark(
-        darkBands.some((band) => {
-          const rect = band.getBoundingClientRect();
-          return rect.top <= line && rect.bottom > line;
-        }),
-      );
     };
     const onScroll = () => {
       if (!frame) frame = requestAnimationFrame(update);
@@ -65,9 +49,9 @@ export function SectionRail() {
     <nav
       aria-label="Page sections"
       data-section-rail
-      className="fixed top-1/2 right-4 z-40 hidden -translate-y-1/2 xl:block 2xl:right-6"
+      className="fixed top-1/2 right-4 z-40 hidden -translate-y-1/2 rounded-2xl border border-white/90 bg-white/85 p-2 shadow-[0_18px_46px_-32px_rgba(20,50,35,0.4)] backdrop-blur-xl xl:block 2xl:right-6"
     >
-      <ol className="flex flex-col items-end">
+      <ol className="flex flex-col gap-0.5">
         {SECTIONS.map((section) => {
           const current = active === section.id;
           return (
@@ -75,35 +59,21 @@ export function SectionRail() {
               <a
                 href={`#${section.id}`}
                 aria-current={current ? 'true' : undefined}
-                className="group flex items-center justify-end gap-3 py-2 pl-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest"
+                className="group flex min-h-8 items-center gap-2 rounded-xl px-2.5 transition-colors hover:bg-ink-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest"
               >
-                <span
-                  className={[
-                    'text-[9.5px] font-medium tracking-[0.18em] uppercase transition-[color,opacity] duration-300 motion-reduce:transition-none',
-                    current
-                      ? onDark
-                        ? 'text-brass-soft'
-                        : 'text-forest'
-                      : onDark
-                        ? 'text-white/45 group-hover:text-white'
-                        : 'text-mute-dim opacity-60 group-hover:text-gink group-hover:opacity-100',
-                  ].join(' ')}
-                >
-                  {section.label}
-                </span>
                 <span
                   aria-hidden="true"
                   className={[
-                    'block rounded-full transition-[width,height,background-color] duration-300 motion-reduce:transition-none',
-                    current
-                      ? onDark
-                        ? 'h-4 w-[2px] bg-brass'
-                        : 'h-4 w-[2px] bg-forest'
-                      : onDark
-                        ? 'h-px w-3 bg-white/25 group-hover:bg-white/60'
-                        : 'h-px w-3 bg-mute-dim/50 group-hover:bg-gink/60',
+                    'size-1.5 shrink-0 rounded-full transition-colors duration-200',
+                    current ? 'bg-forest' : 'bg-ink-line group-hover:bg-forest/40',
                   ].join(' ')}
                 />
+                <span className={[
+                  'text-[9px] font-semibold tracking-[0.08em] uppercase transition-colors',
+                  current ? 'text-forest' : 'text-mute group-hover:text-cream',
+                ].join(' ')}>
+                  {section.label}
+                </span>
               </a>
             </li>
           );

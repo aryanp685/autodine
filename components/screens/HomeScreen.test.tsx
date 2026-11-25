@@ -154,7 +154,11 @@ describe('home', () => {
     expect(tail).toContain('href="/terms"');
     expect(tail).not.toContain('ink="#f7f3ea"');
     expect(home).toContain('data-menu-demo');
-    expect(home).toContain('rgba(251,250,247,0.24)');
+    expect(home).toContain('data-hero-dashboard');
+    expect(home).toContain('RESTAURANT SERVICE, IN SYNC');
+    expect(home).toContain('Every table,');
+    expect(home).toContain('one seamless');
+    expect(home).toContain('experience.');
   });
 
   it('keeps preview boundaries and capability lists visible without release-log counts', () => {

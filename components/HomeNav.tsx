@@ -69,22 +69,22 @@ export function HomeNav({
   }, [activePage, activePricing]);
 
   return (
-    <header className="sticky top-0 z-50 px-3 pt-2.5 sm:px-5" data-scrolled={scrolled ? '' : undefined}>
+    <header className="sticky top-0 z-50 mx-auto max-w-[1400px] px-3 pt-3 sm:px-6 lg:px-8" data-scrolled={scrolled ? '' : undefined}>
       <div
         aria-hidden="true"
         className={[
-          'pointer-events-none absolute inset-x-0 top-0 -z-10 h-20 bg-gradient-to-b from-ink via-ink/80 to-transparent transition-opacity duration-500',
-          scrolled || open ? 'opacity-100' : 'opacity-0',
+          'pointer-events-none absolute inset-x-0 top-0 -z-10 h-24 bg-gradient-to-b from-ink/95 via-ink/75 to-transparent transition-opacity duration-500',
+          scrolled || open ? 'opacity-100' : 'opacity-60',
         ].join(' ')}
       />
       <div
         className={[
-          'relative mx-auto flex max-w-[1180px] items-center gap-4 rounded-full border px-4 backdrop-blur-xl sm:px-5 lg:gap-6',
+          'relative mx-auto flex max-w-[1240px] items-center gap-3 rounded-[22px] border px-3.5 backdrop-blur-2xl sm:gap-4 sm:px-5 lg:gap-6',
           'transition-[background-color,border-color,box-shadow,height] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]',
           scrolled || open
-            ? 'border-ink-line/90 bg-ink shadow-[0_20px_50px_-34px_rgba(42,33,23,0.6)]'
-            : 'border-ink-line/60 bg-ink/90',
-          scrolled ? 'h-14' : 'h-16',
+            ? 'border-ink-line bg-white/95 shadow-[0_16px_42px_-28px_rgba(22,50,36,0.3)]'
+            : 'border-white/80 bg-white/85 shadow-[0_12px_36px_-28px_rgba(22,50,36,0.18)]',
+          scrolled ? 'h-[58px]' : 'h-[64px]',
         ].join(' ')}
       >
         <Link
@@ -106,14 +106,17 @@ export function HomeNav({
                     href={link.href}
                     prefetch={false}
                     aria-current={current ? 'page' : undefined}
-                    className="group relative inline-flex h-9 items-center whitespace-nowrap rounded-full px-3 text-[13px] text-mute transition-colors duration-300 hover:text-cream aria-[current=page]:text-cream lg:px-3.5"
+                    className={[
+                      'group relative inline-flex h-9 items-center whitespace-nowrap rounded-xl px-3 text-[12.5px] font-medium transition-colors duration-200 lg:px-3.5',
+                      current ? 'bg-forest-soft text-forest' : 'text-mute hover:bg-ink-soft hover:text-cream',
+                    ].join(' ')}
                   >
                     {link.label}
                     <span
                       aria-hidden="true"
                       className={[
-                        'absolute inset-x-3 bottom-0 h-px origin-left bg-brass transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] lg:inset-x-3.5',
-                        current ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100',
+                        'absolute right-2 top-1/2 size-1.5 -translate-y-1/2 rounded-full bg-forest transition-opacity duration-200',
+                        current ? 'opacity-100' : 'opacity-0',
                       ].join(' ')}
                     />
                   </Link>
@@ -134,7 +137,7 @@ export function HomeNav({
           <AuthHandoffLink
             href="/signup"
             prefetch={false}
-            className="group inline-flex h-10 items-center gap-2 rounded-full bg-brass pl-4 pr-3.5 text-[13px] font-semibold text-cream shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_12px_26px_-16px_rgba(234,106,42,0.9)] transition-[background-color,transform,box-shadow] duration-300 hover:-translate-y-0.5 hover:bg-brass-strong hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brass motion-reduce:transition-none motion-reduce:hover:translate-y-0 lg:pl-5 lg:pr-4"
+            className="group inline-flex h-10 items-center gap-2 rounded-xl bg-brass px-4 text-[12.5px] font-semibold text-cream shadow-[0_10px_24px_-14px_rgba(191,84,28,0.55)] transition-[background-color,transform,box-shadow] duration-300 hover:-translate-y-0.5 hover:bg-brass-strong focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brass-strong motion-reduce:transition-none motion-reduce:hover:translate-y-0 sm:px-5"
           >
             Create account
             <span
@@ -150,7 +153,7 @@ export function HomeNav({
             aria-controls="home-nav-menu"
             aria-label={open ? 'Close menu' : 'Open menu'}
             onClick={() => setOpen((value) => !value)}
-            className="grid size-10 place-items-center rounded-full border border-hair-strong/60 text-cream transition-colors duration-300 hover:bg-cream/[0.06] md:hidden"
+            className="grid size-10 place-items-center rounded-full border border-ink-line text-cream transition-colors duration-300 hover:bg-ink-soft md:hidden"
           >
             <span aria-hidden="true" className="relative block h-[11px] w-4">
               <span
@@ -181,7 +184,7 @@ export function HomeNav({
           <motion.nav
             id="home-nav-menu"
             aria-label="Primary (mobile)"
-            className="mx-auto mt-2 max-w-[1180px] overflow-hidden rounded-[26px] border border-ink-line bg-ink/95 px-2 py-2 shadow-[0_30px_60px_-40px_rgba(28,27,24,0.55)] backdrop-blur-xl md:hidden"
+            className="mx-auto mt-2 max-w-[1240px] overflow-hidden rounded-[22px] border border-ink-line bg-white/95 px-2 py-2 shadow-[0_24px_54px_-36px_rgba(22,50,36,0.32)] backdrop-blur-2xl md:hidden"
             initial={reduce ? false : { height: 0, opacity: 0, y: -6 }}
             animate={{ height: 'auto', opacity: 1, y: 0 }}
             exit={reduce ? undefined : { height: 0, opacity: 0, y: -6 }}

@@ -1,4 +1,5 @@
 import { HomeNav } from '@/components/HomeNav';
+import { PublicIntroLoader } from '@/components/marketing/PublicIntroLoader';
 import { SiteMotion } from '@/components/SiteMotion';
 import { AuthHandoffLink } from '@/components/AuthHandoffLink';
 import { SiteFooter } from '@/components/SiteFooter';
@@ -76,6 +77,7 @@ export function PricingScreen({
 } = {}) {
   return (
     <div className="public-landing min-h-screen bg-ink text-cream antialiased">
+      <PublicIntroLoader />
       <HomeNav activePricing />
       <main id="pricing-content">
         <header className="relative overflow-hidden border-b border-cream/10 px-5 pt-14 pb-12 sm:px-8 sm:pt-20 sm:pb-16">

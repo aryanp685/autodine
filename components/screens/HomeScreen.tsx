@@ -5,6 +5,7 @@ import { inr } from '@/lib/demo-data';
 import { ProductScene } from '@/components/ProductScene';
 import { SiteMotion } from '@/components/SiteMotion';
 import { SectionRail } from '@/components/marketing/SectionRail';
+import { PublicIntroLoader } from '@/components/marketing/PublicIntroLoader';
 import { HomeNav } from '@/components/HomeNav';
 import { BrandLockup } from '@/components/BrandMark';
 import { HeroTableScene } from '@/components/marketing/HeroTableScene';
@@ -179,6 +180,7 @@ function Tick({ tone = 'dark' }: { tone?: 'dark' | 'light' }) {
 export function Home() {
   return (
     <div className="public-landing min-h-screen overflow-x-clip bg-ink text-cream antialiased">
+      <PublicIntroLoader />
       <SiteMotion />
       <div data-page-progress className="page-progress" aria-hidden="true" />
       <HomeNav />
@@ -206,136 +208,120 @@ function Hero() {
     <section
       data-hero
       aria-labelledby="hero-heading"
-      className="relative isolate overflow-hidden border-b border-ink-line"
+      className="relative isolate overflow-hidden border-b border-ink-line bg-ink"
     >
-      <div className="pointer-events-none absolute inset-0 -z-20">
-        <Image
-          src="/img/restaurant-interior-light.jpg"
-          alt=""
-          fill
-          priority
-          sizes="100vw"
-          className="object-cover object-[68%_50%] opacity-70"
-        />
-      </div>
-      <div
-        aria-hidden="true"
-        className="absolute inset-0 -z-10 bg-[linear-gradient(105deg,rgba(251,250,247,0.90)_0%,rgba(251,250,247,0.73)_42%,rgba(251,250,247,0.24)_100%)]"
-      />
-      <div aria-hidden="true" className="absolute inset-0 -z-10 bg-gradient-to-t from-ink via-transparent to-ink/40" />
+      <div aria-hidden="true" className="pointer-events-none absolute -right-40 -top-56 size-[620px] rounded-full bg-forest/[0.08] blur-[100px]" />
+      <div aria-hidden="true" className="pointer-events-none absolute -bottom-56 left-[18%] size-[520px] rounded-full bg-brass/[0.14] blur-[110px]" />
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-[0.24] [background-image:radial-gradient(var(--color-ink-line)_0.75px,transparent_0.75px)] [background-size:22px_22px]" />
 
-      <CornerGarden className="right-6 top-24 hidden lg:block" tone="text-forest" />
-
-      <div className="relative mx-auto grid max-w-[1180px] gap-12 px-5 pb-16 pt-24 sm:px-8 sm:pt-28 lg:grid-cols-[1fr_0.92fr] lg:items-center lg:gap-8 lg:pb-20 lg:pt-32">
-        <div className="relative z-10 max-w-[36rem]">
-          <p
-            className="inline-flex items-center gap-2.5 rounded-full border border-forest/12 bg-ink-card/70 px-3.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-forest backdrop-blur-sm"
-            data-hero-step
-          >
-            <span aria-hidden="true" className="size-1.5 rounded-full bg-brass" />
-            Autodine · Swagat
+      <div className="relative mx-auto grid max-w-[1240px] items-center gap-12 px-5 pb-16 pt-14 sm:px-8 sm:pb-20 sm:pt-20 lg:grid-cols-[0.9fr_1.1fr] lg:gap-12 lg:px-10 lg:pb-24 lg:pt-24">
+        <div className="relative z-10 max-w-[620px]">
+          <p className="inline-flex items-center gap-2 rounded-full border border-forest/15 bg-white/80 px-3.5 py-2 text-[10px] font-bold tracking-[0.15em] text-forest uppercase shadow-[0_8px_24px_-18px_rgba(20,92,71,0.5)]" data-hero-step>
+            <span aria-hidden="true" className="grid size-5 place-items-center rounded-full bg-forest text-white">
+              <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 8h10M8 3l5 5-5 5" /></svg>
+            </span>
+            RESTAURANT SERVICE, IN SYNC
           </p>
 
-          <h1
-            id="hero-heading"
-            className="display mt-7 text-[clamp(2.75rem,6.4vw,5.05rem)] leading-[0.98]"
-          >
-            <span className="block overflow-hidden pb-[0.06em]"><span className="block" data-line>Every table,</span></span>
-            <span className="block overflow-hidden pb-[0.06em]"><span className="block text-forest" data-line>one seamless</span></span>
-            <span className="block overflow-hidden pb-[0.08em]"><span className="block" data-line><em className="font-normal italic text-brass-strong">experience.</em></span></span>
+          <h1 id="hero-heading" className="display mt-7 max-w-[13ch] text-[clamp(3rem,6vw,5.5rem)] leading-[0.98] tracking-[-0.06em]">
+            <span className="block overflow-hidden pb-[0.04em]"><span className="block" data-line>Every table,</span></span>
+            <span className="block overflow-hidden pb-[0.04em]"><span className="block text-forest" data-line>one seamless</span></span>
+            <span className="block overflow-hidden pb-[0.08em]"><span className="block" data-line><em className="font-semibold text-brass-strong">experience.</em></span></span>
           </h1>
 
-          <p className="mt-7 max-w-[42ch] text-pretty text-[15.5px] leading-[1.75] text-mute" data-hero-step>
-            Scan the table card. Order on the phone. Keep the table and the kitchen connected — and
-            let your team look after the room.
+          <p className="mt-6 max-w-[48ch] text-pretty text-[15px] leading-[1.85] text-mute sm:text-[16px]" data-hero-step>
+            Guests order from their phones. The kitchen sees the ticket. Your team checks the bill and records payment at the counter.
           </p>
 
-          <div className="mt-9 flex flex-col gap-3 sm:flex-row sm:items-center" data-hero-step>
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center" data-hero-step>
             <AuthHandoffLink
               href="/signup"
-              className="group inline-flex min-h-12 items-center justify-center gap-3 rounded-full bg-brass px-7 text-[14px] font-semibold text-cream shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_18px_34px_-20px_rgba(234,106,42,0.95)] transition-[background-color,transform,box-shadow] duration-300 hover:-translate-y-0.5 hover:bg-brass-strong hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brass motion-reduce:transition-none motion-reduce:hover:translate-y-0"
+              className="group inline-flex min-h-12 items-center justify-center gap-3 rounded-xl bg-brass px-6 text-[13px] font-semibold text-cream shadow-[0_16px_34px_-20px_rgba(191,84,28,0.55)] transition-[background-color,transform,box-shadow] duration-300 hover:-translate-y-0.5 hover:bg-brass-strong focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brass-strong motion-reduce:transition-none motion-reduce:hover:translate-y-0"
             >
               Start your {TRIAL_DAYS}-day trial
               <span aria-hidden="true" className="transition-transform duration-300 group-hover:translate-x-0.5 motion-reduce:transition-none">→</span>
             </AuthHandoffLink>
             <Link
               href="/how-it-works"
-              className="group inline-flex min-h-12 items-center justify-center gap-3 rounded-full border border-forest/20 bg-ink-card/70 px-6 text-[14px] font-medium text-forest backdrop-blur-sm transition-colors duration-300 hover:border-forest/35 hover:bg-ink-card focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest"
+              className="group inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-ink-line bg-white/80 px-5 text-[13px] font-semibold text-cream transition-[background-color,border-color,transform] duration-300 hover:-translate-y-0.5 hover:border-forest/30 hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest motion-reduce:transition-none motion-reduce:hover:translate-y-0"
             >
-              <span aria-hidden="true" className="grid size-5 place-items-center rounded-full bg-forest text-white transition-transform duration-300 group-hover:translate-x-0.5 motion-reduce:transition-none">
-                <svg viewBox="0 0 12 12" width="8" height="8" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M2 6h7M6 2.5 9.5 6 6 9.5" /></svg>
+              <span aria-hidden="true" className="grid size-6 place-items-center rounded-full bg-forest-soft text-forest">
+                <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M3 8h10M8 3l5 5-5 5" /></svg>
               </span>
-              See how it works
+              Explore how it works
             </Link>
           </div>
 
-          <p className="mt-5 text-[12px] leading-relaxed text-mute-dim" data-hero-step>
-            No card to begin · Nothing is charged online · Guests never need an app
-          </p>
+          <ul className="mt-8 flex flex-wrap gap-x-6 gap-y-3 border-t border-ink-line pt-5" data-hero-step aria-label="AutoDine workflow facts">
+            {[
+              ['No guest app', 'Phone browser'],
+              ['Orders to kitchen', 'Table stays attached'],
+              ['Pay at counter', 'Staff records it'],
+            ].map(([label, detail]) => (
+              <li key={label} className="flex min-w-[132px] items-start gap-2.5">
+                <span aria-hidden="true" className="mt-1 grid size-4 shrink-0 place-items-center rounded-full bg-forest-soft text-forest">
+                  <svg viewBox="0 0 12 12" width="9" height="9" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m2.2 6.1 2.2 2.1 5.4-5" /></svg>
+                </span>
+                <span>
+                  <span className="block text-[11px] font-semibold text-cream">{label}</span>
+                  <span className="mt-0.5 block text-[10px] text-mute-dim">{detail}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
         </div>
 
-        <div className="relative z-10 mx-auto w-full max-w-[520px] lg:mx-0 lg:ml-auto" data-hero-step>
+        <div className="relative z-10 mx-auto w-full max-w-[600px] lg:mx-0 lg:ml-auto" data-hero-step>
           <div data-hero-visual className="relative">
             <HeroVisualMotion className="relative">
-              <div className="hero-halo relative isolate aspect-[10/14] w-full overflow-hidden rounded-[42px] border border-white/70 bg-[radial-gradient(120%_100%_at_72%_8%,#fffdf8_0%,#f7efe0_52%,#ecdfc9_100%)] shadow-[0_40px_90px_-52px_rgba(28,59,43,0.45)] sm:aspect-[5/4.6] lg:aspect-[5/5]">
-                <div
-                  aria-hidden="true"
-                  className="absolute inset-0 bg-[radial-gradient(60%_45%_at_18%_12%,rgba(28,59,43,0.08),transparent_62%)]"
-                />
-                <HeroTableScene />
-                <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-[#e9dcc4]/80 to-transparent" aria-hidden="true" />
-
-                <div className="absolute left-1/2 top-1/2 w-[276px] -translate-x-1/2 -translate-y-1/2 sm:left-auto sm:right-2 sm:w-[284px] sm:translate-x-0 sm:-translate-y-1/2">
-                  <HeroMenuDemo />
+              <div data-hero-dashboard className="relative isolate overflow-hidden rounded-[30px] border border-white/90 bg-white p-3 shadow-[0_34px_90px_-48px_rgba(15,63,44,0.46)] ring-1 ring-forest/[0.04] sm:rounded-[34px] sm:p-4">
+                <div className="flex items-center justify-between gap-4 border-b border-ink-line px-2 pb-3 sm:px-3">
+                  <div className="flex items-center gap-2.5">
+                    <span className="grid size-8 place-items-center rounded-xl bg-forest text-white">
+                      <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h12v12H4zM7 7h6M7 10h6M7 13h3" /></svg>
+                    </span>
+                    <span>
+                      <span className="block text-[11px] font-bold tracking-tight text-cream">GUEST MENU</span>
+                      <span className="mt-0.5 block text-[9px] text-mute-dim">Interactive sample preview</span>
+                    </span>
+                  </div>
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-forest-soft px-2.5 py-1.5 text-[9px] font-semibold text-forest">
+                    <span aria-hidden="true" className="size-1.5 rounded-full bg-forest" />
+                    LIVE PREVIEW
+                  </span>
                 </div>
 
-                <Sprig className="pointer-events-none absolute -right-2 -top-2 h-32 w-auto rotate-[132deg] text-forest opacity-25" weight={1.2} />
-                <Sprig className="pointer-events-none absolute -bottom-6 -left-3 h-36 w-auto rotate-[8deg] text-forest opacity-20" weight={1.2} />
+                <div className="relative mt-3 aspect-[0.9] overflow-hidden rounded-[24px] bg-[linear-gradient(145deg,var(--color-forest-soft),var(--color-ink)_55%,var(--color-ink-soft))] sm:aspect-[1.08] sm:rounded-[26px]">
+                  <HeroTableScene />
+                  <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-br from-white/35 via-transparent to-forest/10" />
+                  <div className="absolute left-1/2 top-1/2 w-[min(76%,280px)] -translate-x-1/2 -translate-y-1/2 sm:left-auto sm:right-[8%] sm:w-[min(64%,300px)] sm:translate-x-0">
+                    <HeroMenuDemo />
+                  </div>
+                  <div className="absolute bottom-3 left-3 hidden items-center gap-2 rounded-xl border border-white/80 bg-white/90 px-3 py-2 shadow-[0_12px_28px_-20px_rgba(15,63,44,0.42)] backdrop-blur sm:flex">
+                    <span aria-hidden="true" className="grid size-7 place-items-center rounded-full bg-forest-soft text-[12px] text-forest">✓</span>
+                    <span>
+                      <span className="block text-[9px] font-semibold text-cream">Order received</span>
+                      <span className="block text-[8px] text-mute-dim">Table 05 · kitchen board</span>
+                    </span>
+                  </div>
+                </div>
               </div>
             </HeroVisualMotion>
 
-            <div
-              aria-hidden="true"
-              className="absolute -left-3 bottom-6 hidden items-center gap-2.5 rounded-2xl border border-white/80 bg-ink-card/90 px-3.5 py-2.5 shadow-[0_18px_40px_-24px_rgba(28,59,43,0.45)] backdrop-blur sm:flex"
-            >
-              <span className="grid size-8 place-items-center rounded-full bg-forest-soft text-[13px] text-forest">✓</span>
-              <span>
-                <span className="block text-[11px] font-medium text-cream">Order sent to the kitchen</span>
-                <span className="block text-[10px] text-mute-dim">Table 05 · no app to install</span>
+            <div aria-hidden="true" className="absolute -right-2 top-12 hidden rounded-2xl border border-white/80 bg-white/95 px-4 py-3 shadow-[0_18px_42px_-28px_rgba(15,63,44,0.45)] backdrop-blur sm:block lg:-right-7">
+              <span className="flex items-center gap-2 text-[10px] font-semibold text-forest">
+                <span className="grid size-6 place-items-center rounded-lg bg-forest-soft">✓</span>
+                ORDER SENT
               </span>
-            </div>
-
-            <div aria-hidden="true" className="absolute -right-2 top-8 hidden rounded-2xl border border-brass/25 bg-brass px-3.5 py-2 text-cream shadow-[0_16px_34px_-20px_rgba(234,106,42,0.9)] sm:block">
-              <span className="block font-display text-[19px] italic leading-none">₹600</span>
-              <span className="mt-1 block text-[9px] uppercase tracking-[0.12em] text-cream">Sample bill · paid at counter</span>
+              <span className="mt-1 block pl-8 text-[9px] text-mute-dim">Kitchen ticket · Table 05</span>
             </div>
           </div>
-
-          <div className="mt-4 flex justify-center sm:justify-end">
-            <p className="rounded-full border border-white/70 bg-ink-card/80 px-3.5 py-1.5 text-[10.5px] font-medium text-forest backdrop-blur">
+          <div className="mt-3 flex justify-end px-1">
+            <p className="rounded-full border border-ink-line bg-white/75 px-3 py-1.5 text-[9px] font-medium text-mute backdrop-blur" data-hero-step>
               Interactive preview · sample dishes and prices
             </p>
           </div>
         </div>
-      </div>
-
-      <div className="relative border-t border-ink-line bg-ink/60 backdrop-blur-sm">
-        <ul className="mx-auto flex max-w-[1180px] flex-wrap gap-x-10 gap-y-4 px-5 py-6 sm:px-8" data-hero-step>
-          {[
-            ['Digital menu', 'For your customers'],
-            ['Live kitchen orders', 'For your staff'],
-            ['Simple setup', 'Minutes, not weeks'],
-            ['Works for all', 'Cafés, casual & fine dining'],
-          ].map(([title, sub]) => (
-            <li key={title} className="flex items-center gap-2.5">
-              <span aria-hidden="true" className="text-[13px] leading-none text-brass-strong">✓</span>
-              <span>
-                <span className="block text-[13px] font-medium text-cream">{title}</span>
-                <span className="block text-[11.5px] text-mute-dim">{sub}</span>
-              </span>
-            </li>
-          ))}
-        </ul>
       </div>
     </section>
   );

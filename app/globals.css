@@ -1542,22 +1542,8 @@ body {
   }
 }
 
-/* SWAGAT WARMTH — the public palette, scoped to the marketing surfaces.
- *
- * The reference sheet's colours, expressed as the same token names the
- * landing already uses: `ink` is the cream room, `cream` is the espresso
- * type, `forest` is the deep dining-room green and `brass` is the burnt
- * saffron action accent. Scoping the override to .public-landing keeps every
- * owner, kitchen and guest screen on its own tokens.
- *
- * The notes palette is the base (cream, forest, saffron). Saffron cannot
- * carry white text at AA (3.2:1), so `brass` fills use espresso ink (5.0:1)
- * and text accents use `brass-strong` (5.0:1 on cream). On the forest band
- * `brass-soft` (4.8:1) is the readable accent.
- *
- * Contrast (WCAG 2.2, sRGB): espresso on cream 14.8:1, muted on cream 6.1:1,
- * white on forest 12.0:1, espresso on saffron 5.0:1, saffron-strong on cream
- * 5.0:1, saffron-soft on forest 4.8:1. */
+/* PUBLIC MARKETING SURFACE — cream paper, deep evergreen and saffron orange,
+   tuned to the supplied AutoDine UI references. Scoped to public pages only. */
 .public-landing {
   --color-ink: #faf6f0;
   --color-ink-soft: #f4ecdf;
@@ -1572,21 +1558,138 @@ body {
   --color-cream: #2b2015;
   --color-mute: #6b5b49;
   --color-mute-dim: #7c6b57;
+  --p-shadow-1: 0 1px 2px rgba(43,32,21,0.04), 0 12px 32px -18px rgba(43,32,21,0.16);
+  --p-shadow-2: 0 2px 8px rgba(43,32,21,0.05), 0 40px 80px -36px rgba(43,32,21,0.24);
   background-image:
-    radial-gradient(ellipse 70% 50% at 88% 0%, color-mix(in oklab, var(--color-brass) 7%, transparent), transparent 70%),
+    radial-gradient(ellipse 70% 50% at 88% 0%, color-mix(in oklab, var(--color-brass) 10%, transparent), transparent 70%),
     radial-gradient(ellipse 60% 45% at 0% 30%, color-mix(in oklab, var(--color-forest) 5%, transparent), transparent 70%);
   background-repeat: no-repeat;
 }
 
-/* The serif's default optical size is small at display sizes; tighten the
-   tracking there so a three-line headline reads as one shape. */
+/* The public pages use the same rounded, restrained product typography and
+   shadcn-style surfaces throughout; editorial serifs remain only as accents. */
 .public-landing .display {
-  font-family: var(--font-display);
-  font-weight: 500;
-  letter-spacing: -0.022em;
-  font-variation-settings: 'SOFT' 40, 'WONK' 1;
+  font-family: var(--font-sans);
+  font-weight: 700;
+  letter-spacing: -0.052em;
+  font-variation-settings: normal;
   text-wrap: balance;
 }
+.public-landing .display em {
+  font-style: normal;
+  font-weight: 700;
+}
+.public-landing .bg-brass.text-white,
+.public-landing .bg-brass .text-white {
+  color: var(--color-cream);
+}
+.public-landing .public-card,
+.public-landing [data-pricing-card],
+.public-landing [data-hero-dashboard] {
+  border-radius: 26px;
+  box-shadow: var(--p-shadow-1);
+}
+.public-landing [data-hero-dashboard] {
+  box-shadow: var(--p-shadow-2);
+}
+.public-landing main > section[id] {
+  scroll-margin-top: 6rem;
+}
+@media (prefers-reduced-motion: no-preference) {
+  html:has(.public-landing) { scroll-behavior: smooth; }
+}
+.public-landing .bg-brass-strong {
+  background-color: var(--color-brass-strong);
+}
+
+/* Reference-inspired full-page welcome: warm paper, quiet botanical halos,
+   centered brand and a saffron progress ring. The page is only dimmed lightly
+   beneath this layer; it clears after about two seconds on first visit. */
+.public-intro-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  padding: 24px;
+  background: color-mix(in srgb, var(--color-ink) 88%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(1.08);
+  backdrop-filter: blur(14px) saturate(1.08);
+  opacity: 1;
+  pointer-events: auto;
+  animation: public-intro-fallback 2s linear forwards;
+  transition: opacity 360ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.public-intro-loader::before,
+.public-intro-loader::after {
+  position: absolute;
+  z-index: -1;
+  border-radius: 50%;
+  content: '';
+  pointer-events: none;
+}
+.public-intro-loader::before {
+  top: -24vmin;
+  left: -12vmin;
+  width: 56vmin;
+  aspect-ratio: 1;
+  background: color-mix(in srgb, var(--color-brass) 10%, transparent);
+}
+.public-intro-loader::after {
+  right: -20vmin;
+  bottom: -30vmin;
+  width: 72vmin;
+  aspect-ratio: 1;
+  background: color-mix(in srgb, var(--color-forest) 8%, transparent);
+}
+.public-intro-loader[data-stage='exit'] {
+  opacity: 0;
+  pointer-events: none;
+}
+.public-intro-loader__content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: var(--color-cream);
+  text-align: center;
+}
+.public-intro-loader__tagline {
+  margin-top: 8px;
+  color: var(--color-mute);
+  font-size: 12px;
+  letter-spacing: 0.01em;
+}
+.public-intro-loader__tagline span { color: var(--color-brass-strong); }
+.public-intro-loader__spinner {
+  width: 40px;
+  height: 40px;
+  margin-top: 34px;
+  border: 3px solid color-mix(in srgb, var(--color-brass) 18%, white);
+  border-top-color: var(--color-brass);
+  border-right-color: var(--color-brass);
+  border-radius: 50%;
+  animation: public-intro-spin 900ms linear infinite;
+}
+.public-intro-loader__caption {
+  margin-top: 17px;
+  color: var(--color-cream);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.015em;
+}
+@keyframes public-intro-spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes public-intro-fallback {
+  0%, 82% { opacity: 1; }
+  100% { opacity: 0; pointer-events: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .public-intro-loader { animation-duration: 1ms; transition-duration: 1ms; }
+  .public-intro-loader__spinner { animation-duration: 1ms; }
+}
+
 
 /* A leaf that breathes. Position lives on the wrapper, motion on the `rotate`
    property, so the two never fight over `transform`. */
