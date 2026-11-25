@@ -176,15 +176,21 @@ export function SiteMotion() {
           /* -------------------------------------------------- the sections */
 
           gsap.utils.toArray<HTMLElement>('[data-reveal]').forEach((el) => {
+            // Group children have their own shorter, sequenced reveal below;
+            // don't create two competing tweens on the same element.
+            if (el.parentElement?.hasAttribute('data-stagger')) return;
             gsap.fromTo(
               el,
-              { opacity: 0, y: 42 },
+              { opacity: 0, y: 22, scale: 0.988, filter: 'blur(5px)' },
               {
                 opacity: 1,
                 y: 0,
-                duration: 1.05,
-                ease: 'power3.out',
-                scrollTrigger: { trigger: el, start: 'top 82%', once: true },
+                scale: 1,
+                filter: 'blur(0px)',
+                duration: 0.72,
+                ease: 'power2.out',
+                clearProps: 'transform,filter',
+                scrollTrigger: { trigger: el, start: 'top 88%', once: true },
               },
             );
           });
@@ -195,14 +201,17 @@ export function SiteMotion() {
 
             gsap.fromTo(
               children,
-              { opacity: 0, y: 32 },
+              { opacity: 0, y: 20, scale: 0.99, filter: 'blur(4px)' },
               {
                 opacity: 1,
                 y: 0,
-                duration: 0.9,
-                ease: 'power3.out',
-                stagger: 0.08,
-                scrollTrigger: { trigger: group, start: 'top 84%', once: true },
+                scale: 1,
+                filter: 'blur(0px)',
+                duration: 0.68,
+                ease: 'power2.out',
+                stagger: 0.085,
+                clearProps: 'transform,filter',
+                scrollTrigger: { trigger: group, start: 'top 88%', once: true },
               },
             );
           });

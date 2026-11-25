@@ -1602,9 +1602,9 @@ body {
   background-color: var(--color-brass-strong);
 }
 
-/* Reference-inspired full-page welcome: warm paper, quiet botanical halos,
-   centered brand and a saffron progress ring. The page is only dimmed lightly
-   beneath this layer; it clears after about two seconds on first visit. */
+/* First-visit welcome: a quiet cream veil over the page, with a tactile
+   brand card and a single deliberate progress stroke. Motion completes in
+   2.5s including the soft exit; reduced-motion visitors skip it in JS. */
 .public-intro-loader {
   position: fixed;
   inset: 0;
@@ -1613,73 +1613,106 @@ body {
   place-items: center;
   overflow: hidden;
   padding: 24px;
+  isolation: isolate;
   background: color-mix(in srgb, var(--color-ink) 88%, transparent);
-  -webkit-backdrop-filter: blur(14px) saturate(1.08);
-  backdrop-filter: blur(14px) saturate(1.08);
+  -webkit-backdrop-filter: blur(18px) saturate(1.08);
+  backdrop-filter: blur(18px) saturate(1.08);
   opacity: 1;
   pointer-events: auto;
-  animation: public-intro-fallback 2s linear forwards;
-  transition: opacity 360ms cubic-bezier(0.22, 1, 0.36, 1);
+  animation: public-intro-fallback 2500ms linear forwards;
+  transition: opacity 420ms cubic-bezier(0.22, 1, 0.36, 1), transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 .public-intro-loader::before,
 .public-intro-loader::after {
   position: absolute;
-  z-index: -1;
+  z-index: 0;
   border-radius: 50%;
   content: '';
   pointer-events: none;
+  filter: blur(2px);
 }
 .public-intro-loader::before {
-  top: -24vmin;
-  left: -12vmin;
-  width: 56vmin;
+  top: -30vmin;
+  left: -15vmin;
+  width: 62vmin;
   aspect-ratio: 1;
-  background: color-mix(in srgb, var(--color-brass) 10%, transparent);
+  background: radial-gradient(circle, color-mix(in srgb, var(--color-brass) 12%, transparent), transparent 68%);
 }
 .public-intro-loader::after {
-  right: -20vmin;
-  bottom: -30vmin;
-  width: 72vmin;
+  right: -22vmin;
+  bottom: -34vmin;
+  width: 78vmin;
   aspect-ratio: 1;
-  background: color-mix(in srgb, var(--color-forest) 8%, transparent);
+  background: radial-gradient(circle, color-mix(in srgb, var(--color-forest) 10%, transparent), transparent 70%);
 }
 .public-intro-loader[data-stage='exit'] {
   opacity: 0;
+  transform: scale(1.012);
   pointer-events: none;
 }
 .public-intro-loader__content {
+  position: relative;
+  z-index: 1;
   display: flex;
+  width: min(100%, 390px);
   flex-direction: column;
   align-items: center;
+  padding: 38px 34px 32px;
+  border: 1px solid color-mix(in srgb, var(--color-ink-card) 88%, transparent);
+  border-radius: 30px;
+  background: color-mix(in srgb, var(--color-ink-card) 82%, transparent);
+  box-shadow: var(--p-shadow-2);
   color: var(--color-cream);
   text-align: center;
+  animation: public-intro-enter 620ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.public-intro-loader__eyebrow {
+  margin-top: 26px;
+  color: var(--color-forest);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  line-height: 1.4;
+  text-transform: uppercase;
 }
 .public-intro-loader__tagline {
   margin-top: 8px;
   color: var(--color-mute);
-  font-size: 12px;
+  font-size: 13px;
   letter-spacing: 0.01em;
 }
-.public-intro-loader__tagline span { color: var(--color-brass-strong); }
-.public-intro-loader__spinner {
-  width: 40px;
-  height: 40px;
-  margin-top: 34px;
-  border: 3px solid color-mix(in srgb, var(--color-brass) 18%, white);
-  border-top-color: var(--color-brass);
-  border-right-color: var(--color-brass);
-  border-radius: 50%;
-  animation: public-intro-spin 900ms linear infinite;
+.public-intro-loader__tagline span { padding: 0 3px; color: var(--color-brass-strong); }
+.public-intro-loader__progress {
+  width: min(100%, 188px);
+  height: 3px;
+  margin-top: 30px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-forest) 10%, white);
+}
+.public-intro-loader__progress span {
+  display: block;
+  width: 38%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--color-forest), var(--color-brass));
+  transform-origin: left center;
+  animation: public-intro-progress 1850ms cubic-bezier(0.22, 1, 0.36, 1) 180ms both;
 }
 .public-intro-loader__caption {
-  margin-top: 17px;
-  color: var(--color-cream);
+  margin-top: 14px;
+  color: var(--color-mute);
   font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.015em;
 }
-@keyframes public-intro-spin {
-  to { transform: rotate(360deg); }
+@keyframes public-intro-enter {
+  from { opacity: 0; transform: translateY(10px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes public-intro-progress {
+  from { width: 8%; opacity: 0.72; }
+  to { width: 100%; opacity: 1; }
 }
 @keyframes public-intro-fallback {
   0%, 82% { opacity: 1; }
@@ -1687,7 +1720,8 @@ body {
 }
 @media (prefers-reduced-motion: reduce) {
   .public-intro-loader { animation-duration: 1ms; transition-duration: 1ms; }
-  .public-intro-loader__spinner { animation-duration: 1ms; }
+  .public-intro-loader__content { animation-duration: 1ms; }
+  .public-intro-loader__progress span { animation-duration: 1ms; }
 }
 
 
@@ -1735,11 +1769,23 @@ body {
 }
 @media (prefers-reduced-motion: no-preference) {
   .public-landing a, .public-landing button {
-    transition: transform 200ms ease, background-color 200ms ease, color 200ms ease, box-shadow 200ms ease;
+    transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1), background-color 220ms ease,
+      border-color 220ms ease, color 220ms ease, box-shadow 220ms ease;
   }
-  .public-landing a:active, .public-landing button:active { transform: translateY(1px) scale(0.98); }
-  .public-landing .public-card { transition: transform 300ms ease, box-shadow 300ms ease; }
-  .public-landing .public-card:hover { transform: translateY(-5px); box-shadow: var(--p-shadow-2); }
+  .public-landing a:active, .public-landing button:active { transform: translateY(1px) scale(0.985); }
+  .public-landing .public-card,
+  .public-landing [data-pricing-card] {
+    transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 320ms ease, border-color 240ms ease;
+  }
+  .public-landing .public-card:hover,
+  .public-landing [data-pricing-card]:hover {
+    transform: translateY(-4px);
+    border-color: color-mix(in oklab, var(--color-forest) 18%, var(--color-ink-line));
+    box-shadow: var(--p-shadow-2);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .public-intro-loader { opacity: 0; pointer-events: none; }
 }
 
 /* Only signed-out account pages inherit the landing palette. Staff screens

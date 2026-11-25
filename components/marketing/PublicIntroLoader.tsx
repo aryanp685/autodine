@@ -5,8 +5,8 @@ import { BrandLockup } from '@/components/BrandMark';
 import { BRAND_GREEN } from '@/lib/brand';
 
 const SEEN_KEY = 'autodine-public-intro-seen';
-const DISPLAY_MS = 1640;
-const EXIT_MS = 360;
+const DISPLAY_MS = 2080;
+const EXIT_MS = 420;
 
 /** One soft, full-viewport welcome transition per tab session on public screens. */
 export function PublicIntroLoader() {
@@ -60,15 +60,17 @@ export function PublicIntroLoader() {
       aria-label="Loading AutoDine experience"
       data-public-intro
       data-stage={stage}
+      data-duration="2500"
       className="public-intro-loader"
     >
       <span aria-hidden="true" className="public-intro-loader__leaf public-intro-loader__leaf--one" />
       <span aria-hidden="true" className="public-intro-loader__leaf public-intro-loader__leaf--two" />
       <div className="public-intro-loader__content">
         <BrandLockup size={46} ink="currentColor" dot={BRAND_GREEN} />
+        <p className="public-intro-loader__eyebrow">A better rhythm for every table</p>
         <p className="public-intro-loader__tagline">Scan <span>·</span> Order <span>·</span> Enjoy</p>
-        <span className="public-intro-loader__spinner" aria-hidden="true" />
-        <span className="public-intro-loader__caption">Setting up your dining experience…</span>
+        <div className="public-intro-loader__progress" aria-hidden="true"><span /></div>
+        <span className="public-intro-loader__caption">Setting up your dining experience</span>
       </div>
     </div>
   );

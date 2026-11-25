@@ -13,6 +13,8 @@ describe('public intro loader', () => {
     expect(markup).toContain('Order');
     expect(markup).toContain('Enjoy');
     expect(markup).toContain('Setting up your dining experience');
-    expect(markup).toContain('public-intro-loader__spinner');
+    expect(markup).toContain('data-duration="2500"');
+    expect(markup).toContain('public-intro-loader__progress');
+    expect(markup).toContain('public-intro-loader__eyebrow');
   });
 });

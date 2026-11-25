@@ -38,6 +38,15 @@ export function HomeNav({
   const reduce = useReducedMotion();
 
   useEffect(() => {
+    if (!open) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [open]);
+
+  useEffect(() => {
     let frame = 0;
     const sections = NAV_LINKS.map((link) => document.getElementById(link.id)).filter(
       (node): node is HTMLElement => node !== null,
@@ -69,7 +78,7 @@ export function HomeNav({
   }, [activePage, activePricing]);
 
   return (
-    <header className="sticky top-0 z-50 mx-auto max-w-[1400px] px-3 pt-3 sm:px-6 lg:px-8" data-scrolled={scrolled ? '' : undefined}>
+    <header className="sticky top-0 z-50 mx-auto max-w-[1440px] px-3 pt-3 sm:px-6 lg:px-8" data-scrolled={scrolled ? '' : undefined}>
       <div
         aria-hidden="true"
         className={[
@@ -79,11 +88,11 @@ export function HomeNav({
       />
       <div
         className={[
-          'relative mx-auto flex max-w-[1240px] items-center gap-3 rounded-[22px] border px-3.5 backdrop-blur-2xl sm:gap-4 sm:px-5 lg:gap-6',
+          'relative mx-auto flex max-w-[1280px] items-center gap-3 rounded-[22px] border px-3.5 backdrop-blur-2xl sm:gap-4 sm:px-5 lg:gap-6',
           'transition-[background-color,border-color,box-shadow,height] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]',
           scrolled || open
-            ? 'border-ink-line bg-white/95 shadow-[0_16px_42px_-28px_rgba(22,50,36,0.3)]'
-            : 'border-white/80 bg-white/85 shadow-[0_12px_36px_-28px_rgba(22,50,36,0.18)]',
+            ? 'border-ink-line/90 bg-white/95 shadow-[0_14px_40px_-24px_rgba(24,61,50,0.24)]'
+            : 'border-white/90 bg-white/90 shadow-[0_12px_34px_-24px_rgba(24,61,50,0.18)]',
           scrolled ? 'h-[58px]' : 'h-[64px]',
         ].join(' ')}
       >
@@ -91,7 +100,7 @@ export function HomeNav({
           href="/"
           aria-label="AutoDine home"
           data-brand-handoff
-          className="shrink-0 rounded-full text-cream transition-opacity duration-300 hover:opacity-75"
+          className="shrink-0 rounded-full text-cream transition-[opacity,transform] duration-300 hover:scale-[1.02] hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest motion-reduce:transform-none"
         >
           <BrandLockup size={21} ink="currentColor" dot={BRAND_GREEN} />
         </Link>
@@ -107,16 +116,16 @@ export function HomeNav({
                     prefetch={false}
                     aria-current={current ? 'page' : undefined}
                     className={[
-                      'group relative inline-flex h-9 items-center whitespace-nowrap rounded-xl px-3 text-[12.5px] font-medium transition-colors duration-200 lg:px-3.5',
-                      current ? 'bg-forest-soft text-forest' : 'text-mute hover:bg-ink-soft hover:text-cream',
+                      'group relative inline-flex h-10 items-center whitespace-nowrap rounded-xl px-3.5 text-[12.5px] font-medium transition-[background-color,color,box-shadow,transform] duration-300 hover:-translate-y-px focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest motion-reduce:transform-none lg:px-3.5',
+                      current ? 'bg-forest-soft text-forest shadow-[inset_0_0_0_1px_rgba(24,61,50,0.08)]' : 'text-mute hover:bg-ink-soft hover:text-cream',
                     ].join(' ')}
                   >
                     {link.label}
                     <span
                       aria-hidden="true"
                       className={[
-                        'absolute right-2 top-1/2 size-1.5 -translate-y-1/2 rounded-full bg-forest transition-opacity duration-200',
-                        current ? 'opacity-100' : 'opacity-0',
+                        'absolute right-2 top-1/2 size-1.5 -translate-y-1/2 scale-75 rounded-full bg-brass transition-[opacity,scale] duration-200',
+                        current ? 'scale-100 opacity-100' : 'opacity-0',
                       ].join(' ')}
                     />
                   </Link>
@@ -130,14 +139,14 @@ export function HomeNav({
           <AuthHandoffLink
             href="/login"
             prefetch={false}
-            className="hidden rounded-full px-3 text-[13px] text-mute transition-colors duration-300 hover:text-cream md:inline-flex md:h-9 md:items-center"
+            className="hidden h-10 items-center rounded-xl px-4 text-[12.5px] font-medium text-mute transition-[background-color,color] duration-200 hover:bg-ink-soft hover:text-cream focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest md:inline-flex"
           >
             Sign in
           </AuthHandoffLink>
           <AuthHandoffLink
             href="/signup"
             prefetch={false}
-            className="group inline-flex h-10 items-center gap-2 rounded-xl bg-brass px-4 text-[12.5px] font-semibold text-cream shadow-[0_10px_24px_-14px_rgba(191,84,28,0.55)] transition-[background-color,transform,box-shadow] duration-300 hover:-translate-y-0.5 hover:bg-brass-strong focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brass-strong motion-reduce:transition-none motion-reduce:hover:translate-y-0 sm:px-5"
+            className="group inline-flex h-10 items-center gap-2 rounded-xl bg-brass px-4 text-[12.5px] font-semibold text-white shadow-[0_10px_24px_-14px_rgba(191,84,28,0.6)] transition-[background-color,transform,box-shadow] duration-300 hover:-translate-y-0.5 hover:bg-brass-strong hover:shadow-[0_14px_28px_-14px_rgba(191,84,28,0.65)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brass-strong motion-reduce:transition-none motion-reduce:hover:translate-y-0 sm:px-5"
           >
             Create account
             <span
@@ -153,7 +162,7 @@ export function HomeNav({
             aria-controls="home-nav-menu"
             aria-label={open ? 'Close menu' : 'Open menu'}
             onClick={() => setOpen((value) => !value)}
-            className="grid size-10 place-items-center rounded-full border border-ink-line text-cream transition-colors duration-300 hover:bg-ink-soft md:hidden"
+            className="grid size-10 place-items-center rounded-xl border border-ink-line bg-white/70 text-cream transition-[background-color,border-color,box-shadow] duration-200 hover:border-forest/25 hover:bg-forest-soft hover:shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest md:hidden"
           >
             <span aria-hidden="true" className="relative block h-[11px] w-4">
               <span
@@ -184,7 +193,7 @@ export function HomeNav({
           <motion.nav
             id="home-nav-menu"
             aria-label="Primary (mobile)"
-            className="mx-auto mt-2 max-w-[1240px] overflow-hidden rounded-[22px] border border-ink-line bg-white/95 px-2 py-2 shadow-[0_24px_54px_-36px_rgba(22,50,36,0.32)] backdrop-blur-2xl md:hidden"
+            className="mx-auto mt-2 max-w-[1280px] overflow-hidden rounded-[24px] border border-ink-line/90 bg-white/95 px-2.5 py-2.5 shadow-[0_24px_60px_-34px_rgba(24,61,50,0.28)] backdrop-blur-2xl md:hidden"
             initial={reduce ? false : { height: 0, opacity: 0, y: -6 }}
             animate={{ height: 'auto', opacity: 1, y: 0 }}
             exit={reduce ? undefined : { height: 0, opacity: 0, y: -6 }}
@@ -198,7 +207,7 @@ export function HomeNav({
                     prefetch={false}
                     aria-current={active === link.id ? 'page' : undefined}
                     onClick={() => setOpen(false)}
-                    className="flex items-baseline justify-between rounded-2xl px-4 py-3 text-[15px] text-cream/80 transition-colors duration-300 hover:bg-forest-soft/45 hover:text-cream"
+                    className="flex min-h-12 items-center justify-between rounded-2xl px-4 py-3 text-[14px] font-medium text-cream/80 transition-[background-color,color,transform] duration-200 hover:translate-x-0.5 hover:bg-forest-soft/60 hover:text-forest focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-forest motion-reduce:transform-none"
                   >
                     {link.label}
                     <span aria-hidden="true" className="font-display text-[11px] italic text-mute-dim">
@@ -207,14 +216,22 @@ export function HomeNav({
                   </Link>
                 </li>
               ))}
-              <li className="mt-1 border-t border-ink-line/70 pt-1">
+              <li className="mt-2 grid grid-cols-2 gap-2 border-t border-ink-line/80 pt-3">
                 <Link
                   href="/login"
                   prefetch={false}
                   onClick={() => setOpen(false)}
-                  className="block rounded-2xl px-4 py-3 text-[15px] text-cream/80 transition-colors duration-300 hover:bg-forest-soft/45 hover:text-cream"
+                  className="inline-flex min-h-11 items-center justify-center rounded-xl border border-ink-line bg-white px-3 text-[13px] font-semibold text-forest transition-colors hover:bg-forest-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest"
                 >
                   Sign in
+                </Link>
+                <Link
+                  href="/signup"
+                  prefetch={false}
+                  onClick={() => setOpen(false)}
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-brass px-3 text-[13px] font-semibold text-white shadow-[0_10px_24px_-16px_rgba(191,84,28,0.7)] transition-[background-color,transform] hover:-translate-y-px hover:bg-brass-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brass-strong motion-reduce:transform-none"
+                >
+                  Create account <span aria-hidden="true">→</span>
                 </Link>
               </li>
             </ul>
