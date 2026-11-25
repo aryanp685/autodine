@@ -46,6 +46,8 @@ describe('sign in', () => {
     expect(html).toContain('data-auth-shell');
     expect(html).toContain('Before you sign in');
     expect(html).toContain('Restaurant workspace overview');
+    expect(html).toContain('AutoDine sample workspace preview');
+    expect(html).toContain('SAMPLE PREVIEW');
     expect(html).toContain('autoComplete="current-password"');
   });
 

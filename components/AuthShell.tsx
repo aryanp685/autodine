@@ -6,6 +6,7 @@ import { AuthHandoffLink } from '@/components/AuthHandoffLink';
 import { useBrandHandoff } from '@/components/useBrandHandoff';
 import { BrandMark } from '@/components/BrandMark';
 import { AuthPanelArt } from '@/components/auth/AuthPanelArt';
+import { AuthProductPreview } from '@/components/auth/AuthProductPreview';
 
 export const authButtonClass =
   'inline-flex min-h-[46px] items-center justify-center gap-2 rounded-full bg-[var(--auth-accent)] px-5 py-3 text-[13.5px] font-semibold text-[var(--auth-heading)] shadow-[0_10px_26px_-14px_rgba(234,106,42,0.85)] transition-[background-color,transform,box-shadow] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-px hover:bg-[var(--auth-accent-strong)] hover:shadow-[0_16px_32px_-14px_rgba(234,106,42,0.8)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--auth-accent-ink)] disabled:cursor-not-allowed disabled:opacity-55 disabled:shadow-none disabled:hover:translate-y-0 motion-reduce:transition-none motion-reduce:hover:translate-y-0';
@@ -61,20 +62,25 @@ export function AuthShell({
         className="pointer-events-none absolute inset-x-0 bottom-0 h-64 bg-gradient-to-t from-[#f3ecdf] to-transparent"
       />
 
-      <header className="relative z-10 border-b border-hair/80 bg-white/60 backdrop-blur-xl">
-        <div className="mx-auto flex h-16 w-full max-w-[1180px] items-center justify-between gap-4 px-5 sm:px-8">
-          <AuthHandoffLink href="/" ref={brandRef} data-brand-handoff className="inline-flex items-center gap-2.5 text-gink transition-opacity hover:opacity-75">
-            <BrandMark size={25} className="translate-y-[1px]" tone="auth" />
-            <span className="text-[16px] leading-none font-medium tracking-[-0.04em]">autodine</span>
+      <header className="relative z-10 border-b border-[#e8dcc9]/80 bg-[#fffdf8]/75 backdrop-blur-xl">
+        <div className="mx-auto flex h-[72px] w-full max-w-[1360px] items-center justify-between gap-4 px-5 sm:px-8 lg:px-10">
+          <AuthHandoffLink href="/" ref={brandRef} data-brand-handoff className="inline-flex items-center gap-3 text-gink transition-opacity hover:opacity-75">
+            <span className="grid size-10 shrink-0 place-items-center rounded-[14px] bg-forest shadow-[0_8px_20px_-12px_rgba(31,61,46,0.8)]">
+              <BrandMark size={25} ink="#fffdf8" dot="#f08a55" tone="auth" />
+            </span>
+            <span>
+              <span className="block text-[16px] leading-none font-semibold tracking-[-0.045em] text-gink">AutoDine</span>
+              <span className="mt-1 hidden text-[10px] tracking-[0.04em] text-gink-46 sm:block">Restaurant ordering &amp; operations</span>
+            </span>
           </AuthHandoffLink>
 
           {action ? (
-            <div className="flex items-center gap-3 text-[12.5px]">
-              <span className="hidden text-gink-46 sm:inline">{action.prompt}</span>
+            <div className="flex items-center gap-2.5 text-[12px] sm:gap-3 sm:text-[12.5px]">
+              <span className="hidden text-gink-46 md:inline">{action.prompt}</span>
               <Link
                 href={action.href}
                 prefetch={false}
-                className="inline-flex h-9 items-center rounded-full border border-hair bg-white/70 px-4 font-medium text-gink transition-[background-color,border-color,transform] duration-300 hover:-translate-y-px hover:border-forest/25 hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest motion-reduce:transition-none motion-reduce:hover:translate-y-0"
+                className="inline-flex min-h-10 items-center rounded-full border border-[#e5d8c6] bg-white/80 px-4 font-semibold text-forest transition-[background-color,border-color,transform,box-shadow] duration-300 hover:-translate-y-px hover:border-forest/25 hover:bg-white hover:shadow-[0_8px_20px_-14px_rgba(31,61,46,0.55)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest motion-reduce:transition-none motion-reduce:hover:translate-y-0 sm:px-5"
               >
                 {action.label}
               </Link>
@@ -85,14 +91,14 @@ export function AuthShell({
 
       <main
         data-auth-enhanced={visual ? '' : undefined}
-        className={`relative z-10 mx-auto grid w-full max-w-[1180px] gap-10 px-5 pt-10 pb-16 sm:px-8 sm:pt-14 lg:items-stretch lg:gap-12 lg:pt-14 ${
-          visual ? 'lg:grid-cols-[452px_minmax(0,1fr)]' : 'max-w-[620px]'
+        className={`relative z-10 mx-auto grid w-full max-w-[1240px] gap-8 px-5 pt-8 pb-14 sm:px-8 sm:pt-10 lg:items-start lg:gap-12 lg:px-10 lg:pt-10 lg:pb-20 ${
+          visual ? 'lg:grid-cols-[480px_minmax(0,1fr)]' : 'max-w-[640px]'
         }`}
       >
-        <div className="auth-rise mx-auto w-full max-w-[452px]">
+        <div className="auth-rise mx-auto w-full max-w-[480px]">
           <section
             data-auth-card
-            className="relative overflow-hidden rounded-[26px] border border-white/80 bg-[var(--p-card)]/95 px-5 py-7 shadow-[0_30px_70px_-44px_rgba(43,32,21,0.45)] backdrop-blur-xl sm:px-8 sm:py-9"
+            className="relative overflow-hidden rounded-[28px] border border-white/90 bg-[#fffdf8] px-5 py-7 shadow-[0_24px_70px_-38px_rgba(43,32,21,0.32)] backdrop-blur-xl sm:rounded-[32px] sm:px-8 sm:py-9"
           >
             <span
               aria-hidden="true"
@@ -151,10 +157,21 @@ export function AuthShell({
 
         {visual ? (
           <div className="auth-panel-fade auth-panel-fade-delay hidden lg:sticky lg:top-14 lg:block lg:self-start">
-            <div className="relative overflow-hidden rounded-[32px] bg-forest text-white shadow-[0_44px_90px_-52px_rgba(31,61,46,0.75)]">
+            <div className="relative overflow-hidden rounded-[30px] bg-forest text-white shadow-[0_38px_90px_-48px_rgba(31,61,46,0.72)] sm:rounded-[34px]">
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0"
+                style={{
+                  backgroundImage:
+                    'linear-gradient(180deg, rgba(31,61,46,0.16) 0%, rgba(31,61,46,0.42) 38%, #1f3d2e 72%), url(/img/restaurant-interior-light.jpg)',
+                  backgroundPosition: 'center, center 42%',
+                  backgroundSize: 'cover, cover',
+                }}
+              />
               <AuthPanelArt />
-              <div className="relative z-10 flex min-h-[600px] flex-col justify-end px-8 pt-[440px] pb-8 sm:px-10">
-                {visual}
+              <div className="relative z-10 px-3 pb-7 sm:px-6 sm:pb-9">
+                <AuthProductPreview />
+                <div className="px-2 pt-7 sm:px-4 sm:pt-8">{visual}</div>
               </div>
             </div>
           </div>

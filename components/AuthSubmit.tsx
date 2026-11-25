@@ -2,8 +2,8 @@
 
 import { useFormStatus } from 'react-dom';
 import { authButtonClass } from '@/components/AuthShell';
+import { AuthBrandLoader } from '@/components/auth/AuthBrandLoader';
 import { AuthPendingBar } from '@/components/auth/AuthPendingBar';
-import { AuthSpinner } from '@/components/auth/AuthField';
 
 export function AuthSubmit({ label, pendingLabel }: { label: string; pendingLabel: string }) {
   const { pending } = useFormStatus();
@@ -20,7 +20,7 @@ export function AuthSubmit({ label, pendingLabel }: { label: string; pendingLabe
       >
         <span aria-hidden="true" className="auth-sheen" />
         <span aria-live="polite">{text}</span>
-        {pending ? <AuthSpinner /> : <span aria-hidden="true">↗</span>}
+        {pending ? <AuthBrandLoader /> : <span aria-hidden="true">↗</span>}
       </button>
     </>
   );
