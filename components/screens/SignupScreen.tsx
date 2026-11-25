@@ -61,7 +61,7 @@ export function SignupScreen({ error }: { error?: string }) {
       }
       notesTitle="Your workspace, clearly explained"
       eyebrow="Create an account"
-      title={<>Start with your <em className="font-display font-normal italic text-[var(--auth-accent)]">restaurant</em></>}
+      title={<>Start with your <em className="font-display font-normal italic text-[var(--auth-accent-ink)]">restaurant</em></>}
       lede={`Start your ${TRIAL_DAYS}-day trial with one restaurant and one menu. No card required.`}
       action={{ prompt: 'Already have an account?', label: 'Sign in', href: '/login' }}
       notes={[

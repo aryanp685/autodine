@@ -8,7 +8,7 @@ import { BrandMark } from '@/components/BrandMark';
 import { AuthPanelArt } from '@/components/auth/AuthPanelArt';
 
 export const authButtonClass =
-  'inline-flex min-h-[46px] items-center justify-center gap-2 rounded-full bg-[var(--auth-accent)] px-5 py-3 text-[13.5px] font-medium text-white shadow-[0_10px_26px_-14px_rgba(180,83,27,0.8)] transition-[background-color,transform,box-shadow] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-px hover:bg-[var(--auth-accent-strong)] hover:shadow-[0_16px_32px_-14px_rgba(180,83,27,0.75)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--auth-accent)] disabled:cursor-not-allowed disabled:opacity-55 disabled:shadow-none disabled:hover:translate-y-0 motion-reduce:transition-none motion-reduce:hover:translate-y-0';
+  'inline-flex min-h-[46px] items-center justify-center gap-2 rounded-full bg-[var(--auth-accent)] px-5 py-3 text-[13.5px] font-semibold text-[var(--auth-heading)] shadow-[0_10px_26px_-14px_rgba(234,106,42,0.85)] transition-[background-color,transform,box-shadow] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-px hover:bg-[var(--auth-accent-strong)] hover:shadow-[0_16px_32px_-14px_rgba(234,106,42,0.8)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--auth-accent-ink)] disabled:cursor-not-allowed disabled:opacity-55 disabled:shadow-none disabled:hover:translate-y-0 motion-reduce:transition-none motion-reduce:hover:translate-y-0';
 
 /**
  * The shell every signed-out account screen wears.
@@ -92,13 +92,13 @@ export function AuthShell({
         <div className="auth-rise mx-auto w-full max-w-[452px]">
           <section
             data-auth-card
-            className="relative overflow-hidden rounded-[26px] border border-white/80 bg-white/90 px-5 py-7 shadow-[0_30px_70px_-44px_rgba(43,32,21,0.45)] backdrop-blur-xl sm:px-8 sm:py-9"
+            className="relative overflow-hidden rounded-[26px] border border-white/80 bg-[var(--p-card)]/95 px-5 py-7 shadow-[0_30px_70px_-44px_rgba(43,32,21,0.45)] backdrop-blur-xl sm:px-8 sm:py-9"
           >
             <span
               aria-hidden="true"
               className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[var(--auth-accent)] via-[var(--auth-accent)]/70 to-forest/70"
             />
-            <p className="flex items-center gap-2.5 text-[10.5px] font-semibold tracking-[0.14em] text-[var(--auth-accent)] uppercase">
+            <p className="flex items-center gap-2.5 text-[10.5px] font-semibold tracking-[0.14em] text-[var(--auth-accent-ink)] uppercase">
               <span aria-hidden="true" className="h-px w-5 bg-[var(--auth-accent)]" />
               {eyebrow}
             </p>

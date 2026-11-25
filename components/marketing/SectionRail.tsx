@@ -82,7 +82,7 @@ export function SectionRail() {
                     'text-[9.5px] font-medium tracking-[0.18em] uppercase transition-[color,opacity] duration-300 motion-reduce:transition-none',
                     current
                       ? onDark
-                        ? 'text-brass'
+                        ? 'text-brass-soft'
                         : 'text-forest'
                       : onDark
                         ? 'text-white/45 group-hover:text-white'

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { AuthShell } from '@/components/AuthShell';
 import { ResendSignupConfirmationForm } from '@/components/ResendSignupConfirmationForm';
+import { SignupWelcome } from '@/components/auth/SignupWelcome';
 
 export function SignupConfirmationPendingScreen({
   email,
@@ -69,6 +70,8 @@ export function SignupConfirmationPendingScreen({
       </div>
 
       <ResendSignupConfirmationForm email={email} />
+
+      <SignupWelcome />
 
       <p className="mt-5 text-center text-[12px] leading-[1.5] text-gink-46">
         <Link href="/login" className="font-medium text-gink underline decoration-hair-strong underline-offset-2">

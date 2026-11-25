@@ -69,7 +69,7 @@ export function LoginScreen({ error, notice, next }: { error?: string; notice?: 
       }
       notesTitle="Before you sign in"
       eyebrow="Welcome back"
-      title={<>Sign in to your <em className="font-display font-normal italic text-[var(--auth-accent)]">restaurant</em></>}
+      title={<>Sign in to your <em className="font-display font-normal italic text-[var(--auth-accent-ink)]">restaurant</em></>}
       lede="Use the email address you signed up with."
       action={{ prompt: 'New to AutoDine?', label: 'Create an account', href: '/signup' }}
       notes={[

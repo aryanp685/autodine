@@ -1550,22 +1550,28 @@ body {
  * saffron action accent. Scoping the override to .public-landing keeps every
  * owner, kitchen and guest screen on its own tokens.
  *
- * Contrast (WCAG 2.2, sRGB): espresso on cream 12.4:1, muted on cream 5.6:1,
- * white on forest 11.8:1, white on saffron 5.1:1, saffron on cream 4.6:1. */
+ * The notes palette is the base (cream, forest, saffron). Saffron cannot
+ * carry white text at AA (3.2:1), so `brass` fills use espresso ink (5.0:1)
+ * and text accents use `brass-strong` (5.0:1 on cream). On the forest band
+ * `brass-soft` (4.8:1) is the readable accent.
+ *
+ * Contrast (WCAG 2.2, sRGB): espresso on cream 14.8:1, muted on cream 6.1:1,
+ * white on forest 12.0:1, espresso on saffron 5.0:1, saffron-strong on cream
+ * 5.0:1, saffron-soft on forest 4.8:1. */
 .public-landing {
-  --color-ink: #faf3e6;
-  --color-ink-soft: #f3e8d5;
-  --color-ink-card: #fffcf5;
-  --color-ink-line: #e6d7bd;
-  --color-forest: #1c3b2b;
-  --color-forest-strong: #12291d;
-  --color-forest-soft: #e9efe4;
-  --color-brass: #bf541c;
-  --color-brass-strong: #a64512;
-  --color-brass-soft: #e9a878;
-  --color-cream: #2a2117;
-  --color-mute: #6a5c4b;
-  --color-mute-dim: #7c6c58;
+  --color-ink: #faf6f0;
+  --color-ink-soft: #f4ecdf;
+  --color-ink-card: #fffdf8;
+  --color-ink-line: #e8dcc9;
+  --color-forest: #183d32;
+  --color-forest-strong: #0f2a20;
+  --color-forest-soft: #e7efe9;
+  --color-brass: #ea6a2a;
+  --color-brass-strong: #b24a15;
+  --color-brass-soft: #f08a55;
+  --color-cream: #2b2015;
+  --color-mute: #6b5b49;
+  --color-mute-dim: #7c6b57;
   background-image:
     radial-gradient(ellipse 70% 50% at 88% 0%, color-mix(in oklab, var(--color-brass) 7%, transparent), transparent 70%),
     radial-gradient(ellipse 60% 45% at 0% 30%, color-mix(in oklab, var(--color-forest) 5%, transparent), transparent 70%);
@@ -1639,20 +1645,22 @@ body {
   /* Swagat Warmth: the signed-out screens get the reference's cream-and-forest
      palette and a burnt-orange action accent. Scoped here -- staff and guest
      surfaces keep their own tokens. */
-  --p-paper: #fbf6ee;
-  --p-paper-deep: #f3ecdf;
+  --p-paper: #faf6f0;
+  --p-paper-deep: #f4ecdf;
+  --p-card: #fffdf8;
   --p-ink: #3a2e23;
-  --p-accent: #1f4d3a;
-  --p-accent-strong: #163a2b;
-  --p-accent-soft: #e9f0ea;
-  --p-accent-wash: rgba(31,77,58,.05);
-  --p-line: #eae2d3;
+  --p-accent: #183d32;
+  --p-accent-strong: #0f2a20;
+  --p-accent-soft: #e7efe9;
+  --p-accent-wash: rgba(24,61,50,.05);
+  --p-line: #e8dcc9;
   --auth-heading: #2b2015;
-  --auth-accent: #b4531b;
-  --auth-accent-strong: #93420f;
-  --auth-accent-soft: #f7e8dc;
-  --auth-accent-bright: #f0a26b;
-  background: radial-gradient(ellipse at 10% 8%, rgba(180,83,27,.06), transparent 45%), var(--p-paper);
+  --auth-accent: #ea6a2a;
+  --auth-accent-strong: #f17b3e;
+  --auth-accent-soft: #fbe7da;
+  --auth-accent-bright: #f08a55;
+  --auth-accent-ink: #b24a15;
+  background: radial-gradient(ellipse at 10% 8%, rgba(234,106,42,.07), transparent 45%), var(--p-paper);
 }
 [data-auth-shell] input { min-width: 0; font-size: 16px; }
 [data-auth-shell] input:focus-visible {

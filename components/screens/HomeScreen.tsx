@@ -242,7 +242,7 @@ function Hero() {
           >
             <span className="block overflow-hidden pb-[0.06em]"><span className="block" data-line>Every table,</span></span>
             <span className="block overflow-hidden pb-[0.06em]"><span className="block text-forest" data-line>one seamless</span></span>
-            <span className="block overflow-hidden pb-[0.08em]"><span className="block" data-line><em className="font-normal italic text-brass">experience.</em></span></span>
+            <span className="block overflow-hidden pb-[0.08em]"><span className="block" data-line><em className="font-normal italic text-brass-strong">experience.</em></span></span>
           </h1>
 
           <p className="mt-7 max-w-[42ch] text-pretty text-[15.5px] leading-[1.75] text-mute" data-hero-step>
@@ -253,7 +253,7 @@ function Hero() {
           <div className="mt-9 flex flex-col gap-3 sm:flex-row sm:items-center" data-hero-step>
             <AuthHandoffLink
               href="/signup"
-              className="group inline-flex min-h-12 items-center justify-center gap-3 rounded-full bg-brass px-7 text-[14px] font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_18px_34px_-20px_rgba(191,84,28,0.95)] transition-[background-color,transform,box-shadow] duration-300 hover:-translate-y-0.5 hover:bg-brass-strong focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brass motion-reduce:transition-none motion-reduce:hover:translate-y-0"
+              className="group inline-flex min-h-12 items-center justify-center gap-3 rounded-full bg-brass px-7 text-[14px] font-semibold text-cream shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_18px_34px_-20px_rgba(234,106,42,0.95)] transition-[background-color,transform,box-shadow] duration-300 hover:-translate-y-0.5 hover:bg-brass-strong hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brass motion-reduce:transition-none motion-reduce:hover:translate-y-0"
             >
               Start your {TRIAL_DAYS}-day trial
               <span aria-hidden="true" className="transition-transform duration-300 group-hover:translate-x-0.5 motion-reduce:transition-none">→</span>
@@ -305,9 +305,9 @@ function Hero() {
               </span>
             </div>
 
-            <div aria-hidden="true" className="absolute -right-2 top-8 hidden rounded-2xl border border-brass/25 bg-brass px-3.5 py-2 text-white shadow-[0_16px_34px_-20px_rgba(191,84,28,0.9)] sm:block">
+            <div aria-hidden="true" className="absolute -right-2 top-8 hidden rounded-2xl border border-brass/25 bg-brass px-3.5 py-2 text-cream shadow-[0_16px_34px_-20px_rgba(234,106,42,0.9)] sm:block">
               <span className="block font-display text-[19px] italic leading-none">₹600</span>
-              <span className="mt-1 block text-[9px] uppercase tracking-[0.12em] text-white">2 dishes · paid at counter</span>
+              <span className="mt-1 block text-[9px] uppercase tracking-[0.12em] text-cream">Sample bill · paid at counter</span>
             </div>
           </div>
 
@@ -328,7 +328,7 @@ function Hero() {
             ['Works for all', 'Cafés, casual & fine dining'],
           ].map(([title, sub]) => (
             <li key={title} className="flex items-center gap-2.5">
-              <span aria-hidden="true" className="text-[13px] leading-none text-brass">✓</span>
+              <span aria-hidden="true" className="text-[13px] leading-none text-brass-strong">✓</span>
               <span>
                 <span className="block text-[13px] font-medium text-cream">{title}</span>
                 <span className="block text-[11.5px] text-mute-dim">{sub}</span>
@@ -410,7 +410,7 @@ function Problem() {
                 />
                 <div className="flex items-start gap-4 sm:gap-5">
                   <span
-                    className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-brass/10 text-brass ring-1 ring-brass/15 transition-colors duration-300 group-hover:bg-brass group-hover:text-white"
+                    className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-brass/10 text-brass-strong ring-1 ring-brass/15 transition-colors duration-300 group-hover:bg-brass group-hover:text-cream"
                     aria-hidden="true"
                   >
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -630,7 +630,7 @@ function Screens() {
       <div className="mx-auto max-w-[1180px] px-5 sm:px-8">
         <Eyebrow>A closer look</Eyebrow>
         <h2 id="screens-heading" className="display mt-5 max-w-[20ch] text-[clamp(2.1rem,4.2vw,3.35rem)] leading-[1.02]" data-reveal>
-          Three screens, in <em className="font-normal italic text-brass">service order.</em>
+          Three screens, in <em className="font-normal italic text-brass-strong">service order.</em>
         </h2>
         <div data-rule className="rule-draw mt-6 h-px w-16" aria-hidden="true" />
         <p className="mt-5 max-w-[55ch] text-[15px] leading-relaxed text-mute" data-reveal>
@@ -689,7 +689,7 @@ function Screens() {
                 </div>
               </div>
               <div className="flex flex-1 flex-col p-6">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-brass">{String(index + 1).padStart(2, '0')} / {panel.kicker}</p>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-brass-strong">{String(index + 1).padStart(2, '0')} / {panel.kicker}</p>
                 <h3 className="mt-3 font-display text-[23px] leading-tight">{panel.title}</h3>
                 <p className="mt-2 text-[14px] leading-relaxed text-mute">{panel.body}</p>
               </div>
@@ -699,7 +699,7 @@ function Screens() {
         <div className="group relative mt-8 flex flex-col items-start justify-between gap-5 overflow-hidden rounded-[22px] border border-ink-line bg-white p-6 transition-colors duration-300 hover:border-brass/30 sm:flex-row sm:items-center">
           <span aria-hidden="true" className="absolute inset-y-0 left-0 w-px bg-brass" />
           <p className="max-w-[45ch] text-[14px] leading-relaxed text-mute">Your staff stay in control. Sending an order does not automatically mark its bill as paid.</p>
-          <AuthHandoffLink href="/signup" className="inline-flex min-h-11 shrink-0 items-center justify-center gap-3 rounded-full bg-brass px-6 py-3 text-[13px] font-semibold text-white shadow-[0_14px_28px_-18px_rgba(191,84,28,0.9)] motion-safe:transition-[transform,background-color] motion-safe:duration-300 motion-safe:hover:-translate-y-0.5 motion-safe:hover:bg-brass-strong focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brass">
+          <AuthHandoffLink href="/signup" className="inline-flex min-h-11 shrink-0 items-center justify-center gap-3 rounded-full bg-brass px-6 py-3 text-[13px] font-semibold text-cream shadow-[0_14px_28px_-18px_rgba(234,106,42,0.9)] motion-safe:transition-[transform,background-color,color] motion-safe:duration-300 motion-safe:hover:-translate-y-0.5 motion-safe:hover:bg-brass-strong motion-safe:hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brass">
             Set up your restaurant <span aria-hidden="true" className="transition-transform duration-300 group-hover:translate-x-0.5 motion-reduce:transition-none">↗</span>
           </AuthHandoffLink>
         </div>
@@ -889,7 +889,7 @@ function Pricing() {
         <div className="max-w-[46ch]">
           <Eyebrow>Simple &amp; transparent</Eyebrow>
           <h2 id="pricing-heading" className="display mt-5 text-[clamp(2.1rem,4.2vw,3.35rem)] leading-[1.02]" data-reveal>
-            Start with what you <em className="font-normal italic text-brass">need.</em>
+            Start with what you <em className="font-normal italic text-brass-strong">need.</em>
           </h2>
           <div data-rule className="rule-draw mt-6 h-px w-16" aria-hidden="true" />
           <p className="mt-4 text-[15px] leading-[1.6] text-mute" data-reveal>
@@ -976,7 +976,7 @@ function Close() {
         <CornerGarden className="bottom-6 left-4 hidden lg:block" tone="text-forest" flip />
 
         <div className="mx-auto max-w-[1180px] px-5 py-24 text-center sm:px-8">
-          <p className="font-display text-[13px] italic text-brass" data-reveal>Swagat, always.</p>
+          <p className="font-display text-[13px] italic text-brass-strong" data-reveal>Swagat, always.</p>
           <h2 id="close-heading" data-reveal className="display mx-auto mt-4 max-w-[22ch] text-[clamp(2.2rem,4.6vw,3.6rem)] leading-[1.0]">
             Give your next service a <em className="font-normal italic text-forest">clearer flow.</em>
           </h2>

@@ -67,7 +67,7 @@ export function AuthLoading() {
             aria-hidden="true"
             className="auth-arc mt-8 block size-7 rounded-full border-[2.5px] border-[var(--auth-accent)]/20 border-t-[var(--auth-accent)]"
           />
-          <p className="mt-4 text-[12.5px] leading-[1.6] text-gink-64">Setting up your dining experience…</p>
+          <p className="mt-4 text-[12.5px] leading-[1.6] text-gink-64">Setting your table…</p>
         </div>
       </main>
     </div>
