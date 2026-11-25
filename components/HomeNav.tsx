@@ -75,8 +75,8 @@ export function HomeNav({ activePricing = false }: { activePricing?: boolean } =
           'relative mx-auto flex max-w-[1180px] items-center gap-4 rounded-full border px-4 backdrop-blur-xl sm:px-5 lg:gap-6',
           'transition-[background-color,border-color,box-shadow,height] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]',
           scrolled || open
-            ? 'border-ink-line/80 bg-ink/90 shadow-[0_18px_44px_-30px_rgba(28,27,24,0.55)]'
-            : 'border-white/60 bg-ink/60',
+            ? 'border-ink-line/90 bg-ink shadow-[0_20px_50px_-34px_rgba(42,33,23,0.6)]'
+            : 'border-ink-line/60 bg-ink/90',
           scrolled ? 'h-14' : 'h-16',
         ].join(' ')}
       >
@@ -97,6 +97,7 @@ export function HomeNav({ activePricing = false }: { activePricing?: boolean } =
                 <li key={link.id}>
                   <Link
                     href={link.href}
+                    prefetch={false}
                     aria-current={current ? 'page' : undefined}
                     className="group relative inline-flex h-9 items-center whitespace-nowrap rounded-full px-3 text-[13px] text-mute transition-colors duration-300 hover:text-cream aria-[current=page]:text-cream lg:px-3.5"
                   >
@@ -104,7 +105,7 @@ export function HomeNav({ activePricing = false }: { activePricing?: boolean } =
                     <span
                       aria-hidden="true"
                       className={[
-                        'absolute inset-x-3 bottom-0 h-px origin-left bg-forest transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] lg:inset-x-3.5',
+                        'absolute inset-x-3 bottom-0 h-px origin-left bg-brass transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] lg:inset-x-3.5',
                         current ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100',
                       ].join(' ')}
                     />
@@ -118,15 +119,15 @@ export function HomeNav({ activePricing = false }: { activePricing?: boolean } =
         <div className="ml-auto flex items-center gap-2 lg:gap-2.5">
           <AuthHandoffLink
             href="/login"
-            prefetch
+            prefetch={false}
             className="hidden rounded-full px-3 text-[13px] text-mute transition-colors duration-300 hover:text-cream md:inline-flex md:h-9 md:items-center"
           >
             Sign in
           </AuthHandoffLink>
           <AuthHandoffLink
             href="/signup"
-            prefetch
-            className="group inline-flex h-10 items-center gap-2 rounded-full bg-forest pl-4 pr-3.5 text-[13px] font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.16),0_10px_24px_-16px_rgba(31,77,58,0.8)] transition-[background-color,transform,box-shadow] duration-300 hover:-translate-y-0.5 hover:bg-forest-strong focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest motion-reduce:transition-none motion-reduce:hover:translate-y-0 lg:pl-5 lg:pr-4"
+            prefetch={false}
+            className="group inline-flex h-10 items-center gap-2 rounded-full bg-brass pl-4 pr-3.5 text-[13px] font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_12px_26px_-16px_rgba(191,84,28,0.9)] transition-[background-color,transform,box-shadow] duration-300 hover:-translate-y-0.5 hover:bg-brass-strong focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brass motion-reduce:transition-none motion-reduce:hover:translate-y-0 lg:pl-5 lg:pr-4"
           >
             Create account
             <span
@@ -198,6 +199,7 @@ export function HomeNav({ activePricing = false }: { activePricing?: boolean } =
               <li className="mt-1 border-t border-ink-line/70 pt-1">
                 <Link
                   href="/login"
+                  prefetch={false}
                   onClick={() => setOpen(false)}
                   className="block rounded-2xl px-4 py-3 text-[15px] text-cream/80 transition-colors duration-300 hover:bg-forest-soft/45 hover:text-cream"
                 >

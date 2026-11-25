@@ -12,22 +12,22 @@ export function SignupConfirmationPendingScreen({
   return (
     <AuthShell
       visual={
-        <aside className="hidden pt-6 lg:block" aria-label="Email confirmation guide">
-          <p className="text-[10.5px] font-semibold uppercase tracking-[0.18em] text-forest">A secure first step</p>
-          <h2 className="mt-6 max-w-[13ch] text-[clamp(2.5rem,4.5vw,3.8rem)] font-medium leading-[1.06] tracking-[-0.05em]">
-            Check your inbox.<br /><span className="text-forest">Then step in.</span>
+        <aside className="pt-6" aria-label="Email confirmation guide">
+          <p className="text-[10.5px] font-semibold uppercase tracking-[0.18em] text-white/80">A secure first step</p>
+          <h2 className="mt-6 max-w-[13ch] text-[clamp(2.25rem,3.6vw,3.1rem)] font-medium leading-[1.06] tracking-[-0.05em] text-white">
+            Check your inbox.<br /><span className="text-[var(--auth-accent-bright)]">Then step in.</span>
           </h2>
-          <p className="mt-6 max-w-[35ch] text-[15px] leading-relaxed text-gink-64">
+          <p className="mt-5 max-w-[35ch] text-[14.5px] leading-relaxed text-white/80">
             Confirming the address protects the account and keeps sign-in tied to the right person.
           </p>
-          <div aria-hidden="true" className="login-service-art relative mt-10 grid h-52 place-items-center overflow-hidden rounded-[28px] border border-forest/10 bg-forest-soft/50">
-            <div className="absolute size-40 rounded-full border border-forest/10" />
-            <div className="absolute size-56 rounded-full border border-[#B98A4B]/20" />
-            <div className="relative grid size-24 place-items-center rounded-3xl border border-forest/15 bg-white shadow-[0_8px_24px_rgba(31,77,58,0.06)]">
-              <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" className="text-forest">
+          <div aria-hidden="true" className="login-service-art relative mt-9 grid h-52 place-items-center overflow-hidden rounded-[26px] border border-white/15 bg-white/10">
+            <div className="absolute size-40 rounded-full border border-white/15" />
+            <div className="absolute size-56 rounded-full border border-[var(--auth-accent-bright)]/25" />
+            <div className="relative grid size-24 place-items-center rounded-3xl border border-white/20 bg-white/10 text-white">
+              <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="6" width="18" height="13" rx="3" />
                 <path d="m4 8 8 6 8-6" />
-                <path d="M8 3h8" stroke="#B98A4B" />
+                <path d="M8 3h8" stroke="var(--auth-accent-bright)" />
               </svg>
             </div>
           </div>

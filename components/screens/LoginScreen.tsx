@@ -17,63 +17,59 @@ export function LoginScreen({ error, notice, next }: { error?: string; notice?: 
   return (
     <AuthShell
       visual={
-        <aside className="hidden pt-2 lg:block" aria-label="Restaurant workspace overview">
-          <p className="flex items-center gap-2.5 text-[10.5px] font-semibold uppercase tracking-[0.18em] text-forest">
-            <span aria-hidden="true" className="h-px w-6 bg-brass" />
+        <aside className="pt-2" aria-label="Restaurant workspace overview">
+          <p className="flex items-center gap-2.5 text-[10.5px] font-semibold uppercase tracking-[0.18em] text-white/80">
+            <span aria-hidden="true" className="h-px w-6 bg-[var(--auth-accent-bright)]" />
             Back to your service
           </p>
-          <h2 className="mt-6 max-w-[13ch] text-[clamp(2.5rem,4.5vw,3.8rem)] font-medium leading-[1.05] tracking-[-0.05em]">
+          <h2 className="mt-6 max-w-[13ch] text-[clamp(2.25rem,3.6vw,3.1rem)] font-medium leading-[1.05] tracking-[-0.05em] text-white">
             The room moves.<br />
-            <span className="text-forest">Stay <em className="font-display font-normal italic">connected.</em></span>
+            Stay <em className="font-display font-normal italic text-[var(--auth-accent-bright)]">connected.</em>
           </h2>
-          <p className="mt-6 max-w-[35ch] text-[15px] leading-[1.7] text-gink-64">
+          <p className="mt-5 max-w-[35ch] text-[14.5px] leading-[1.7] text-white/80">
             Your menu, kitchen tickets and counter, with a place for every part of service.
           </p>
 
-          <div className="relative mt-10 overflow-hidden rounded-[30px] border border-white/70 bg-white/65 p-5 shadow-[0_24px_60px_-42px_rgba(31,77,58,0.5)] backdrop-blur-xl">
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-0 bg-[radial-gradient(80%_60%_at_85%_0%,rgba(31,77,58,0.07),transparent_60%)]"
-            />
+          <div className="relative mt-9 overflow-hidden rounded-[26px] border border-white/15 bg-white/10 p-5 backdrop-blur-xl">
             <div className="relative flex items-center justify-between">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gink-46">Live service</p>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-forest-soft px-2.5 py-1 text-[10px] font-medium text-forest">
-                <span aria-hidden="true" className="auth-live-dot size-1.5 rounded-full bg-forest" />
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/75">Live service</p>
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-[10px] font-medium text-white">
+                <span aria-hidden="true" className="auth-live-dot size-1.5 rounded-full bg-[var(--auth-accent-bright)]" />
                 One order
               </span>
             </div>
 
             <ol className="relative mt-4 space-y-2.5">
               {[
-                { n: '01', place: 'Table 05', state: 'Order sent', detail: '2 dishes · one guest note', accent: 'bg-forest' },
-                { n: '02', place: 'Kitchen', state: 'Preparing', detail: 'Table 05 · no app to install', accent: 'bg-brass' },
-                { n: '03', place: 'Counter', state: 'Awaiting payment', detail: 'Check, then record at the counter', accent: 'bg-gink-28' },
+                { n: '01', place: 'Table 05', state: 'Order sent', detail: '2 dishes · one guest note', accent: 'bg-[var(--auth-accent-bright)]' },
+                { n: '02', place: 'Kitchen', state: 'Preparing', detail: 'Table 05 · no app to install', accent: 'bg-[var(--auth-accent)]' },
+                { n: '03', place: 'Counter', state: 'Awaiting payment', detail: 'Check, then record at the counter', accent: 'bg-white/40' },
               ].map((row) => (
-                <li key={row.place} className="flex items-center gap-3 rounded-2xl border border-hair/80 bg-white/80 px-3.5 py-3 transition-colors duration-300 hover:border-forest/20 hover:bg-white">
+                <li key={row.place} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/10 px-3.5 py-3 transition-colors duration-300 hover:border-white/25 hover:bg-white/15">
                   <span aria-hidden="true" className={`size-1.5 shrink-0 rounded-full ${row.accent}`} />
                   <span className="min-w-0 flex-1">
-                    <span className="block text-[12.5px] font-medium text-gink">{row.place}</span>
-                    <span className="block text-[11px] text-gink-46">{row.detail}</span>
+                    <span className="block text-[12.5px] font-medium text-white">{row.place}</span>
+                    <span className="block text-[11px] text-white/80">{row.detail}</span>
                   </span>
-                  <span className="shrink-0 text-[10.5px] font-medium text-forest">{row.state}</span>
-                  <span aria-hidden="true" className="text-[9px] tabular-nums tracking-[0.12em] text-gink-28">{row.n}</span>
+                  <span className="shrink-0 text-[10.5px] font-medium text-[var(--auth-accent-bright)]">{row.state}</span>
+                  <span aria-hidden="true" className="text-[9px] tabular-nums tracking-[0.12em] text-white/35">{row.n}</span>
                 </li>
               ))}
             </ol>
 
-            <p className="relative mt-4 border-t border-hair/80 pt-3.5 text-[11px] leading-relaxed text-gink-46">
+            <p className="relative mt-4 border-t border-white/10 pt-3.5 text-[11px] leading-relaxed text-white/80">
               Sending an order does not mark its bill as paid. Staff still check and record payment.
             </p>
           </div>
 
-          <Link href="/#screens" className="mt-6 inline-flex min-h-11 items-center gap-2.5 text-[13px] font-medium text-forest transition-colors hover:text-forest-strong">
+          <Link href="/#screens" className="mt-6 inline-flex min-h-11 items-center gap-2.5 text-[13px] font-medium text-white transition-colors hover:text-[var(--auth-accent-bright)]">
             Take a look around <span aria-hidden="true">↗</span>
           </Link>
         </aside>
       }
       notesTitle="Before you sign in"
       eyebrow="Welcome back"
-      title={<>Sign in to your <em className="font-display font-normal italic text-forest">restaurant</em></>}
+      title={<>Sign in to your <em className="font-display font-normal italic text-[var(--auth-accent)]">restaurant</em></>}
       lede="Use the email address you signed up with."
       action={{ prompt: 'New to AutoDine?', label: 'Create an account', href: '/signup' }}
       notes={[

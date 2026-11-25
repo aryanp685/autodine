@@ -19,7 +19,7 @@ export const BRAND_HANDOFF_KEY = 'autodine:brand-handoff';
 
 type Props = ComponentProps<typeof Link> & { ref?: Ref<HTMLAnchorElement> };
 
-export function AuthHandoffLink({ href, children, onClick, ...props }: Props) {
+export function AuthHandoffLink({ href, children, onClick, prefetch = false, ...props }: Props) {
   const remember = (event: MouseEvent<HTMLAnchorElement>) => {
     onClick?.(event);
     if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
@@ -37,7 +37,7 @@ export function AuthHandoffLink({ href, children, onClick, ...props }: Props) {
   };
 
   return (
-    <Link href={href} onClick={remember} {...props}>
+    <Link href={href} onClick={remember} prefetch={prefetch} {...props}>
       {children}
     </Link>
   );

@@ -15,17 +15,17 @@ export function ForgotPasswordScreen({ error, notice }: { error?: string; notice
   return (
     <AuthShell
       visual={
-        <aside className="hidden pt-6 lg:block" aria-label="Account recovery guide">
-          <p className="text-[10.5px] font-semibold uppercase tracking-[0.18em] text-forest">A way back in</p>
-          <h2 className="mt-6 max-w-[13ch] text-[clamp(2.5rem,4.5vw,3.8rem)] font-medium leading-[1.06] tracking-[-0.05em]">A fresh password.<br /><span className="text-forest">The same workspace.</span></h2>
-          <p className="mt-6 max-w-[35ch] text-[15px] leading-relaxed text-gink-64">Start with your account email. Keep this browser handy to open the recovery link and choose your new password.</p>
-          <div aria-hidden="true" className="login-service-node relative mt-10 grid h-52 place-items-center overflow-hidden rounded-[28px] border border-forest/10 bg-forest-soft/50">
-            <div className="absolute size-40 rounded-full border border-[#B98A4B]/25" />
-            <div className="relative grid size-24 place-items-center rounded-3xl border border-forest/15 bg-white shadow-[0_8px_24px_rgba(31,77,58,0.06)]">
-              <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" className="text-forest"><rect x="3" y="6" width="18" height="13" rx="3" /><path d="m4 8 8 6 8-6" /><path d="M8 3h8" stroke="#B98A4B" /></svg>
+        <aside className="pt-6" aria-label="Account recovery guide">
+          <p className="text-[10.5px] font-semibold uppercase tracking-[0.18em] text-white/80">A way back in</p>
+          <h2 className="mt-6 max-w-[13ch] text-[clamp(2.25rem,3.6vw,3.1rem)] font-medium leading-[1.06] tracking-[-0.05em] text-white">A fresh password.<br /><span className="text-[var(--auth-accent-bright)]">The same workspace.</span></h2>
+          <p className="mt-5 max-w-[35ch] text-[15px] leading-relaxed text-white/80">Start with your account email. Keep this browser handy to open the recovery link and choose your new password.</p>
+          <div aria-hidden="true" className="login-service-node relative mt-9 grid h-52 place-items-center overflow-hidden rounded-[26px] border border-white/15 bg-white/10">
+            <div className="absolute size-40 rounded-full border border-[var(--auth-accent-bright)]/30" />
+            <div className="relative grid size-24 place-items-center rounded-3xl border border-white/20 bg-white/10 text-white">
+              <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="6" width="18" height="13" rx="3" /><path d="m4 8 8 6 8-6" /><path d="M8 3h8" stroke="var(--auth-accent-bright)" /></svg>
             </div>
           </div>
-          <Link href="/login" className="mt-6 inline-flex min-h-11 items-center gap-3 text-[13px] font-medium text-forest"><span aria-hidden="true">←</span> Back to sign in</Link>
+          <Link href="/login" className="mt-6 inline-flex min-h-11 items-center gap-3 text-[13px] font-medium text-white transition-colors hover:text-[var(--auth-accent-bright)]"><span aria-hidden="true">←</span> Back to sign in</Link>
         </aside>
       }
       eyebrow="Account recovery"

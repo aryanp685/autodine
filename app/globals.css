@@ -45,6 +45,28 @@
 @import '@fontsource/inter/latin-600.css';
 @import '@fontsource/inter/latin-700.css';
 
+/* Fraunces, self-hosted (SIL OFL, latin subset, variable weight).
+ *
+ * The public voice: a warm, soft-contrast serif that carries the reference's
+ * editorial hospitality far better than a platform serif does on Android,
+ * where the fallback resolves to a stiff slab. One face, one request, both
+ * roman and italic so the accent word in a headline does not synthesise an
+ * oblique. */
+@font-face {
+  font-family: 'Fraunces';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/fraunces-latin-wght-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Fraunces';
+  font-style: italic;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/fraunces-latin-wght-italic.woff2') format('woff2');
+}
+
 /* The marketing layer. It also carries the product's default (warm) token
    values, which is why it is still shipped with the app rather than to the
    public pages alone. */
@@ -1247,6 +1269,8 @@ body {
   --color-forest-strong: #163a2b;
   --color-forest-soft: #e9f0ea;
   --color-brass: #b98a4b;
+  --color-brass-strong: #9a6d34;
+  --color-brass-soft: #e5a26a;
 
   /* ONE PLUM, per the finalized brief: the action hue of the product
      (the same aubergine as --p-accent) carried onto the marketing surface.
@@ -1280,7 +1304,7 @@ body {
      gets Iowan Old Style, Windows gets Palatino/Georgia, everything else
      falls back to the platform serif. Used in italic for the one accented
      word in a headline -- never for body text. */
-  --font-display: 'Iowan Old Style', 'Palatino Linotype', Palatino,
+  --font-display: 'Fraunces', 'Iowan Old Style', 'Palatino Linotype', Palatino,
     'Book Antiqua', 'New York', Georgia, ui-serif, serif;
 
   --radius-card: 18px;
@@ -1518,6 +1542,80 @@ body {
   }
 }
 
+/* SWAGAT WARMTH — the public palette, scoped to the marketing surfaces.
+ *
+ * The reference sheet's colours, expressed as the same token names the
+ * landing already uses: `ink` is the cream room, `cream` is the espresso
+ * type, `forest` is the deep dining-room green and `brass` is the burnt
+ * saffron action accent. Scoping the override to .public-landing keeps every
+ * owner, kitchen and guest screen on its own tokens.
+ *
+ * Contrast (WCAG 2.2, sRGB): espresso on cream 12.4:1, muted on cream 5.6:1,
+ * white on forest 11.8:1, white on saffron 5.1:1, saffron on cream 4.6:1. */
+.public-landing {
+  --color-ink: #faf3e6;
+  --color-ink-soft: #f3e8d5;
+  --color-ink-card: #fffcf5;
+  --color-ink-line: #e6d7bd;
+  --color-forest: #1c3b2b;
+  --color-forest-strong: #12291d;
+  --color-forest-soft: #e9efe4;
+  --color-brass: #bf541c;
+  --color-brass-strong: #a64512;
+  --color-brass-soft: #e9a878;
+  --color-cream: #2a2117;
+  --color-mute: #6a5c4b;
+  --color-mute-dim: #7c6c58;
+  background-image:
+    radial-gradient(ellipse 70% 50% at 88% 0%, color-mix(in oklab, var(--color-brass) 7%, transparent), transparent 70%),
+    radial-gradient(ellipse 60% 45% at 0% 30%, color-mix(in oklab, var(--color-forest) 5%, transparent), transparent 70%);
+  background-repeat: no-repeat;
+}
+
+/* The serif's default optical size is small at display sizes; tighten the
+   tracking there so a three-line headline reads as one shape. */
+.public-landing .display {
+  font-family: var(--font-display);
+  font-weight: 500;
+  letter-spacing: -0.022em;
+  font-variation-settings: 'SOFT' 40, 'WONK' 1;
+  text-wrap: balance;
+}
+
+/* A leaf that breathes. Position lives on the wrapper, motion on the `rotate`
+   property, so the two never fight over `transform`. */
+@media (prefers-reduced-motion: no-preference) {
+  .botanical-sway { animation: botanical-sway 13s ease-in-out infinite alternate; }
+  .botanical-sway-slow { animation: botanical-sway 19s ease-in-out infinite alternate-reverse; }
+  @keyframes botanical-sway {
+    from { rotate: -2deg; }
+    to { rotate: 2.5deg; }
+  }
+}
+
+/* A soft, warm halo behind the hero phone: two blurred discs, no image. */
+.hero-halo::before,
+.hero-halo::after {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  border-radius: 999px;
+  filter: blur(46px);
+  pointer-events: none;
+}
+.hero-halo::before {
+  inset: 8% -6% auto auto;
+  width: 62%;
+  aspect-ratio: 1;
+  background: color-mix(in oklab, var(--color-brass) 26%, transparent);
+}
+.hero-halo::after {
+  inset: auto auto 4% -8%;
+  width: 52%;
+  aspect-ratio: 1;
+  background: color-mix(in oklab, var(--color-forest) 18%, transparent);
+}
+
 /* Public landing: tactile controls and a gentle, independent phone drift.
    Content remains visible without JavaScript; motion is opt-in by OS setting. */
 .public-landing section[id] { scroll-margin-top: 5.5rem; }
@@ -1538,15 +1636,23 @@ body {
 /* Only signed-out account pages inherit the landing palette. Staff screens
    retain their own tokens; authentication actions and validation are unchanged. */
 [data-surface='owner'][data-auth-shell] {
-  --p-paper: #fbfaf7;
-  --p-paper-deep: #f3f0e9;
-  --p-ink: #1c1b18;
+  /* Swagat Warmth: the signed-out screens get the reference's cream-and-forest
+     palette and a burnt-orange action accent. Scoped here -- staff and guest
+     surfaces keep their own tokens. */
+  --p-paper: #fbf6ee;
+  --p-paper-deep: #f3ecdf;
+  --p-ink: #3a2e23;
   --p-accent: #1f4d3a;
   --p-accent-strong: #163a2b;
   --p-accent-soft: #e9f0ea;
   --p-accent-wash: rgba(31,77,58,.05);
-  --p-line: #e8e3da;
-  background: radial-gradient(ellipse at 10% 8%, rgba(31,77,58,.05), transparent 45%), var(--p-paper);
+  --p-line: #eae2d3;
+  --auth-heading: #2b2015;
+  --auth-accent: #b4531b;
+  --auth-accent-strong: #93420f;
+  --auth-accent-soft: #f7e8dc;
+  --auth-accent-bright: #f0a26b;
+  background: radial-gradient(ellipse at 10% 8%, rgba(180,83,27,.06), transparent 45%), var(--p-paper);
 }
 [data-auth-shell] input { min-width: 0; font-size: 16px; }
 [data-auth-shell] input:focus-visible {
@@ -1643,5 +1749,46 @@ body {
   @keyframes auth-live-pulse {
     0% { transform: scale(1); opacity: 0.35; }
     70%, 100% { transform: scale(2.8); opacity: 0; }
+  }
+}
+
+/* ---------------------------------------------------------------- Swagat panel
+   The forest panel's own motion. All transform/opacity, all decoration: the
+   panel is fully readable if none of it plays. */
+.auth-panel-fade { opacity: 1; }
+@media (prefers-reduced-motion: no-preference) {
+  .auth-panel-fade { animation: auth-panel-in 0.7s cubic-bezier(0.22, 1, 0.36, 1) both; }
+  .auth-panel-fade-delay { animation-delay: 120ms; }
+  @keyframes auth-panel-in {
+    from { opacity: 0; transform: translateY(14px); }
+    to { opacity: 1; transform: none; }
+  }
+  /* The waiter's cloche lifts once on arrival -- the panel's signature moment. */
+  .auth-cloche { animation: auth-cloche-lift 1.1s cubic-bezier(0.22, 1, 0.36, 1) 0.25s both; }
+  @keyframes auth-cloche-lift {
+    from { transform: translateY(10px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+  .auth-leaf-sway { animation: auth-leaf 7s ease-in-out infinite alternate; transform-origin: 50% 90%; }
+  @keyframes auth-leaf {
+    from { transform: rotate(-1.6deg); }
+    to { transform: rotate(2.2deg); }
+  }
+  .auth-bird { animation: auth-bird 9s ease-in-out infinite alternate; }
+  @keyframes auth-bird {
+    from { transform: translate(0, 0); }
+    to { transform: translate(14px, -9px); }
+  }
+}
+
+/* The loading boundary's spinner arc, drawn with the panel stroke. */
+.auth-arc { position: relative; }
+@media (prefers-reduced-motion: no-preference) {
+  .auth-arc { animation: auth-arc-spin 1.15s cubic-bezier(0.5, 0.15, 0.5, 0.85) infinite; }
+  @keyframes auth-arc-spin { to { transform: rotate(360deg); } }
+  .auth-cloche-hover { animation: auth-cloche-hover 3.2s ease-in-out infinite alternate; }
+  @keyframes auth-cloche-hover {
+    from { transform: translateY(0); }
+    to { transform: translateY(-6px); }
   }
 }
