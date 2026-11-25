@@ -1595,6 +1595,35 @@ body {
 .public-landing main > section[id] {
   scroll-margin-top: 6rem;
 }
+/* A softly washed restaurant photograph gives the long cream sections a
+   little atmosphere without competing with copy, cards, or product UI. */
+.public-landing main > section {
+  --public-section-tint: var(--color-ink);
+  background-image:
+    linear-gradient(
+      color-mix(in srgb, var(--public-section-tint) 90%, transparent),
+      color-mix(in srgb, var(--public-section-tint) 90%, transparent)
+    ),
+    url('/img/restaurant-interior-light.jpg');
+  background-position: center, center;
+  background-size: cover, cover;
+}
+.public-landing main > section[class~='bg-forest'] {
+  --public-section-tint: var(--color-forest);
+}
+.public-landing main > section[class~='bg-forest-strong'] {
+  --public-section-tint: var(--color-forest-strong);
+}
+.public-landing main#pricing-content > header {
+  background-image:
+    linear-gradient(
+      color-mix(in srgb, var(--color-ink) 91%, transparent),
+      color-mix(in srgb, var(--color-ink) 91%, transparent)
+    ),
+    url('/img/restaurant-interior-light.jpg');
+  background-position: center, center 42%;
+  background-size: cover, cover;
+}
 @media (prefers-reduced-motion: no-preference) {
   html:has(.public-landing) { scroll-behavior: smooth; }
 }
@@ -1811,6 +1840,22 @@ body {
   --auth-accent-ink: #b24a15;
   background: radial-gradient(ellipse at 10% 8%, rgba(234,106,42,.07), transparent 45%), var(--p-paper);
 }
+[data-auth-shell] .auth-atmosphere::before {
+  position: absolute;
+  inset: 0;
+  content: '';
+  background-image:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--p-paper) 84%, transparent),
+      color-mix(in srgb, var(--p-paper) 90%, transparent)
+    ),
+    url('/img/restaurant-interior-light.jpg');
+  background-position: center, center 46%;
+  background-size: cover, cover;
+  opacity: 0.58;
+}
+
 [data-auth-shell] input:not([type='checkbox']) {
   min-width: 0;
   min-height: 48px;
@@ -1853,6 +1898,102 @@ body {
 /* Account pages: a 3px read-only progress hairline while a form is submitting,
    plus a sheen inside the submit button. Both are decoration -- the button's
    disabled state and aria-busy carry the actual meaning. */
+.auth-submit-overlay[data-auth-submit-overlay] {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  padding: 24px;
+  isolation: isolate;
+  background: color-mix(in srgb, var(--p-paper) 84%, transparent);
+  -webkit-backdrop-filter: blur(15px) saturate(1.05);
+  backdrop-filter: blur(15px) saturate(1.05);
+  animation: auth-submit-veil-in 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.auth-submit-overlay::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  content: '';
+  background-image:
+    linear-gradient(
+      color-mix(in srgb, var(--p-paper) 84%, transparent),
+      color-mix(in srgb, var(--p-paper) 90%, transparent)
+    ),
+    url('/img/restaurant-interior-light.jpg');
+  background-position: center, center 46%;
+  background-size: cover, cover;
+  opacity: 0.56;
+}
+.auth-submit-overlay__card {
+  width: min(100%, 410px);
+  padding: 38px 32px 30px;
+  border: 1px solid color-mix(in srgb, var(--p-card) 88%, transparent);
+  border-radius: 30px;
+  background: color-mix(in srgb, var(--p-card) 94%, transparent);
+  box-shadow: var(--p-shadow-2);
+  color: var(--auth-heading);
+  text-align: center;
+  animation: auth-submit-card-in 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.auth-submit-overlay__eyebrow {
+  margin-top: 25px;
+  color: var(--auth-accent-ink);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.17em;
+  text-transform: uppercase;
+}
+.auth-submit-overlay__message {
+  margin-top: 9px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.auth-submit-overlay__track {
+  height: 3px;
+  margin: 26px auto 0;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--auth-heading) 10%, white);
+}
+.auth-submit-overlay__track span {
+  display: block;
+  width: 38%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--color-forest), var(--auth-accent));
+  transform-origin: left center;
+}
+.auth-submit-overlay__caption {
+  margin-top: 13px;
+  color: color-mix(in srgb, var(--auth-heading) 62%, transparent);
+  font-size: 11px;
+  line-height: 1.55;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .auth-submit-overlay__track span { animation: auth-submit-progress 1.45s cubic-bezier(0.22, 1, 0.36, 1) infinite alternate; }
+}
+@keyframes auth-submit-veil-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes auth-submit-card-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes auth-submit-progress {
+  from { width: 14%; }
+  to { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .auth-submit-overlay { animation-duration: 1ms; }
+  .auth-submit-overlay__card { animation-duration: 1ms; }
+  .auth-submit-overlay__track span { width: 100%; }
+}
+
 .auth-pending-bar {
   position: fixed;
   inset-inline: 0;

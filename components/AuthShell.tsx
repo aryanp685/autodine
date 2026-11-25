@@ -53,9 +53,10 @@ export function AuthShell({
       data-auth-shell
       className="relative min-h-dvh overflow-hidden bg-paper text-gink antialiased"
     >
+      <div aria-hidden="true" className="auth-atmosphere pointer-events-none absolute inset-0 z-0" />
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(70%_50%_at_12%_0%,rgba(180,83,27,0.07),transparent_60%),radial-gradient(50%_40%_at_92%_8%,rgba(31,61,46,0.07),transparent_62%)]"
+        className="pointer-events-none absolute inset-0 z-0 bg-[radial-gradient(70%_50%_at_12%_0%,rgba(180,83,27,0.07),transparent_60%),radial-gradient(50%_40%_at_92%_8%,rgba(31,61,46,0.07),transparent_62%)]"
       />
       <div
         aria-hidden="true"

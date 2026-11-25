@@ -20,6 +20,7 @@ export function AuthLoading() {
 
   return (
     <div data-surface="owner" data-auth-shell className="relative min-h-dvh overflow-hidden bg-paper text-gink antialiased">
+      <div aria-hidden="true" className="auth-atmosphere pointer-events-none absolute inset-0 z-0" />
       <header className="relative z-10 border-b border-hair/80 bg-white/60 backdrop-blur-xl">
         <div className="mx-auto flex h-16 w-full max-w-[1180px] items-center justify-between gap-4 px-5 sm:px-8">
           <AuthHandoffLink

@@ -3,6 +3,7 @@
 import { useFormStatus } from 'react-dom';
 import { authButtonClass } from '@/components/AuthShell';
 import { AuthBrandLoader } from '@/components/auth/AuthBrandLoader';
+import { AuthSubmissionOverlay } from '@/components/auth/AuthSubmissionOverlay';
 import { AuthPendingBar } from '@/components/auth/AuthPendingBar';
 
 export function AuthSubmit({ label, pendingLabel }: { label: string; pendingLabel: string }) {
@@ -11,6 +12,7 @@ export function AuthSubmit({ label, pendingLabel }: { label: string; pendingLabe
   return (
     <>
       <AuthPendingBar />
+      <AuthSubmissionOverlay open={pending} message={text} />
       <button
         className={`${authButtonClass} relative mt-1 w-full overflow-hidden`}
         type="submit"

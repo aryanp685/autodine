@@ -44,6 +44,7 @@ describe('sign in', () => {
     expect(html).not.toContain('pg__asideCard');
     // One shell, one card, and the notes under it as a list.
     expect(html).toContain('data-auth-shell');
+    expect(html).toContain('class="auth-atmosphere pointer-events-none absolute inset-0 z-0"');
     expect(html).toContain('Before you sign in');
     expect(html).toContain('Restaurant workspace overview');
     expect(html).toContain('AutoDine sample workspace preview');
