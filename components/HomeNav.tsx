@@ -83,7 +83,7 @@ export function HomeNav({
       />
       <div
         className={[
-          'relative mx-auto flex max-w-[1180px] items-center gap-4 rounded-full border px-4 backdrop-blur-xl sm:px-5 lg:gap-6',
+          'relative mx-auto flex max-w-[1180px] items-center gap-3 rounded-full border px-3 backdrop-blur-xl sm:gap-4 sm:px-5 lg:gap-6',
           'transition-[background-color,border-color,box-shadow,height] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]',
           scrolled || open
             ? 'border-ink-line/90 bg-ink shadow-[0_20px_50px_-34px_rgba(42,33,23,0.6)]'
@@ -97,9 +97,15 @@ export function HomeNav({
           href="/"
           aria-label="AutoDine home"
           data-brand-handoff
-          className="shrink-0 rounded-full text-cream transition-opacity duration-300 hover:opacity-75"
+          className="min-w-0 shrink rounded-full text-cream transition-opacity duration-300 hover:opacity-75"
         >
-          <BrandLockup size={21} ink="currentColor" dot={BRAND_GREEN} />
+          <BrandLockup
+            size={21}
+            ink="currentColor"
+            dot={BRAND_GREEN}
+            wordClassName="hidden min-[360px]:inline"
+            sublineClassName="hidden sm:block"
+          />
         </Link>
 
         <nav aria-label="Primary" className="hidden flex-1 md:block">
@@ -140,7 +146,7 @@ export function HomeNav({
           <AuthHandoffLink
             href="/signup"
             prefetch={false}
-            className="group inline-flex h-10 items-center gap-2 rounded-full bg-brass pl-4 pr-3.5 text-[13px] font-bold text-cream shadow-[0_8px_16px_rgba(244,123,41,0.3)] transition-[background-color,transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:bg-brass-strong hover:shadow-[0_12px_22px_rgba(232,91,19,0.35)] active:translate-y-0 active:bg-brass-strong focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brass motion-reduce:transition-none motion-reduce:hover:translate-y-0 lg:pl-5 lg:pr-4"
+            className="group inline-flex h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-full bg-brass pl-3 pr-2.5 text-[13px] font-bold text-cream shadow-[0_8px_16px_rgba(244,123,41,0.3)] transition-[background-color,transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:bg-brass-strong hover:shadow-[0_12px_22px_rgba(232,91,19,0.35)] active:translate-y-0 active:bg-brass-strong focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brass motion-reduce:transition-none motion-reduce:hover:translate-y-0 sm:gap-2 sm:pl-4 sm:pr-3.5 lg:pl-5 lg:pr-4"
           >
             Create account
             <span

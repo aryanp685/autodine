@@ -90,11 +90,17 @@ export function BrandLockup({
   ink = 'currentColor',
   dot = '#2f7d4f',
   className,
+  sublineClassName = '',
+  wordClassName = '',
 }: {
   size?: number;
   ink?: string;
   dot?: string;
   className?: string;
+  /** Lets a narrow bar drop the tagline without a second mark component. */
+  sublineClassName?: string;
+  /** Lets the tightest bars drop to the mark alone. */
+  wordClassName?: string;
 }) {
   return (
     <span
@@ -104,6 +110,7 @@ export function BrandLockup({
       <BrandMark size={size * 1.36} ink={ink} dot={dot} tone="lockup" />
       <span style={{ display: 'inline-flex', flexDirection: 'column', gap: size * 0.12 }}>
         <span
+          className={wordClassName}
           style={{
             fontSize: size * 0.82,
             fontWeight: 500,
@@ -115,6 +122,7 @@ export function BrandLockup({
         </span>
         {size >= 20 ? (
           <span
+            className={sublineClassName}
             style={{
               fontSize: size * 0.36,
               fontWeight: 500,
