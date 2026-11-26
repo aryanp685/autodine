@@ -1566,11 +1566,11 @@ body {
   --color-forest-strong: #11342b;
   --color-forest-soft: #e3f1e7;
   --color-brass: #ff7025;
-  --color-brass-strong: #b4531b;
+  --color-brass-strong: #e85b13;
   --color-brass-soft: #ff9551;
   --color-cream: #2b2015;
-  --color-mute: #6b5b49;
-  --color-mute-dim: #7c6b57;
+  --color-mute: #4f463b;
+  --color-mute-dim: #6b5b49;
   background-image:
     radial-gradient(ellipse 70% 50% at 88% 0%, color-mix(in oklab, var(--color-brass) 7%, transparent), transparent 70%),
     radial-gradient(ellipse 60% 45% at 0% 30%, color-mix(in oklab, var(--color-forest) 5%, transparent), transparent 70%);

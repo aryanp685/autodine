@@ -178,12 +178,13 @@ export function SiteMotion() {
           gsap.utils.toArray<HTMLElement>('[data-reveal]').forEach((el) => {
             gsap.fromTo(
               el,
-              { opacity: 0, y: 42 },
+              { opacity: 0, y: 56, filter: 'blur(6px)' },
               {
                 opacity: 1,
                 y: 0,
-                duration: 1.05,
-                ease: 'power3.out',
+                filter: 'blur(0px)',
+                duration: 1.1,
+                ease: 'expo.out',
                 scrollTrigger: { trigger: el, start: 'top 82%', once: true },
               },
             );
@@ -195,13 +196,14 @@ export function SiteMotion() {
 
             gsap.fromTo(
               children,
-              { opacity: 0, y: 32 },
+              { opacity: 0, y: 44, scale: 0.97 },
               {
                 opacity: 1,
                 y: 0,
-                duration: 0.9,
-                ease: 'power3.out',
-                stagger: 0.08,
+                scale: 1,
+                duration: 0.95,
+                ease: 'expo.out',
+                stagger: 0.09,
                 scrollTrigger: { trigger: group, start: 'top 84%', once: true },
               },
             );

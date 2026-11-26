@@ -99,14 +99,14 @@ export function HomeNav({ activePricing = false }: { activePricing?: boolean } =
                     href={link.href}
                     prefetch={false}
                     aria-current={current ? 'page' : undefined}
-                    className="group relative inline-flex h-9 items-center whitespace-nowrap rounded-full px-3 text-[13px] text-mute transition-colors duration-300 hover:text-cream aria-[current=page]:text-cream lg:px-3.5"
+                    className="group relative inline-flex h-9 items-center whitespace-nowrap rounded-full px-3 text-[13px] font-semibold text-mute transition-colors duration-300 hover:text-brass-strong aria-[current=page]:text-ink lg:px-3.5"
                   >
                     {link.label}
                     <span
                       aria-hidden="true"
                       className={[
-                        'absolute inset-x-3 bottom-0 h-px origin-left bg-brass transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] lg:inset-x-3.5',
-                        current ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100',
+                        'absolute inset-x-3 bottom-0 h-[2px] origin-left rounded-full bg-brass transition-transform duration-300 ease-[cubic-bezier(0.22,0.61,0.36,1)] lg:inset-x-3.5',
+                        current ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100 group-focus-visible:scale-x-100',
                       ].join(' ')}
                     />
                   </Link>
@@ -120,14 +120,14 @@ export function HomeNav({ activePricing = false }: { activePricing?: boolean } =
           <AuthHandoffLink
             href="/login"
             prefetch={false}
-            className="hidden rounded-full px-3 text-[13px] text-mute transition-colors duration-300 hover:text-cream md:inline-flex md:h-9 md:items-center"
+            className="hidden rounded-full px-3 text-[13px] font-semibold text-mute transition-colors duration-300 hover:text-brass-strong md:inline-flex md:h-9 md:items-center"
           >
             Sign in
           </AuthHandoffLink>
           <AuthHandoffLink
             href="/signup"
             prefetch={false}
-            className="group inline-flex h-10 items-center gap-2 rounded-full bg-brass pl-4 pr-3.5 text-[13px] font-semibold text-cream shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_12px_26px_-16px_rgba(234,106,42,0.9)] transition-[background-color,transform,box-shadow] duration-300 hover:-translate-y-0.5 hover:bg-brass-strong hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brass motion-reduce:transition-none motion-reduce:hover:translate-y-0 lg:pl-5 lg:pr-4"
+            className="group inline-flex h-10 items-center gap-2 rounded-full bg-brass pl-4 pr-3.5 text-[13px] font-bold text-white shadow-[0_8px_16px_rgba(244,123,41,0.3)] transition-[background-color,transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:bg-brass-strong hover:shadow-[0_12px_22px_rgba(232,91,19,0.35)] active:translate-y-0 active:bg-brass-strong focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brass motion-reduce:transition-none motion-reduce:hover:translate-y-0 lg:pl-5 lg:pr-4"
           >
             Create account
             <span
