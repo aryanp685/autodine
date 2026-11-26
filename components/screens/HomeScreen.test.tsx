@@ -87,13 +87,13 @@ describe('home', () => {
   it('plays the sample menu in the hero as an honest, tappable preview', () => {
     const section = home.match(/<section[^>]*data-hero[\s\S]*?<\/section>/)?.[0] ?? '';
     expect(section).toContain('data-menu-demo');
-    expect(section).toContain('aria-label="Interactive preview of the guest menu"');
-    expect(section.match(/data-menu-dish/g)).toHaveLength(3);
+    expect(section).toContain('aria-label="Interactive demo of the guest menu"');
+    expect(section.match(/data-menu-dish/g)).toHaveLength(6);
     expect(section).toContain('aria-pressed="true"');
     expect(section).toContain('Paneer Tikka');
     expect(section).toContain('Butter Chicken');
     expect(section).toContain('Sample order');
-    expect(section).toContain('Interactive preview · sample dishes and prices');
+    expect(section).toContain('Live demo · sample dishes and prices');
     expect(section).not.toMatch(/pay now|pay online|checkout/i);
   });
 
@@ -114,7 +114,7 @@ describe('home', () => {
   it('labels product mockups honestly and keeps decorative controls out of the tab order', () => {
     const section = home.match(/<section[^>]*id="screens"[\s\S]*?<\/section>/)?.[0] ?? '';
     expect(section).toContain('aria-labelledby="screens-heading"');
-    expect(section).toContain('Illustrative product previews');
+    expect(section).toContain('Illustrative screens');
     expect(section.match(/data-tour-panel/g)).toHaveLength(3);
     expect(section.match(/aria-hidden="true"/g)?.length).toBeGreaterThanOrEqual(3);
     expect(section).not.toContain('<button');
@@ -154,18 +154,18 @@ describe('home', () => {
     expect(tail).toContain('href="/terms"');
     expect(tail).not.toContain('ink="#f7f3ea"');
     expect(home).toContain('data-menu-demo');
-    expect(home).toContain('rgba(251,250,247,0.24)');
+    expect(home).toContain('rgba(255,255,255,0.24)');
   });
 
   it('keeps preview boundaries and capability lists visible without release-log counts', () => {
     const status = home.slice(home.indexOf('id="status"'), home.indexOf('id="pricing"'));
     for (const item of [...LIVE, ...NOT_CONNECTED]) expect(status).toContain(item.label.replaceAll('&', '&amp;'));
-    expect(status).toContain('not a certification for live restaurant operations');
+    expect(status).toContain('no sample data mixed in');
     expect(status).toContain('No SMS or WhatsApp receipts');
-    expect(status).toContain('access becomes read-only');
+    expect(status).toContain('through Cashfree');
     expect(status).not.toContain('things work.');
     expect(home).toContain(`Start your ${TRIAL_DAYS}-day trial`);
-    expect(home).toContain('No paid subscription is activated at signup.');
+    expect(home).toContain('No card needed at signup');
     expect(home).toContain('href="/#status"');
   });
 
@@ -196,8 +196,10 @@ describe('pricing', () => {
     expect(pricing).not.toMatch(/>Buy/);
   });
 
-  it('marks every plan as not on sale', () => {
-    expect(pricing.match(/Planned · not on sale/g)?.length).toBe(3);
+  it('shows plans as billable through Cashfree, not as planned prices', () => {
+    expect(pricing).toContain('billed through Cashfree');
+    expect(pricing).not.toContain('not on sale');
+    expect(pricing).not.toContain('Planned ·');
   });
 
   it('compares the catalog the product enforces, not a second list', () => {

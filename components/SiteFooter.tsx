@@ -55,9 +55,9 @@ type Props = {
 
 export function SiteFooter({
   note = 'Table QR ordering and restaurant operations, built around the service a restaurant actually runs.',
-  scope = 'Sample restaurant content. No live payments or subscriptions.',
-  fineLeft = 'AutoDine · Product preview',
-  fineRight = 'Not for live restaurant operations',
+  scope = 'QR ordering, kitchen and counter — ready for service.',
+  fineLeft = 'AutoDine',
+  fineRight = 'Built for Indian restaurants',
   address,
   phone,
 }: Props = {}) {

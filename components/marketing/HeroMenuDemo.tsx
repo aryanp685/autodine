@@ -130,7 +130,7 @@ export function HeroMenuDemo() {
       className="relative mx-auto w-full"
       data-menu-demo
       role="group"
-      aria-label="Interactive preview of the guest menu"
+      aria-label="Interactive demo of the guest menu"
       onPointerEnter={() => setHovered(true)}
       onPointerLeave={() => setHovered(false)}
       onFocusCapture={() => setFocused(true)}

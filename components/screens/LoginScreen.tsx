@@ -74,13 +74,13 @@ export function LoginScreen({ error, notice, next }: { error?: string; notice?: 
       action={{ prompt: 'New to AutoDine?', label: 'Create an account', href: '/signup' }}
       notes={[
         <span key="live">
-          <strong>Ordering, the kitchen board and the counter are live in this preview.</strong> Not certified for live restaurant operations.
+          <strong>Ordering, the kitchen board and the counter are live.</strong> Every outlet, order and menu row stays exactly where you left it.
         </span>,
         <span key="plans">
-          <strong>Plans are not on sale.</strong> New accounts start with {TRIAL_DAYS} trial days; existing workspaces keep their recorded end date. After it, access is read-only until extended.
+          <strong>New accounts start with {TRIAL_DAYS} trial days.</strong> Pick a plan whenever you are ready — checkout is secure, through Cashfree.
         </span>,
         <span key="payments">
-          <strong>Payments are recorded at the counter.</strong> AutoDine does not collect online payments.
+          <strong>Guest bills are settled your way.</strong> AutoDine records counter payments; subscription billing runs through Cashfree.
         </span>,
       ]}
     >

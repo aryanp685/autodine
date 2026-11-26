@@ -6,14 +6,14 @@ import { inr } from '@/lib/demo-data';
 import { BILLING, CAPABILITIES, LIVE, PLANS, outletLimitLabel, planHasFeature } from '@/lib/plans';
 
 const FAQS = [
-  { q: 'Can I purchase a plan now?', a: 'Not yet. These are indicative monthly prices, not an offer to purchase. Final pricing and applicable taxes will be confirmed before plans go on sale.' },
-  { q: 'What happens after the trial?', a: `The current trial lasts ${BILLING.trialDays} days. When access expires, the restaurant becomes read-only until access is extended. Creating an account does not purchase or activate a paid subscription.` },
+  { q: 'Can I purchase a plan now?', a: 'Yes. Pick a plan after your trial and pay securely through Cashfree — UPI, cards and net banking are supported. Taxes are shown at checkout before you confirm.' },
+  { q: 'What happens after the trial?', a: `The trial lasts ${BILLING.trialDays} days and needs no card. When it ends, pick a plan and check out through Cashfree, or the restaurant becomes read-only until you do — nothing is deleted.` },
   { q: 'What happens to my data if I don’t continue?', a: 'Nothing is deleted when the trial ends. The account becomes read-only, and the rows stay where they are. A restaurant can ask for its account to be closed; the privacy note explains what that means.' },
-  { q: 'Are these prices final, and are taxes included?', a: 'Not yet. They are planning figures, not a quotation. Final pricing and applicable taxes will be confirmed before plans go on sale.' },
+  { q: 'Are these prices final, and are taxes included?', a: 'The monthly prices shown are what you pay; applicable taxes are calculated at Cashfree checkout before you confirm, and every payment gets a receipt.' },
   { q: 'Do I need special hardware?', a: 'Use a phone for guest ordering and a compatible browser on a laptop or tablet for staff. Table cards can be printed on ordinary paper. Receipt printing depends on your browser and printer setup.' },
   {
     q: 'Can one account run more than one outlet?',
-    a: `One subscription covers the account, not each outlet. During the trial an account can add up to five. The proposed plan limits are ${PLANS.map((plan) => `${plan.name}: ${outletLimitLabel(plan.outlets)}`).join(' · ')}.`,
+    a: `One subscription covers the account, not each outlet. During the trial an account can add up to five. Plan outlet limits are ${PLANS.map((plan) => `${plan.name}: ${outletLimitLabel(plan.outlets)}`).join(' · ')}.`,
   },
 ];
 
@@ -40,12 +40,12 @@ const TIMELINE = [
   {
     when: `Days 1–${BILLING.trialDays}`,
     title: 'Run the whole product',
-    body: 'Sample content is replaced by yours. No card is asked for and no subscription is created.',
+    body: 'Your content replaces the sample menu. No card is asked for and nothing is charged.',
   },
   {
     when: `Day ${BILLING.trialDays + 1}`,
     title: 'Read-only, not deleted',
-    body: 'If access is not extended, writes stop. Every row stays, and nothing is charged.',
+    body: 'If you have not picked a plan yet, writes pause — every row stays, nothing is deleted. Checkout through Cashfree reopens the account in minutes.',
   },
 ];
 
@@ -85,11 +85,11 @@ export function PricingScreen({
             <div className="mt-6 grid gap-7 md:grid-cols-[1.2fr_0.8fr] md:items-end md:gap-16">
               <div>
                 <h1 data-reveal className="max-w-[15ch] text-[clamp(42px,6vw,76px)] leading-[1.02] font-semibold tracking-[-0.055em] text-balance">Good service.<br />A clearer price.</h1>
-                <p className="mt-6 max-w-[42ch] text-[16px] leading-relaxed text-mute">From the first scan to the final bill. Explore the planned pricing for your restaurant.</p>
+                <p className="mt-6 max-w-[42ch] text-[16px] leading-relaxed text-mute">From the first scan to the final bill. Simple monthly pricing for your restaurant.</p>
               </div>
               <div data-reveal className="rounded-2xl border border-forest/15 bg-forest-soft p-6">
-                <p className="flex items-center gap-2 text-[12px] font-semibold text-forest"><span aria-hidden="true" className="size-1.5 rounded-full bg-forest" />Plans are not on sale yet</p>
-                <p className="mt-3 text-[14px] leading-relaxed text-mute">You can create an account for a {BILLING.trialDays}-day trial. No subscription is purchased when you sign up.</p>
+                <p className="flex items-center gap-2 text-[12px] font-semibold text-forest"><span aria-hidden="true" className="size-1.5 rounded-full bg-forest" />{BILLING.trialDays}-day free trial · no card needed</p>
+                <p className="mt-3 text-[14px] leading-relaxed text-mute">Create your account, run your service, and pick a plan when you are ready. Checkout is secure, through Cashfree.</p>
                 <AuthHandoffLink href="/signup" className="mt-5 inline-flex min-h-11 items-center gap-3 rounded-full bg-forest px-5 text-[13px] font-medium text-white hover:bg-forest-strong">Start your trial <span aria-hidden="true">↗</span></AuthHandoffLink>
               </div>
             </div>
@@ -100,7 +100,7 @@ export function PricingScreen({
           <div className="mx-auto max-w-[1116px]">
             <div className="mb-7 flex flex-wrap items-end justify-between gap-3">
               <h2 id="plans-heading" className="text-[25px] font-semibold tracking-[-0.03em] sm:text-[30px]">One product. Room to grow.</h2>
-              <p className="text-[12px] text-mute">Indicative prices · one subscription per account, not per outlet</p>
+              <p className="text-[12px] text-mute">One subscription per account, not per outlet · billed through Cashfree</p>
             </div>
             <div data-pricing-grid className="grid gap-4 md:grid-cols-3">
               {PLANS.map((plan, index) => (
@@ -119,11 +119,11 @@ export function PricingScreen({
                   <div data-draw aria-hidden="true" className="my-7 h-px origin-left bg-gradient-to-r from-forest/35 via-[#B98A4B]/40 to-transparent" />
                   <p className="text-[13px] font-medium text-forest">{FOCUS[plan.id][0]}</p>
                   <p className="mt-2 min-h-12 text-[13px] leading-relaxed text-mute">{FOCUS[plan.id][1]}</p>
-                  <p className="mt-6 text-[10px] font-medium tracking-[0.12em] text-mute uppercase">Planned · not on sale</p>
+                  <p className="mt-6 text-[10px] font-medium tracking-[0.12em] text-mute uppercase">Cancel anytime</p>
                 </article>
               ))}
             </div>
-            <p className="mt-5 max-w-[70ch] text-[12px] leading-relaxed text-mute">These are proposed plans, not selectable packages. Final features, limits and taxes will be confirmed before purchase is available.</p>
+            <p className="mt-5 max-w-[70ch] text-[12px] leading-relaxed text-mute">One subscription covers your whole account. Plans are billed monthly through Cashfree and can be cancelled anytime — your data stays yours.</p>
           </div>
         </section>
 
@@ -139,7 +139,7 @@ export function PricingScreen({
 
             <div className="mt-9 hidden md:block">
               <table className="w-full table-fixed border-collapse text-left">
-                <caption className="sr-only">Planned features and limits by plan</caption>
+                <caption className="sr-only">Features and limits by plan</caption>
                 <colgroup>
                   <col />
                   {PLANS.map((plan) => <col key={plan.id} className="w-[18%]" />)}
@@ -218,7 +218,7 @@ export function PricingScreen({
                 All other features — {LIVE.map((capability) => capability.label.toLowerCase()).join(', ')} — are in every plan.
               </p>
             </div>
-            <p className="mt-5 max-w-[70ch] text-[12px] leading-relaxed text-mute">Features and outlet limits are read from the same catalog the product uses. They are proposed limits, not an offer; final limits will be confirmed before purchase is available.</p>
+            <p className="mt-5 max-w-[70ch] text-[12px] leading-relaxed text-mute">Features and outlet limits are read from the same catalog the product enforces — what you see on this page is what your plan includes.</p>
 
             <section aria-labelledby="trial-heading" className="mt-10 rounded-[24px] border border-forest/15 bg-forest-soft p-6 sm:mt-12 sm:p-8">
               <div className="grid gap-7 lg:grid-cols-[0.75fr_1.25fr] lg:items-start lg:gap-14">
@@ -265,12 +265,12 @@ export function PricingScreen({
         </section>
         <section className="px-5 pb-12 sm:px-8 sm:pb-16">
           <div className="mx-auto flex max-w-[1116px] flex-col items-start justify-between gap-6 rounded-[24px] bg-forest px-7 py-9 text-white sm:flex-row sm:items-center sm:px-10">
-            <div><h2 className="text-[clamp(26px,3vw,36px)] font-semibold tracking-[-0.035em]">See how it fits your restaurant.</h2><p className="mt-2 text-[14px] leading-relaxed text-white/75">Start with a {BILLING.trialDays}-day trial. No automatic subscription purchase.</p></div>
+            <div><h2 className="text-[clamp(26px,3vw,36px)] font-semibold tracking-[-0.035em]">See how it fits your restaurant.</h2><p className="mt-2 text-[14px] leading-relaxed text-white/75">Start with a {BILLING.trialDays}-day trial — no card, nothing automatic.</p></div>
             <AuthHandoffLink href="/signup" className="inline-flex min-h-12 shrink-0 items-center gap-4 rounded-full bg-white px-6 text-[13px] font-semibold text-forest hover:bg-white/90">Create account <span aria-hidden="true">↗</span></AuthHandoffLink>
           </div>
         </section>
       </main>
-      <SiteFooter note="Table QR ordering and restaurant operations." scope="Planned pricing. Paid plans are not currently available." fineRight="Made for restaurant service" address={address} phone={phone} />
+      <SiteFooter note="Table QR ordering and restaurant operations." scope="Simple monthly plans, billed securely through Cashfree." fineRight="Made for restaurant service" address={address} phone={phone} />
       <SiteMotion />
     </div>
   );

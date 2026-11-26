@@ -784,7 +784,7 @@ export function SettingsScreen({
                 {!live ? (
                   <p className="mt-3 text-[11.5px] leading-[1.5] text-gink-46">
                     The database is not connected, so there are no outlets to list and none can be
-                    added. The sample restaurant elsewhere in this preview is a single outlet.
+                    added. Connect the database to manage outlets.
                   </p>
                 ) : null}
 

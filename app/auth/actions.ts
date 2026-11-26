@@ -164,8 +164,8 @@ export async function signUpAction(formData: FormData): Promise<void> {
   if (!email) fail('/signup', 'Please enter a valid email address.');
   const passwordIssue = passwordProblem(password);
   if (passwordIssue) fail('/signup', passwordIssue);
-  // Preview-account data use must be explicitly acknowledged.
-  if (!agreed) fail('/signup', 'Please confirm that you understand how this preview uses your account details.');
+  // Terms and data use must be explicitly acknowledged.
+  if (!agreed) fail('/signup', 'Please confirm that you agree to the Terms and how AutoDine uses your account details.');
 
   const supabase = await createSupabaseServerClient({
     preservePkceVerifierCookiesOnAuthError: true,

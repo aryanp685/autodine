@@ -50,7 +50,7 @@ export function SignupScreen({ error }: { error?: string }) {
               ))}
             </ol>
             <p className="relative mt-4 border-t border-white/10 pt-3.5 text-[11px] leading-relaxed text-white/80">
-              Nothing is charged at signup. The preview starts with one restaurant and one menu.
+              Nothing is charged at signup. Your workspace starts with one restaurant and one menu.
             </p>
           </div>
 
@@ -69,13 +69,14 @@ export function SignupScreen({ error }: { error?: string }) {
           <strong>Your workspace is created immediately</strong> — a restaurant, one menu and
           one owner membership, ready for dishes.
         </span>,
-        <span key="preview">
-          <strong>Product preview.</strong> Explore the guest, kitchen and counter workflow. Not certified for live restaurant operations.
+        <span key="live">
+          <strong>Everything is ready on day one.</strong> QR ordering, the kitchen board and the
+          counter work together from the moment your menu is in.
         </span>,
         <span key="charged">
-          <strong>Nothing is charged.</strong> No payment gateway is connected, no plan can be
-          bought. A {TRIAL_DAYS}-day trial starts when your restaurant is created; after it ends, the workspace
-          becomes read-only until access is extended.
+          <strong>Nothing is charged.</strong> A {TRIAL_DAYS}-day trial starts when your restaurant is
+          created. When it ends, pick a plan — checkout is handled securely through Cashfree —
+          or your workspace stays readable until you do.
         </span>,
       ]}
     >
@@ -163,8 +164,8 @@ export function SignupScreen({ error }: { error?: string }) {
             className="mt-[2px] size-4 shrink-0 accent-[var(--p-accent)]"
           />
           <span className="text-[11.5px] leading-[1.55] text-gink-64">
-            I understand this is a preview, and that my details are used to create this account in
-            AutoDine’s configured account service.
+            I agree that my details are used to create this AutoDine account, and I accept the
+            Terms and Privacy policy.
           </span>
         </label>
 
@@ -172,7 +173,7 @@ export function SignupScreen({ error }: { error?: string }) {
 
         <p className="text-center text-[11.5px] leading-[1.6] text-gink-46">
           Signing up creates a restaurant workspace with one menu and one owner. A {TRIAL_DAYS}-day trial starts
-          with the workspace. No paid subscription is created by this form.
+          with the workspace. No card is required and nothing is charged by this form.
         </p>
         <p className="text-center text-[11.5px] leading-relaxed text-gink-46">
           Read our{' '}

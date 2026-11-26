@@ -34,7 +34,7 @@ describe('sign in', () => {
   const html = renderToStaticMarkup(<LoginScreen />);
 
   it('keeps the sign-in form focused with a separate desktop overview', () => {
-    expect(html).toMatch(/Sign in to your\s*<em[^>]*>restaurant<\/em>/);
+    expect(html).toMatch(/Sign in to your\s*<(?:em|span)[^>]*>restaurant<\/(?:em|span)>/);
     expect(html).toContain('name="email"');
     expect(html).toContain('name="password"');
     expect(html).toContain('type="submit"');
@@ -56,9 +56,10 @@ describe('sign in', () => {
 
   it('keeps saying what is live, without a card competing with the form', () => {
     expect(html).toContain('Ordering, the kitchen board and the counter are live');
-    expect(html).toContain('Plans are not on sale');
     expect(html).toContain('New accounts start with 21 trial days');
-    expect(html).toContain('Payments are recorded at the counter');
+    expect(html).toContain('through Cashfree');
+    expect(html).not.toContain('Plans are not on sale');
+    expect(html).not.toContain('preview');
   });
 
   it('carries the requested destination through the form', () => {
@@ -96,11 +97,12 @@ describe('sign up', () => {
   });
 
   it('promises nothing that is not connected', () => {
-    expect(html).toContain('No payment gateway is connected');
     expect(html).toContain('A 21-day trial starts');
     expect(html).not.toContain('seven-day trial');
     expect(html).not.toContain('no trial is being enforced');
-    expect(html).toContain('No paid subscription is created by this form');
+    expect(html).toContain('through Cashfree');
+    expect(html).not.toContain('preview');
+    expect(html).toContain('No card is required and nothing is charged by this form');
     expect(html).toContain('data-auth-card');
     expect(html).toContain('bg-forest');
     expect(html).toContain('text-white');

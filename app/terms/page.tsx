@@ -4,20 +4,19 @@ import { TRIAL_DAYS } from '@/lib/trial';
 
 export const metadata: Metadata = {
   title: 'Terms · AutoDine',
-  description: `Preview terms: the ${TRIAL_DAYS}-day trial, what is not available yet, and how orders and payments are handled.`,
+  description: `AutoDine terms: the ${TRIAL_DAYS}-day trial, plan billing, and how orders and payments are handled.`,
 };
 
 /**
  * Keep this page aligned with the product's enforced behavior: the account
- * trial, counter-only guest ordering, and the currently unconfigured billing
- * provider boundary.
+ * trial, counter-only guest ordering, and the Cashfree billing boundary.
  */
 export default function TermsPage() {
   return (
     <LegalPage
       kicker="Terms"
       title="What this product promises, and what it does not."
-      lede="AutoDine is in preview, preparing for its first restaurants. These terms describe how it behaves today — including the parts that are not finished."
+      lede="These terms describe how AutoDine behaves — the account trial, how orders are priced and paid, and what a plan subscription covers."
     >
       <LegalSection title="The trial">
         <p>
@@ -36,9 +35,9 @@ export default function TermsPage() {
       <LegalSection title="Plans and prices">
         <p>
           The approved monthly prices are Starter ₹999, Professional ₹2,699 and Business ₹3,699. One
-          subscription belongs to an account and is shared by its outlets. No payment provider is
-          configured, so online plan checkout and automated charges are not available; this site does
-          not charge for a plan.
+          subscription belongs to an account and is shared by its outlets. Plan subscriptions are
+          billed through Cashfree checkout inside the app; the public pricing pages link to signup, not
+          to a purchase.
         </p>
         <p>
           Plan entitlements and outlet limits are enforced by the server and database. A downgrade or
@@ -77,10 +76,9 @@ export default function TermsPage() {
 
       <LegalSection title="Availability">
         <p>
-          This is a preview, provided as it is. There is no uptime commitment, no support contract and
-          no guarantee that a feature described on the marketing pages will not change. Before a
-          restaurant relies on it for a service, it should be tested on that restaurant&rsquo;s own
-          phones, tablets and network.
+          AutoDine is provided as it is. There is no uptime commitment beyond the hosting platform&rsquo;s
+          own, and features described on the marketing pages may evolve. Before a restaurant relies on
+          it for a service, it should be tested on that restaurant&rsquo;s own phones, tablets and network.
         </p>
       </LegalSection>
     </LegalPage>

@@ -34,11 +34,11 @@ export function SampleMenu() {
           </h1>
           <p className="mt-1.5 text-[12px] tracking-[0.05em] text-gink-46">{restaurant.tagline}</p>
 
-          {/* Said at the top, in the place a status would go, because the whole
-              page is a preview and a guest must not try to order from it. */}
+          {/* Said at the top, in the place a status would go, because this page
+              is a sample and a guest must not try to order from it. */}
           <div className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-accent-soft px-2.5 py-1 text-[10.5px] font-semibold tracking-[0.07em] text-[var(--p-accent)] uppercase">
             <span aria-hidden="true" className="size-1.5 rounded-full bg-[var(--p-accent)]" />
-            Preview · no ordering
+            Sample menu · browse dishes
           </div>
         </div>
       </header>
@@ -115,8 +115,7 @@ export function SampleMenu() {
           and the same list the counter bills from.
         </p>
         <p className="mt-2 max-w-[56ch] text-[11.5px] leading-[1.6] text-gink-46">
-          Sample content. AutoDine is a product preview; nothing here is for sale and no order can
-          be placed from this page.
+          Sample content. This is a demonstration menu only; no order can be placed from this page.
         </p>
       </footer>
     </div>

@@ -49,15 +49,14 @@ export function LegalPage({
         <p className="mt-5 max-w-[62ch] text-[15px] leading-[1.6] text-mute">{lede}</p>
 
         <p className="mt-8 rounded-xl border border-cream/15 bg-white px-4 py-3 text-[12.5px] leading-relaxed text-mute-dim">
-          Product preview. This page describes what the software does today, in plain language. It is
-          not a lawyer&apos;s document, and it will be replaced by one before any restaurant is charged
-          money.
+          This page describes what the software does today, in plain language. It sits
+          beside the Terms, and both apply to every restaurant account.
         </p>
 
         <div className="mt-12 space-y-10">{children}</div>
       </main>
 
-      <SiteFooter fineRight="Product preview" address={address} phone={phone} />
+      <SiteFooter fineRight="Plain-language terms" address={address} phone={phone} />
     </div>
   );
 }

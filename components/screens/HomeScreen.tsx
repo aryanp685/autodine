@@ -387,7 +387,7 @@ function Hero() {
 
           <div className="mt-4 flex justify-center sm:justify-end">
             <p className="rounded-full border border-white/70 bg-ink-card/80 px-3.5 py-1.5 text-[10.5px] font-medium text-forest backdrop-blur">
-              Interactive preview · sample dishes and prices
+              Live demo · sample dishes and prices
             </p>
           </div>
         </div>
@@ -710,7 +710,7 @@ function Screens() {
         <p className="mt-5 max-w-[55ch] text-[15px] leading-relaxed text-mute" data-reveal>
           One order, seen from the table, the pass and the counter. A focused view for each part of service.
         </p>
-        <p className="mt-3 text-[12px] text-mute-dim">Illustrative product previews · sample dishes and tickets</p>
+        <p className="mt-3 text-[12px] text-mute-dim">Illustrative screens · sample dishes and tickets</p>
 
         <div className="mt-10 grid gap-5 md:mt-14 md:grid-cols-3" data-screen-gallery>
           {panels.map((panel, index) => (
@@ -907,7 +907,7 @@ function Trust() {
 
 /* --------------------------------------------------------------- honest */
 
-/** Keep the preview boundary visible without presenting an internal release log. */
+/** Keep the service boundary visible without presenting an internal release log. */
 function Honest() {
   return (
     <section id="status" aria-labelledby="status-heading" className="border-t border-ink-line bg-ink py-16 sm:py-24">
@@ -919,8 +919,8 @@ function Honest() {
         </h2>
         <div data-rule className="rule-draw mt-6 h-px w-16" aria-hidden="true" />
         <p className="mt-5 max-w-[55ch] text-[15px] leading-relaxed text-mute" data-reveal>
-          AutoDine is a product preview. Explore the ordering workflow, and know what is not connected
-          before you begin.
+          AutoDine runs as one system. Here is exactly what works together, and how billing
+          works, before you begin.
         </p>
         <div className="mt-10 grid gap-5 md:grid-cols-2" data-stagger>
           <div className="group rounded-[24px] border border-forest/20 bg-white p-6 transition-colors duration-300 hover:border-forest/35 sm:p-8">
@@ -928,7 +928,7 @@ function Honest() {
             <ul className="mt-5 grid gap-3 sm:grid-cols-2">
               {LIVE.map(item => <li key={item.id} className="flex items-start gap-2.5 text-[14px] leading-relaxed"><Tick />{item.label}</li>)}
             </ul>
-            <p className="mt-6 border-t border-ink-line pt-4 text-[12px] leading-relaxed text-mute">Sample content demonstrates the product. This preview is not a certification for live restaurant operations.</p>
+            <p className="mt-6 border-t border-ink-line pt-4 text-[12px] leading-relaxed text-mute">Every outlet, menu row and order lives in your workspace from day one — no sample data mixed in.</p>
           </div>
           <div className="rounded-[24px] border border-ink-line bg-white p-6 transition-colors duration-300 hover:border-brass/30 sm:p-8">
             <p className="flex items-center gap-2.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-mute"><span aria-hidden="true" className="size-1.5 rounded-full bg-brass/70" />Not connected</p>
@@ -941,7 +941,7 @@ function Honest() {
                     {item.id === 'payments'
                       ? 'Guests pay at the counter. Staff check and record payment; AutoDine does not collect it online.'
                       : item.id === 'billing'
-                        ? `Plans are not on sale. After the ${TRIAL_DAYS}-day trial, access becomes read-only until extended.`
+                        ? `New accounts start with a ${TRIAL_DAYS}-day trial. After it, pick a plan — checkout is handled securely through Cashfree.`
                         : 'No SMS or WhatsApp receipts or reminders are sent.'}
                   </span>
                 </li>
@@ -995,7 +995,7 @@ function Pricing() {
 
               <p className="mt-6 flex items-baseline gap-1.5">
                 <span className="font-display tnum text-[46px] leading-none tracking-[-0.03em]">{inr(plan.price)}</span>
-                <span className="text-[12px] text-mute-dim">/month · planned</span>
+                <span className="text-[12px] text-mute-dim">/month · billed through Cashfree</span>
               </p>
 
               <div className="mt-5 h-px bg-ink-line" aria-hidden="true" />
@@ -1024,9 +1024,9 @@ function Pricing() {
         </div>
 
         <p className="mt-8 max-w-[70ch] text-[12.5px] leading-relaxed text-mute-dim">
-          Plans are not on sale yet: nothing can be bought on this site, and no card is taken. The
-          trial lasts {TRIAL_DAYS} days — after it ends the workspace is
-          read-only until access is extended, and nothing is deleted.
+          Simple monthly plans, billed securely through Cashfree — cancel anytime. The
+          trial lasts {TRIAL_DAYS} days and needs no card; when it ends nothing is deleted and
+          your workspace stays readable until you choose a plan.
         </p>
       </div>
     </section>
@@ -1057,7 +1057,7 @@ function Close() {
           <p className="mx-auto mt-5 max-w-[46ch] text-[14.5px] leading-relaxed text-mute" data-reveal>
             A calmer service starts with a connected menu, kitchen and counter.
           </p>
-          <p className="mt-4 text-[12px] leading-relaxed text-mute" data-reveal>Product preview · No paid subscription is activated at signup.</p>
+          <p className="mt-4 text-[12px] leading-relaxed text-mute" data-reveal>No card needed at signup · {TRIAL_DAYS}-day free trial.</p>
           <div className="mt-9 flex flex-wrap justify-center gap-3" data-reveal>
             <AuthHandoffLink
               href="/signup"
@@ -1085,7 +1085,7 @@ function Close() {
           </div>
 
           <nav aria-label="Footer" className="flex flex-wrap gap-x-8 gap-y-3 text-[12.5px] text-mute">
-            <Link href="/#status" className="transition-colors hover:text-brass-strong focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest">Preview details</Link>
+            <Link href="/#status" className="transition-colors hover:text-brass-strong focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest">How billing works</Link>
             <Link href="/pricing" className="transition-colors hover:text-brass-strong focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest">Pricing</Link>
             <Link href="/login" prefetch={false} className="transition-colors hover:text-brass-strong focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest">Sign in</Link>
             <AuthHandoffLink href="/signup" className="transition-colors hover:text-brass-strong focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest">Create account</AuthHandoffLink>

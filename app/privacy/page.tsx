@@ -92,8 +92,8 @@ export default function PrivacyPage() {
 
       <LegalSection title="Questions">
         <p>
-          This is a product preview preparing for its first restaurants. Questions about a specific
-          restaurant&rsquo;s data should go to the person who set that restaurant&rsquo;s account up.
+          Questions about a specific restaurant&rsquo;s data should go to the person who set that
+          restaurant&rsquo;s account up. For anything else, contact the AutoDine team.
         </p>
       </LegalSection>
     </LegalPage>
