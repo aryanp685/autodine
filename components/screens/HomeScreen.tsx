@@ -229,20 +229,20 @@ function Hero() {
       <div className="relative mx-auto grid max-w-[1180px] gap-12 px-5 pb-16 pt-24 sm:px-8 sm:pt-28 lg:grid-cols-[1fr_0.92fr] lg:items-center lg:gap-8 lg:pb-20 lg:pt-32">
         <div className="relative z-10 max-w-[36rem]">
           <p
-            className="inline-flex items-center gap-2.5 rounded-full border border-forest/12 bg-ink-card/70 px-3.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-forest backdrop-blur-sm"
+            className="inline-flex items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.28em] text-forest/70"
             data-hero-step
           >
-            <span aria-hidden="true" className="size-1.5 rounded-full bg-brass" />
-            Autodine · Swagat
+            Restaurant technology
+            <span aria-hidden="true" className="h-px w-10 bg-forest/30" />
           </p>
 
           <h1
             id="hero-heading"
-            className="display mt-7 text-[clamp(2.75rem,6.4vw,5.05rem)] leading-[0.98]"
+            className="display mt-7 text-[clamp(2.75rem,6.4vw,5.05rem)] leading-[1.02]"
           >
             <span className="block overflow-hidden pb-[0.06em]"><span className="block" data-line>Every table,</span></span>
-            <span className="block overflow-hidden pb-[0.06em]"><span className="block text-forest" data-line>one seamless</span></span>
-            <span className="block overflow-hidden pb-[0.08em]"><span className="block" data-line><em className="font-normal italic text-brass-strong">experience.</em></span></span>
+            <span className="block overflow-hidden pb-[0.06em]"><span className="block" data-line>one seamless</span></span>
+            <span className="block overflow-hidden pb-[0.08em]"><span className="block text-brass" data-line>experience.</span></span>
           </h1>
 
           <p className="mt-7 max-w-[42ch] text-pretty text-[15.5px] leading-[1.75] text-mute" data-hero-step>
@@ -291,6 +291,32 @@ function Hero() {
 
                 <Sprig className="pointer-events-none absolute -right-2 -top-2 h-32 w-auto rotate-[132deg] text-forest opacity-25" weight={1.2} />
                 <Sprig className="pointer-events-none absolute -bottom-6 -left-3 h-36 w-auto rotate-[8deg] text-forest opacity-20" weight={1.2} />
+
+                <div
+                  aria-hidden="true"
+                  className="absolute bottom-5 right-4 flex items-center gap-2 rounded-xl border border-white/80 bg-white/95 px-2.5 py-2 shadow-[0_16px_34px_-20px_rgba(28,59,43,0.55)] sm:-right-4 sm:-bottom-4"
+                >
+                  <svg viewBox="0 0 24 24" className="size-9" role="img">
+                    <g fill="#17483d">
+                      <rect x="1" y="1" width="7" height="7" rx="1" fillOpacity="0.12" />
+                      <rect x="3" y="3" width="3" height="3" />
+                      <rect x="16" y="1" width="7" height="7" rx="1" fillOpacity="0.12" />
+                      <rect x="18" y="3" width="3" height="3" />
+                      <rect x="1" y="16" width="7" height="7" rx="1" fillOpacity="0.12" />
+                      <rect x="3" y="18" width="3" height="3" />
+                      <rect x="11" y="2" width="2" height="2" />
+                      <rect x="12" y="6" width="2" height="2" />
+                      <rect x="10" y="11" width="3" height="3" />
+                      <rect x="15" y="12" width="2" height="2" />
+                      <rect x="18" y="15" width="2" height="2" />
+                      <rect x="20" y="19" width="3" height="3" />
+                      <rect x="12" y="17" width="2" height="2" />
+                      <rect x="16" y="20" width="2" height="2" />
+                      <rect x="10" y="20" width="1.5" height="3" />
+                    </g>
+                  </svg>
+                  <span className="text-[9px] font-semibold uppercase tracking-[0.14em] text-forest">Table 05</span>
+                </div>
               </div>
             </HeroVisualMotion>
 
@@ -305,10 +331,14 @@ function Hero() {
               </span>
             </div>
 
-            <div aria-hidden="true" className="absolute -right-2 top-8 hidden rounded-2xl border border-brass/25 bg-brass px-3.5 py-2 text-cream shadow-[0_16px_34px_-20px_rgba(255,112,37,0.9)] sm:block">
-              <span className="block font-display text-[19px] italic leading-none">₹600</span>
-              <span className="mt-1 block text-[9px] uppercase tracking-[0.12em] text-cream">Sample bill · paid at counter</span>
-            </div>
+            <div
+              aria-hidden="true"
+              className="absolute -right-10 -top-16 -z-10 size-[380px] rounded-full bg-forest shadow-[0_40px_80px_-48px_rgba(23,72,61,0.6)]"
+            />
+            <div
+              aria-hidden="true"
+              className="absolute -bottom-10 -left-12 -z-10 size-[220px] rounded-full bg-brass/15"
+            />
           </div>
 
           <div className="mt-4 flex justify-center sm:justify-end">

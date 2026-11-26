@@ -102,15 +102,30 @@ export function BrandLockup({
       style={{ display: 'inline-flex', alignItems: 'center', gap: size * 0.34, color: ink }}
     >
       <BrandMark size={size * 1.36} ink={ink} dot={dot} tone="lockup" />
-      <span
-        style={{
-          fontSize: size * 0.82,
-          fontWeight: 500,
-          letterSpacing: '-0.04em',
-          lineHeight: 1,
-        }}
-      >
-        autodine
+      <span style={{ display: 'inline-flex', flexDirection: 'column', gap: size * 0.12 }}>
+        <span
+          style={{
+            fontSize: size * 0.82,
+            fontWeight: 500,
+            letterSpacing: '-0.04em',
+            lineHeight: 1,
+          }}
+        >
+          autodine
+        </span>
+        {size >= 20 ? (
+          <span
+            style={{
+              fontSize: size * 0.36,
+              fontWeight: 500,
+              letterSpacing: '0.02em',
+              lineHeight: 1,
+              opacity: 0.62,
+            }}
+          >
+            Smart Restaurant Solutions
+          </span>
+        ) : null}
       </span>
     </span>
   );

@@ -102,7 +102,7 @@ export function AuthShell({
               <span aria-hidden="true" className="h-px w-5 bg-[var(--auth-accent)]" />
               {eyebrow}
             </p>
-            <h1 className="mt-3 text-balance text-[clamp(1.55rem,3.2vw,1.95rem)] leading-[1.12] font-medium tracking-[-0.045em] text-[var(--auth-heading)]">
+            <h1 className="mt-3 text-balance text-[clamp(1.7rem,3.4vw,2.1rem)] leading-[1.08] font-bold tracking-[-0.03em] text-[var(--auth-heading)]">
               {title}
             </h1>
             <p className="mt-2.5 border-b border-hair pb-5 text-[13px] leading-[1.6] text-gink-64">

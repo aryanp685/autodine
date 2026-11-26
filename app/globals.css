@@ -1299,13 +1299,11 @@ body {
   --font-sans: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto,
     'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
 
-  /* The editorial voice of the public pages. No download: the serif is the
-     one the operating system already has, and the stack is ordered so macOS
-     gets Iowan Old Style, Windows gets Palatino/Georgia, everything else
-     falls back to the platform serif. Used in italic for the one accented
-     word in a headline -- never for body text. */
-  --font-display: 'Fraunces', 'Iowan Old Style', 'Palatino Linotype', Palatino,
-    'Book Antiqua', 'New York', Georgia, ui-serif, serif;
+  /* The reference is a bold geometric sans: SF Pro on Apple hardware (the
+     stack resolves there first), Inter elsewhere -- the closest freely
+     licensed match, already installed on the platform. */
+  --font-display: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
 
   --radius-card: 18px;
   --radius-panel: 24px;
@@ -1579,13 +1577,13 @@ body {
   background-repeat: no-repeat;
 }
 
-/* The serif's default optical size is small at display sizes; tighten the
-   tracking there so a three-line headline reads as one shape. */
+/* The reference is a bold geometric sans at display sizes -- SF Pro / Inter,
+   already in --font-sans, nothing to download. Tight tracking so a three-line
+   headline reads as one shape. */
 .public-landing .display {
-  font-family: var(--font-display);
-  font-weight: 500;
-  letter-spacing: -0.022em;
-  font-variation-settings: 'SOFT' 40, 'WONK' 1;
+  font-family: var(--font-sans);
+  font-weight: 800;
+  letter-spacing: -0.035em;
   text-wrap: balance;
 }
 
