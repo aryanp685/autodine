@@ -1,7 +1,7 @@
 import type { CSSProperties, ReactNode } from 'react';
 import Link from 'next/link';
 import { BrandMark } from '@/components/BrandMark';
-import { BRAND_GREEN } from '@/lib/brand';
+
 
 /**
  * The shell every screen in the ordering flow wears.
@@ -180,7 +180,9 @@ export function GuestFlow({
                 aria-label="AutoDine"
                 className="-ml-1.5 grid size-9 shrink-0 place-items-center rounded-full text-gink transition hover:bg-gink-07"
               >
-                <BrandMark size={22} ink="currentColor" dot={BRAND_GREEN} tone="flow" />
+                <span className="inline-flex items-center justify-center rounded-full bg-[#FBF6EE] p-1.5 ring-1 ring-black/5">
+                  <BrandMark size={20} />
+                </span>
               </Link>
             )}
 

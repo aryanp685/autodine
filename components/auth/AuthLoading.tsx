@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef } from 'react';
-import { BrandMark } from '@/components/BrandMark';
+import { BrandLockup } from '@/components/BrandMark';
 import { AuthHandoffLink } from '@/components/AuthHandoffLink';
 import { useBrandHandoff } from '@/components/useBrandHandoff';
 
@@ -29,8 +29,7 @@ export function AuthLoading() {
             aria-label="AutoDine home"
             className="inline-flex items-center gap-2.5 text-gink"
           >
-            <BrandMark size={25} className="translate-y-[1px]" tone="auth" />
-            <span className="text-[16px] leading-none font-medium tracking-[-0.04em]">autodine</span>
+            <BrandLockup height={30} priority />
           </AuthHandoffLink>
           <div aria-hidden="true" className="h-9 w-[104px] rounded-full border border-hair bg-white/70" />
         </div>

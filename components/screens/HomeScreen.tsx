@@ -11,7 +11,6 @@ import { HeroMenuDemo } from '@/components/marketing/HeroMenuDemo';
 import { HeroVisualMotion } from '@/components/marketing/HeroVisualMotion';
 import { AuthHandoffLink } from '@/components/AuthHandoffLink';
 import { CornerGarden, LeafFrond, Sprig } from '@/components/marketing/Botanical';
-import { BRAND_GREEN } from '@/lib/brand';
 import { TRIAL_DAYS } from '@/lib/trial';
 
 /**
@@ -1078,7 +1077,7 @@ function Close() {
       <div className="border-t border-ink-line">
         <div className="mx-auto flex max-w-[1180px] flex-col gap-6 px-5 py-10 sm:flex-row sm:items-center sm:justify-between sm:px-8">
           <div>
-            <BrandLockup size={20} ink="currentColor" dot={BRAND_GREEN} />
+            <BrandLockup variant="stacked" height={86} />
             <p className="mt-3 max-w-[42ch] text-[12.5px] leading-relaxed text-mute-dim">
               QR menu, kitchen board, counter — one system.
             </p>

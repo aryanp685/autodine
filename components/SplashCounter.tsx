@@ -94,14 +94,15 @@ export function SplashCounter({ force = false, minMs = 2800 }: { force?: boolean
             style={{ transition: 'stroke-dashoffset 120ms linear' }}
           />
         </svg>
-        <BrandMark size={46} ink="#17483d" dot="#ff7025" />
+        <BrandMark size={56} priority />
       </div>
 
       <p
         className="mt-8 text-[38px] font-semibold leading-none tracking-[-0.04em] text-forest"
         style={{ fontFamily: "'Fraunces', Georgia, serif", fontVariationSettings: "'SOFT' 40, 'WONK' 1" }}
       >
-        autodine
+        <span className="text-forest">auto</span>
+        <span className="text-[#EA6A2A]">dine</span>
       </p>
       <p className="mt-2.5 text-[10px] font-semibold uppercase tracking-[0.34em] text-forest/55">
         Smart Restaurant Solutions

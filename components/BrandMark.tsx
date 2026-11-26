@@ -1,140 +1,90 @@
 /**
- * The AutoDine mark: an A that is a hand holding a fork.
+ * The AutoDine logo, in the three forms the owner supplied.
  *
  * WHERE THIS COMES FROM
  *
- * The owner's own artwork. It was exported at 331px and is not a vector, so
- * this is a redrawn approximation rather than the source file -- close enough
- * to be indistinguishable at the sizes it is used (16px in a tab, 28px in the
- * nav, 40px on a phone), and honestly not pixel-exact at poster size. If the
- * original .ai or .svg ever turns up, replace the paths below and nothing else
- * has to change.
+ * The owner's own artwork: an A whose right leg is a leaf, in forest green and
+ * orange on cream. The deliverables arrived as flat images rather than SVG, so
+ * the files in `public/brand/` are the artwork with the cream background
+ * knocked out and the empty margin trimmed. Nothing is redrawn here, so the
+ * mark is exactly what was signed off; when vector originals arrive, drop them
+ * in at the same paths and nothing else has to change.
  *
- * HOW IT IS BUILT
+ * THE THREE FORMS
  *
- * A mask, not a stack of shapes: everything is punched out of one solid form,
- * so the fork is a true hole through the letterform rather than a white shape
- * sitting on top of it. That matters the moment the mark sits on anything
- * other than white -- a dark nav, a coloured tile, a photograph. A white-on-
- * white fake would show as a pale ghost.
+ *  - `horizontal` (mark + wordmark side by side): the desktop header, where the
+ *    bar is wide and short.
+ *  - `stacked` (mark above the wordmark): the footer, where the column is
+ *    narrow and tall.
+ *  - `icon` (the mark alone): the browser favicon and the phone header, where
+ *    anything wider than the mark steals room from the actions.
  *
- * The mask id is derived from `tone`, so two marks with different colours can
- * be on the same page without one stealing the other's mask.
+ * RATIO
  *
- * NO ".in"
- *
- * The wordmark is "autodine". A domain in a logo dates the day the domain
- * changes, and the mark carries the meaning anyway.
+ * Every image is sized by height and given the width its own aspect ratio calls
+ * for, so it scales without stretching and reserves its space before it loads.
  */
 
+export type LockupVariant = 'horizontal' | 'stacked' | 'icon';
+
+const LOGOS: Record<LockupVariant, { src: string; width: number; height: number }> = {
+  horizontal: { src: '/brand/autodine-horizontal.png', width: 480, height: 109 },
+  stacked: { src: '/brand/autodine-stacked.png', width: 260, height: 197 },
+  icon: { src: '/brand/autodine-icon.png', width: 320, height: 259 },
+};
+
+/** The mark alone, for tight spots and loading moments. */
 export function BrandMark({
   size = 28,
-  ink = 'currentColor',
-  dot = '#2f7d4f',
   className,
-  /** Distinguishes the mask when two marks with different colours share a page. */
-  tone = 'a',
+  priority = false,
 }: {
+  /** Height in px; the width follows the artwork's own ratio. */
   size?: number;
-  ink?: string;
-  dot?: string;
   className?: string;
-  tone?: string;
+  priority?: boolean;
 }) {
-  const id = `ad-mark-${tone}`;
+  const logo = LOGOS.icon;
 
   return (
-    <svg
-      viewBox="0 0 128 120"
-      width={size}
-      height={(size * 120) / 128}
+    <img
+      src={logo.src}
+      alt="AutoDine"
+      width={Math.round((size * logo.width) / logo.height)}
+      height={size}
       className={className}
-      role="img"
-      aria-label="AutoDine"
-    >
-      <defs>
-        <mask id={id}>
-          <rect width="128" height="120" fill="#000" />
-          {/* left leg */}
-          <path d="M56 30 L32 85" stroke="#fff" strokeWidth="25" strokeLinecap="round" fill="none" />
-          {/* the round apex, then the right leg */}
-          <circle cx="57" cy="28.5" r="12.4" fill="#fff" />
-          <path d="M57 17 C65.5 16.6 72 20.4 75 27.4 L97 68 L61 68 Z" fill="#fff" />
-          {/* the fork, knocked out */}
-          <g stroke="#000" strokeLinecap="round" fill="none">
-            <path d="M45.6 43.4 L52.4 31.2" strokeWidth="4.6" />
-            <path d="M52.8 45.8 L59.6 33.4" strokeWidth="4.6" />
-            <path d="M60 48.2 L66.8 35.8" strokeWidth="4.6" />
-            <path
-              d="M45.6 43.4 C42.9 48.4 42.7 52.2 45.2 55.2 C47.9 57.6 52 57.4 54.6 54.8"
-              strokeWidth="5.6"
-            />
-          </g>
-        </mask>
-      </defs>
-
-      <rect width="128" height="120" fill={ink} mask={`url(#${id})`} />
-      <circle cx="89.5" cy="86" r="13.6" fill={dot} />
-    </svg>
+      style={{ height: size, width: 'auto' }}
+      decoding="async"
+      fetchPriority={priority ? 'high' : 'auto'}
+    />
   );
 }
 
-/**
- * Mark plus wordmark, for places with room for both.
- *
- * The word is set in the page's own typeface at the page's own ink, so it
- * belongs to the surface it sits on instead of carrying a second palette.
- */
+/** Mark plus wordmark, for places with room for both. */
 export function BrandLockup({
-  size = 26,
-  ink = 'currentColor',
-  dot = '#2f7d4f',
+  variant = 'horizontal',
+  height = 30,
   className,
-  sublineClassName = '',
-  wordClassName = '',
+  priority = false,
 }: {
-  size?: number;
-  ink?: string;
-  dot?: string;
+  variant?: LockupVariant;
+  /** Height in px; the width follows the artwork's own ratio. */
+  height?: number;
   className?: string;
-  /** Lets a narrow bar drop the tagline without a second mark component. */
-  sublineClassName?: string;
-  /** Lets the tightest bars drop to the mark alone. */
-  wordClassName?: string;
+  priority?: boolean;
 }) {
+  const logo = LOGOS[variant];
+
   return (
-    <span
+    <img
+      src={logo.src}
+      alt="AutoDine"
+      width={Math.round((height * logo.width) / logo.height)}
+      height={height}
       className={className}
-      style={{ display: 'inline-flex', alignItems: 'center', gap: size * 0.34, color: ink }}
-    >
-      <BrandMark size={size * 1.36} ink={ink} dot={dot} tone="lockup" />
-      <span style={{ display: 'inline-flex', flexDirection: 'column', gap: size * 0.12 }}>
-        <span
-          className={wordClassName}
-          style={{
-            fontSize: size * 0.82,
-            fontWeight: 500,
-            letterSpacing: '-0.04em',
-            lineHeight: 1,
-          }}
-        >
-          autodine
-        </span>
-        {size >= 20 ? (
-          <span
-            className={sublineClassName}
-            style={{
-              fontSize: size * 0.36,
-              fontWeight: 500,
-              letterSpacing: '0.02em',
-              lineHeight: 1,
-              opacity: 0.62,
-            }}
-          >
-            Smart Restaurant Solutions
-          </span>
-        ) : null}
-      </span>
-    </span>
+      style={{ height, width: 'auto' }}
+      decoding="async"
+      fetchPriority={priority ? 'high' : 'auto'}
+    />
   );
 }

@@ -10,9 +10,8 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { BrandLockup } from '@/components/BrandMark';
+import { BrandLockup, BrandMark } from '@/components/BrandMark';
 import { AuthHandoffLink } from '@/components/AuthHandoffLink';
-import { BRAND_GREEN } from '@/lib/brand';
 
 const NAV_LINKS = [
   { label: 'Product', href: '/#product', id: 'product' },
@@ -99,13 +98,8 @@ export function HomeNav({
           data-brand-handoff
           className="min-w-0 shrink rounded-full text-cream transition-opacity duration-300 hover:opacity-75"
         >
-          <BrandLockup
-            size={21}
-            ink="currentColor"
-            dot={BRAND_GREEN}
-            wordClassName="hidden min-[360px]:inline"
-            sublineClassName="hidden sm:block"
-          />
+          <BrandLockup height={34} className="hidden sm:block" priority />
+          <BrandMark size={34} className="sm:hidden" priority />
         </Link>
 
         <nav aria-label="Primary" className="hidden flex-1 md:block">

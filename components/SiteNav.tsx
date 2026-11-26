@@ -22,7 +22,6 @@
 
 import Link from 'next/link';
 import { BrandLockup } from '@/components/BrandMark';
-import { BRAND_GREEN } from '@/lib/brand';
 import { useEffect, useState } from 'react';
 
 export type SiteNavLink = { label: string; href: string; active?: boolean };
@@ -103,7 +102,7 @@ export function SiteNav({
           aria-label="AutoDine home"
           className={onImage ? 'shrink-0 text-cream' : 'shrink-0 text-cream'}
         >
-          <BrandLockup size={21} ink="currentColor" dot={BRAND_GREEN} />
+          <BrandLockup height={34} priority />
         </Link>
 
         <nav aria-label="Primary" className="hidden flex-1 md:block">

@@ -218,7 +218,7 @@ export function DashboardBar({
                 carries the brand green: the rail is pale, so the dot has to be
                 the one saturated thing in the column rather than another grey
                 line. It stays a token, so the mark is one value in one place. */}
-            <BrandLockup size={21} ink="currentColor" dot="var(--p-brass)" />
+            <BrandLockup height={26} />
           </Link>
 
           <button

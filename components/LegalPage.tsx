@@ -2,7 +2,7 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { BrandLockup } from '@/components/BrandMark';
 import { SiteFooter } from '@/components/SiteFooter';
-import { BRAND_GREEN } from '@/lib/brand';
+
 
 /**
  * The shape both reading pages share.
@@ -33,7 +33,7 @@ export function LegalPage({
       <header className="border-b border-cream/[0.12]">
         <div className="mx-auto flex h-16 max-w-[820px] items-center justify-between px-5 sm:px-8">
           <Link href="/" aria-label="AutoDine home">
-            <BrandLockup size={21} ink="currentColor" dot={BRAND_GREEN} />
+            <BrandLockup height={34} />
           </Link>
           <Link href="/" className="text-[13px] text-mute transition-colors hover:text-cream">
             Back to the site

@@ -1,6 +1,5 @@
 import Link from 'next/link';
 import { BrandLockup } from '@/components/BrandMark';
-import { BRAND_GREEN } from '@/lib/brand';
 
 /* ============================================================================
    The footer is the last thing a page says, so it says the same thing on every
@@ -68,7 +67,7 @@ export function SiteFooter({
         <div className="grid gap-10 md:grid-cols-[1.6fr_1fr_1fr_1.2fr]">
           <div>
             <div className="text-cream">
-              <BrandLockup size={20} ink="currentColor" dot={BRAND_GREEN} />
+              <BrandLockup variant="stacked" height={78} />
             </div>
             <p className="mt-4 max-w-[38ch] text-[13px] leading-[1.6] text-mute">{note}</p>
             {contact && (
