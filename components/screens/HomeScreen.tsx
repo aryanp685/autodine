@@ -281,7 +281,7 @@ function Hero() {
             <HeroVisualMotion className="relative">
               {/* The phone floats directly over the full-bleed photo, no card
                   behind it — the framed card is a small-screen-only stage. */}
-              <div className="relative sm:w-[300px] lg:ml-auto lg:mr-6 lg:w-[320px] xl:mr-16">
+              <div className="relative hidden sm:block sm:w-[300px] lg:ml-auto lg:mr-6 lg:w-[320px] xl:mr-16">
                 <HeroMenuDemo />
               </div>
 
@@ -293,7 +293,7 @@ function Hero() {
                     both. Photo is from the signature frontend's own asset. */}
                 <div
                   aria-hidden="true"
-                  className="absolute -inset-x-6 -top-10 bottom-0 rounded-[45%_0_0_0] bg-[linear-gradient(90deg,#fbf5ec_0%,rgba(251,245,236,0)_34%),url('/restaurant.jpg')] bg-[position:center_54%] bg-cover"
+                  className="absolute -inset-x-6 -top-10 bottom-0 rounded-[45%_0_0_0] bg-[linear-gradient(90deg,rgba(251,245,236,0.92)_0%,rgba(251,245,236,0.35)_55%,rgba(251,245,236,0.05)_100%)]"
                 />
                 <div
                   aria-hidden="true"
