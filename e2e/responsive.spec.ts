@@ -112,6 +112,10 @@ test(`responsive: ${route.slug} holds from 320px to 1440px`, async ({ page }) =>
 test('responsive: the phone menu opens and reaches every link', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 800 });
   await page.goto('/');
+  // The first-load veil sits above the bar on purpose; wait it out, the way a
+  // visitor does, instead of racing it with the click.
+  await waitForAppReady(page);
+  await page.locator('[data-splash]').waitFor({ state: 'detached', timeout: 15_000 });
 
   const toggle = page.getByRole('button', { name: /open menu/i });
   await expect(toggle, 'hamburger must exist on a phone').toBeVisible();

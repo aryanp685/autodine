@@ -26,6 +26,7 @@ const nextConfig = {
    */
   allowedDevOrigins: [
     '*.e2b.app',
+    '*.vercel.run',
     ...(process.env.DEV_PREVIEW_ORIGINS ?? '')
       .split(',')
       .map((origin) => origin.trim())

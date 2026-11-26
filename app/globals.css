@@ -1587,6 +1587,19 @@ body {
   text-wrap: balance;
 }
 
+/* The three-screen gallery: the reference sheet's warm set — cream cards on a
+   peach wash, sand tiles and saffron marks. Deliberately green-free, so the
+   band reads as paper and clay between the cream sections around it. */
+.screens-band {
+  --screens-card: #fffaf1;
+  --screens-surface: #fffdf8;
+  --screens-line: #ecdfcc;
+  --screens-tile: #f7e8d4;
+  --screens-peach: #fdeedd;
+  --screens-peach-deep: #f9ddc2;
+  --screens-track: #f0e4d3;
+}
+
 /* A leaf that breathes. Position lives on the wrapper, motion on the `rotate`
    property, so the two never fight over `transform`. */
 @media (prefers-reduced-motion: no-preference) {
@@ -1739,6 +1752,34 @@ body {
 }
 @media (prefers-reduced-motion: reduce) {
   .auth-pending-bar { transform: scaleX(1); opacity: 0.7; }
+}
+
+/* The submit button while the server answers: the AutoDine mark breathing
+   beside three brass dots. Under reduced motion both settle to a still mark
+   and three steady dots, so the state stays legible without movement. */
+.auth-loading-logo { display: inline-flex; flex: none; }
+.auth-loading-dots { display: inline-flex; align-items: center; gap: 3px; }
+.auth-loading-dots i {
+  display: block;
+  width: 4px;
+  height: 4px;
+  border-radius: 9999px;
+  background: currentColor;
+  opacity: 0.45;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .auth-loading-logo { animation: auth-mark-breathe 1.6s ease-in-out infinite; }
+  @keyframes auth-mark-breathe {
+    0%, 100% { transform: scale(0.92); opacity: 0.7; }
+    50% { transform: scale(1); opacity: 1; }
+  }
+  .auth-loading-dots i { animation: auth-dot 1.05s ease-in-out infinite; }
+  .auth-loading-dots i:nth-child(2) { animation-delay: 0.14s; }
+  .auth-loading-dots i:nth-child(3) { animation-delay: 0.28s; }
+  @keyframes auth-dot {
+    0%, 100% { opacity: 0.35; transform: translateY(0); }
+    50% { opacity: 1; transform: translateY(-2px); }
+  }
 }
 
 /* A quiet status pulse for the live-service board on the sign-in visual. */

@@ -1,10 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useRef, type ReactNode } from 'react';
-import { AuthHandoffLink } from '@/components/AuthHandoffLink';
-import { useBrandHandoff } from '@/components/useBrandHandoff';
-import { BrandLockup } from '@/components/BrandMark';
+import type { ReactNode } from 'react';
+import { HomeNav } from '@/components/HomeNav';
 import { AuthPanelArt } from '@/components/auth/AuthPanelArt';
 
 export const authButtonClass =
@@ -21,6 +19,11 @@ export const authButtonClass =
  * The visual slot renders inside the forest panel, below the illustration. On
  * a phone the panel is removed rather than compressed, and the card takes the
  * full measure of the screen.
+ *
+ * The bar at the top is the marketing bar itself (`HomeNav`), so the account
+ * screens carry the same cream pill, the same links and the same single action
+ * as the landing page — the only difference is that it points at the other
+ * page of the pair and drops the shortcut to the one you are already on.
  */
 export function AuthShell({
   visual,
@@ -43,14 +46,11 @@ export function AuthShell({
   notes?: ReactNode[];
   notesTitle?: string;
 }) {
-  const brandRef = useRef<HTMLAnchorElement>(null);
-  useBrandHandoff(brandRef);
-
   return (
     <div
       data-surface="owner"
       data-auth-shell
-      className="relative min-h-dvh overflow-hidden bg-paper text-gink antialiased"
+      className="relative min-h-dvh overflow-x-clip bg-paper text-gink antialiased"
     >
       <div
         aria-hidden="true"
@@ -61,26 +61,12 @@ export function AuthShell({
         className="pointer-events-none absolute inset-x-0 bottom-0 h-64 bg-gradient-to-t from-[#f3ecdf] to-transparent"
       />
 
-      <header className="relative z-10 border-b border-hair/80 bg-white/60 backdrop-blur-xl">
-        <div className="mx-auto flex h-16 w-full max-w-[1180px] items-center justify-between gap-4 px-5 sm:px-8">
-          <AuthHandoffLink href="/" ref={brandRef} data-brand-handoff className="inline-flex items-center gap-2.5 text-gink transition-opacity hover:opacity-75">
-            <BrandLockup height={30} priority />
-          </AuthHandoffLink>
-
-          {action ? (
-            <div className="flex items-center gap-3 text-[12.5px]">
-              <span className="hidden text-gink-46 sm:inline">{action.prompt}</span>
-              <Link
-                href={action.href}
-                prefetch={false}
-                className="inline-flex h-9 items-center rounded-full border border-hair bg-white/70 px-4 font-medium text-gink transition-[background-color,border-color,transform] duration-300 hover:-translate-y-px hover:border-forest/25 hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest motion-reduce:transition-none motion-reduce:hover:translate-y-0"
-              >
-                {action.label}
-              </Link>
-            </div>
-          ) : null}
-        </div>
-      </header>
+      <div className="public-landing relative z-40 contents">
+        <HomeNav
+          signIn={false}
+          cta={action ? { label: action.label, href: action.href } : null}
+        />
+      </div>
 
       <main
         data-auth-enhanced={visual ? '' : undefined}

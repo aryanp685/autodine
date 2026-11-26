@@ -61,7 +61,14 @@ export function SplashCounter({ force = false, minMs = 2800 }: { force?: boolean
       else finish();
     };
     raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+    // Safety net: requestAnimationFrame is throttled to a stop in a hidden tab
+    // and in some embedded webviews, which would leave the veil covering the
+    // page with the counter frozen. Dismiss on a timer whatever happens.
+    const safety = setTimeout(finish, minMs + 600);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(safety);
+    };
   }, [force, minMs]);
 
   if (gone) return null;

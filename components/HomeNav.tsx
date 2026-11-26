@@ -23,10 +23,16 @@ const NAV_LINKS = [
 export function HomeNav({
   activePricing = false,
   glass = false,
+  signIn = true,
+  cta = { label: 'Create account', href: '/signup' },
 }: {
   activePricing?: boolean;
   /** Landing hero mode: the photo runs behind the bar until the page scrolls. */
   glass?: boolean;
+  /** The account screen you are already on drops its own shortcut. */
+  signIn?: boolean;
+  /** The bar's one action; the auth screens point it at the other page. */
+  cta?: { label: string; href: string } | null;
 } = {}) {
   const [open, setOpen] = useState(false);
   // The bar sits flush over the hero, then settles into a compact, slightly
@@ -41,9 +47,10 @@ export function HomeNav({
     const sections = NAV_LINKS.map((link) => document.getElementById(link.id)).filter(
       (node): node is HTMLElement => node !== null,
     );
-    // Scrollspy must follow DOCUMENT order, not nav-label order: the product
-    // section sits after screens in the DOM, so a nav-ordered loop kept
-    // lighting "Screens" while the reader was on "Product".
+    // Scrollspy follows DOCUMENT order rather than the order of this array,
+    // so a section the page composes differently still highlights correctly.
+    // The landing composes its sections in exactly this nav order (product,
+    // how, screens, pricing); the sort keeps that guarantee cheap to hold.
     const ordered = [...sections].sort((a, b) => a.offsetTop - b.offsetTop);
 
     const update = () => {
@@ -130,26 +137,30 @@ export function HomeNav({
         </nav>
 
         <div className="ml-auto flex items-center gap-2 lg:gap-2.5">
-          <AuthHandoffLink
-            href="/login"
-            prefetch={false}
-            className="hidden rounded-full px-3 text-[13px] font-semibold text-cream/70 transition-colors duration-300 hover:text-brass-strong md:inline-flex md:h-9 md:items-center"
-          >
-            Sign in
-          </AuthHandoffLink>
-          <AuthHandoffLink
-            href="/signup"
-            prefetch={false}
-            className="group inline-flex h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-full bg-brass pl-3 pr-2.5 text-[13px] font-bold text-cream shadow-[0_8px_16px_rgba(244,123,41,0.3)] transition-[background-color,transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:bg-brass-strong hover:shadow-[0_12px_22px_rgba(232,91,19,0.35)] active:translate-y-0 active:bg-brass-strong focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brass motion-reduce:transition-none motion-reduce:hover:translate-y-0 sm:gap-2 sm:pl-4 sm:pr-3.5 lg:pl-5 lg:pr-4"
-          >
-            Create account
-            <span
-              aria-hidden="true"
-              className="transition-transform duration-300 group-hover:translate-x-0.5 motion-reduce:transition-none"
+          {signIn ? (
+            <AuthHandoffLink
+              href="/login"
+              prefetch={false}
+              className="hidden rounded-full px-3 text-[13px] font-semibold text-cream/70 transition-colors duration-300 hover:text-brass-strong md:inline-flex md:h-9 md:items-center"
             >
-              →
-            </span>
-          </AuthHandoffLink>
+              Sign in
+            </AuthHandoffLink>
+          ) : null}
+          {cta ? (
+            <AuthHandoffLink
+              href={cta.href}
+              prefetch={false}
+              className="group inline-flex h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-full bg-brass pl-3 pr-2.5 text-[13px] font-bold text-cream shadow-[0_8px_16px_rgba(244,123,41,0.3)] transition-[background-color,transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:bg-brass-strong hover:shadow-[0_12px_22px_rgba(232,91,19,0.35)] active:translate-y-0 active:bg-brass-strong focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brass motion-reduce:transition-none motion-reduce:hover:translate-y-0 sm:gap-2 sm:pl-4 sm:pr-3.5 lg:pl-5 lg:pr-4"
+            >
+              {cta.label}
+              <span
+                aria-hidden="true"
+                className="transition-transform duration-300 group-hover:translate-x-0.5 motion-reduce:transition-none"
+              >
+                →
+              </span>
+            </AuthHandoffLink>
+          ) : null}
           <button
             type="button"
             aria-expanded={open}
@@ -210,14 +221,26 @@ export function HomeNav({
                 </li>
               ))}
               <li className="mt-1 border-t border-ink-line/70 pt-1">
-                <Link
-                  href="/login"
-                  prefetch={false}
-                  onClick={() => setOpen(false)}
-                  className="block rounded-2xl px-4 py-3 text-[15px] text-cream/80 transition-colors duration-300 hover:bg-forest-soft/45 hover:text-cream"
-                >
-                  Sign in
-                </Link>
+                {signIn ? (
+                  <Link
+                    href="/login"
+                    prefetch={false}
+                    onClick={() => setOpen(false)}
+                    className="block rounded-2xl px-4 py-3 text-[15px] text-cream/80 transition-colors duration-300 hover:bg-forest-soft/45 hover:text-cream"
+                  >
+                    Sign in
+                  </Link>
+                ) : null}
+                {cta ? (
+                  <Link
+                    href={cta.href}
+                    prefetch={false}
+                    onClick={() => setOpen(false)}
+                    className={signIn ? 'mt-0.5 block rounded-2xl px-4 py-3 text-[15px] font-semibold text-brass-strong' : 'block rounded-2xl px-4 py-3 text-[15px] font-semibold text-brass-strong'}
+                  >
+                    {cta.label} →
+                  </Link>
+                ) : null}
               </li>
             </ul>
           </motion.nav>

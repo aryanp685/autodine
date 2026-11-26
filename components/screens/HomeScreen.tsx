@@ -184,10 +184,10 @@ export function Home() {
       <main>
         <Hero />
         <Problem />
+        <Features />
         <Steps />
         <ServiceLoop />
         <Screens />
-        <Features />
         <Trust />
         <Honest />
         <Pricing />
@@ -693,78 +693,168 @@ function ServiceLoop() {
 
 function Screens() {
   const panels = [
-    { kicker: 'Guest menu', title: 'Browse the menu', body: 'Photos, prices and dish details, together on the guest’s phone.' },
-    { kicker: 'Kitchen board', title: 'Follow the ticket', body: 'Keep table numbers, dishes and guest notes together. Staff update the ticket as preparation moves forward.' },
-    { kicker: 'Counter bill', title: 'Review, then record', body: 'See what is billed, what is recorded as paid and what is still outstanding. Staff verify payment before recording it.' },
+    {
+      kicker: 'Guest menu',
+      title: 'A menu they’ll love, right on their phone.',
+      icon: (
+        <>
+          <rect x="3" y="3" width="7" height="7" rx="2" />
+          <rect x="14" y="3" width="7" height="7" rx="2" />
+          <rect x="3" y="14" width="7" height="7" rx="2" />
+          <path d="M14 17.5h7M17.5 14v7" />
+        </>
+      ),
+    },
+    {
+      kicker: 'Kitchen board',
+      title: 'Every order, clearly in view.',
+      icon: (
+        <>
+          <path d="M6.5 16.5h11V13a4.2 4.2 0 0 0-.9-8.2A4.6 4.6 0 0 0 7.4 4.8 4.2 4.2 0 0 0 6.5 13v3.5Z" />
+          <path d="M6.5 20h11" />
+        </>
+      ),
+    },
+    {
+      kicker: 'Counter bill',
+      title: 'Keep billed and paid separate.',
+      icon: (
+        <>
+          <path d="M6 3v18l3-2 3 2 3-2 3 2V3l-3 2-3-2-3 2-3-2Z" />
+          <path d="M9.5 9h5M9.5 13h5" />
+        </>
+      ),
+    },
   ];
   return (
-    <section id="screens" aria-labelledby="screens-heading" className="relative scroll-mt-20 overflow-x-clip border-t border-ink-line bg-ink py-16 text-cream sm:py-24 lg:py-28">
-      <Sprig className="pointer-events-none absolute -left-10 top-24 hidden h-56 w-auto rotate-[18deg] text-forest opacity-[0.1] lg:block" />
-      <div className="mx-auto max-w-[1180px] px-5 sm:px-8">
-        <Eyebrow>A closer look</Eyebrow>
-        <h2 id="screens-heading" className="display mt-5 max-w-[20ch] text-[clamp(2.1rem,4.2vw,3.35rem)] leading-[1.02]" data-reveal>
-          Three screens, in <em className="font-normal italic text-brass-strong">service order.</em>
-        </h2>
-        <div data-rule className="rule-draw mt-6 h-px w-16" aria-hidden="true" />
-        <p className="mt-5 max-w-[55ch] text-[15px] leading-relaxed text-mute" data-reveal>
-          One order, seen from the table, the pass and the counter. A focused view for each part of service.
-        </p>
-        <p className="mt-3 text-[12px] text-mute-dim">Illustrative screens · sample dishes and tickets</p>
+    <section id="screens" aria-labelledby="screens-heading" className="screens-band relative scroll-mt-20 overflow-x-clip border-t border-ink-line bg-ink py-16 text-cream sm:py-24 lg:py-28">
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
+        <span className="absolute -left-24 -top-20 h-80 w-80 rounded-full bg-[radial-gradient(circle_at_center,var(--screens-peach-deep),transparent_68%)] opacity-70" />
+        <span className="absolute -right-28 top-1/4 h-[26rem] w-[26rem] rounded-full bg-[radial-gradient(circle_at_center,var(--screens-peach),transparent_70%)] opacity-80" />
+        <Sprig className="absolute -right-6 top-6 hidden h-44 w-auto rotate-[126deg] text-brass opacity-[0.16] lg:block" weight={1.1} />
+        <Sprig className="absolute -bottom-10 left-2 hidden h-52 w-auto rotate-[14deg] text-brass opacity-[0.14] lg:block" weight={1.1} />
+      </div>
 
-        <div className="mt-10 grid gap-5 md:mt-14 md:grid-cols-3" data-screen-gallery>
+      <div className="relative mx-auto max-w-[1180px] px-5 sm:px-8">
+        <div className="mx-auto max-w-[54rem] text-center">
+          <div aria-hidden="true" className="mx-auto flex items-center justify-center gap-3">
+            <span className="h-px w-10 bg-gradient-to-r from-transparent to-brass/50" />
+            <Sprig className="h-5 w-auto text-brass/80" weight={1.1} />
+            <span className="h-px w-10 bg-gradient-to-l from-transparent to-brass/50" />
+          </div>
+          <h2 id="screens-heading" className="display mt-5 text-[clamp(2rem,4.6vw,3.4rem)] leading-[1.04]" data-reveal>
+            Three screens, in <em className="font-normal italic text-brass-strong">service order.</em>
+          </h2>
+          <p className="mx-auto mt-4 max-w-[46ch] text-[15px] leading-relaxed text-mute" data-reveal>
+            Everything your team needs, brought together — the table, the pass and the counter.
+          </p>
+          <p className="mt-3 text-[12px] text-mute-dim">Illustrative screens · sample dishes and tickets</p>
+        </div>
+
+        <div className="mt-10 grid gap-5 sm:gap-6 md:mt-14 md:grid-cols-3" data-screen-gallery>
           {panels.map((panel, index) => (
-            <article key={panel.title} data-screen-card data-tour-panel className={`group flex min-w-0 flex-col overflow-hidden rounded-[26px] border border-ink-line bg-ink-card shadow-[0_4px_22px_rgba(60,40,20,0.05)] motion-safe:transition-[transform,box-shadow,border-color] motion-safe:duration-300 motion-safe:hover:-translate-y-1 motion-safe:hover:border-brass/30 motion-safe:hover:shadow-[0_28px_50px_-36px_rgba(60,40,20,0.5)] ${index === 1 ? 'md:mt-8' : ''}`}>
-              <div className="relative overflow-hidden border-b border-ink-line bg-forest-soft/70 px-5 pt-6 sm:px-7" aria-hidden="true">
-                <span className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-white/70 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
-                <p className="relative mb-4 flex items-center justify-between text-[9px] font-medium uppercase tracking-[0.1em] text-forest"><span>{panel.kicker}</span><span>Illustration</span></p>
-                <div data-screen-frame className="relative mx-auto min-h-[330px] max-w-[280px] rounded-t-2xl border border-ink-line bg-ink-card p-4 shadow-[0_6px_24px_rgba(31,77,58,0.06)]">
-                  <div className="flex items-center justify-between border-b border-ink-line pb-3 text-[10px] text-mute">
-                    <span className="font-semibold text-forest">AutoDine</span><span>{index === 1 ? 'Kitchen' : 'Table 05'}</span>
-                  </div>
-                  {index === 0 ? (
-                    <>
-                      <p className="mt-4 font-display text-[20px] leading-tight">Something delicious.</p>
-                      <p className="mt-1 text-[10px] text-mute">Fresh picks from our kitchen</p>
-                      <div className="mt-3 flex gap-2 text-[9px]"><span className="rounded-full bg-forest px-3 py-1 text-white">Popular</span><span className="rounded-full bg-ink px-3 py-1 text-mute">Mains</span></div>
-                      <div className="mt-4 grid grid-cols-2 gap-3">
-                        {[{ name: 'Paneer tikka', price: 260, image: 'paneer-tikka' }, { name: 'Butter chicken', price: 340, image: 'butter-chicken' }].map(dish => (
-                          <div key={dish.name} className="overflow-hidden rounded-lg border border-ink-line">
-                            <div className="relative h-20"><Image src={`/img/dishes/${dish.image}.jpg`} alt="" fill sizes="140px" className="object-cover" /></div>
-                            <div className="p-2"><p className="text-[10px] font-medium">{dish.name}</p><p className="mt-1 text-[10px] text-forest">₹{dish.price}</p></div>
+            <article
+              key={panel.kicker}
+              data-screen-card
+              data-tour-panel
+              className={`group relative flex min-w-0 flex-col rounded-[28px] border border-[var(--screens-line)] p-4 shadow-[0_2px_12px_rgba(96,62,32,0.06)] motion-safe:transition-[transform,box-shadow,border-color] motion-safe:duration-300 motion-safe:hover:-translate-y-1 motion-safe:hover:border-brass/35 motion-safe:hover:shadow-[0_34px_60px_-44px_rgba(96,62,32,0.6)] sm:p-5 ${
+                index === 1
+                  ? 'bg-[linear-gradient(165deg,var(--screens-peach),var(--screens-peach-deep))] md:-mt-6'
+                  : 'bg-[var(--screens-card)]'
+              }`}
+            >
+              <span aria-hidden="true" className="mb-4 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--screens-tile)] text-brass-strong">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+                  {panel.icon}
+                </svg>
+              </span>
+
+              <div data-screen-frame className="relative flex-1 rounded-[20px] bg-[var(--screens-surface)] p-4 shadow-[inset_0_0_0_1px_var(--screens-line)]" aria-hidden="true">
+                {index === 0 ? (
+                  <>
+                    <p className="text-[13px] font-semibold tracking-[-0.01em]">The Urban Table</p>
+                    <p className="mt-0.5 text-[11px] text-mute">Table 05</p>
+                    <div className="mt-3.5 space-y-2">
+                      {[
+                        { name: 'Butter Chicken', price: 369, image: 'butter-chicken' },
+                        { name: 'Paneer Tikka', price: 249, image: 'paneer-tikka' },
+                      ].map(dish => (
+                        <div key={dish.name} className="flex items-center gap-3 rounded-xl bg-[var(--screens-card)] px-2.5 py-2">
+                          <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg">
+                            <Image src={`/img/dishes/${dish.image}.jpg`} alt="" fill sizes="40px" className="object-cover" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-[11.5px] font-medium">{dish.name}</p>
+                            <p className="mt-0.5 text-[10.5px] text-mute">₹{dish.price}</p>
+                          </div>
+                          <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-brass text-[13px] font-semibold leading-none text-cream">+</span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                ) : index === 1 ? (
+                  <>
+                    <p className="flex items-center gap-1.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-brass-strong">
+                      <span className="h-1.5 w-1.5 rounded-full bg-brass" />Live kitchen
+                    </p>
+                    <div className="mt-2 flex items-start justify-between gap-2">
+                      <div>
+                        <p className="text-[17px] font-semibold leading-tight tracking-[-0.02em]">Order #1047</p>
+                        <p className="mt-0.5 text-[10.5px] text-mute">Table 05 · 2 items</p>
+                      </div>
+                      <span className="shrink-0 rounded-full bg-brass px-2.5 py-1 text-[10px] font-semibold text-cream">2 min</span>
+                    </div>
+                    <div className="mt-3 flex items-center gap-3 rounded-xl bg-[var(--screens-card)] px-2.5 py-2">
+                      <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg">
+                        <Image src="/img/dishes/butter-chicken.jpg" alt="" fill sizes="40px" className="object-cover" />
+                      </div>
+                      <div className="min-w-0 text-[11.5px] font-medium leading-snug">
+                        <p>Butter Chicken</p>
+                        <p className="text-mute">Naan</p>
+                      </div>
+                    </div>
+                    <div className="mt-4">
+                      <div className="flex items-center">
+                        {[0, 1, 2].map(step => (
+                          <div key={step} className="flex flex-1 items-center last:flex-none">
+                            <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${step < 2 ? 'bg-brass' : 'bg-[var(--screens-track)] ring-1 ring-inset ring-[var(--screens-line)]'}`} />
+                            {step < 2 ? <span className="mx-1 h-0.5 flex-1 rounded-full bg-brass/60" /> : null}
                           </div>
                         ))}
                       </div>
-                    </>
-                  ) : index === 1 ? (
-                    <>
-                      <div className="mt-4 flex items-center justify-between"><p className="font-display text-[20px] leading-tight">On the pass</p><span className="text-[9px] text-mute">2 tickets</span></div>
-                      {[{ code: 'AD-1042', table: 'Table 05', state: 'New', dish: '1 × Paneer tikka', note: 'Less spicy, please.' }, { code: 'AD-1041', table: 'Table 03', state: 'Preparing', dish: '2 × Butter naan', note: 'No additional notes' }].map(ticket => (
-                        <div key={ticket.code} className="mt-3 rounded-xl border border-ink-line border-l-[3px] border-l-brass bg-ink p-3">
-                          <div className="flex justify-between gap-2 text-[10px] font-medium"><span>{ticket.table}</span><span className="rounded-full bg-forest-soft px-2 py-0.5 text-forest">{ticket.state}</span></div>
-                          <p className="mt-2 text-[11px] font-medium">{ticket.dish}</p><p className="mt-1 text-[10px] text-mute">{ticket.note}</p>
-                          <p className="mt-2 text-[8px] tracking-wider text-mute">{ticket.code}</p>
-                        </div>
-                      ))}
-                    </>
-                  ) : (
-                    <>
-                      <p className="mt-4 font-display text-[20px] leading-tight">At the counter</p>
-                      <div className="mt-3 flex items-center justify-between text-[9px] text-mute"><span>AD-1042 · Table 05</span><span>Unpaid</span></div>
-                      <div className="mt-4 flex justify-between gap-2 border-y border-ink-line py-3 text-[10px]"><span>1 × Paneer tikka</span><span>₹260</span></div>
-                      <div className="mt-4 space-y-2 text-[10px]">
-                        <div className="flex justify-between"><span className="text-mute">Bill total</span><span>₹260</span></div>
-                        <div className="flex justify-between"><span className="text-mute">Recorded as paid</span><span>₹0</span></div>
-                        <div className="flex justify-between border-t border-ink-line pt-3 font-medium text-forest"><span>Outstanding</span><span>₹260</span></div>
+                      <div className="mt-2 flex justify-between text-[9.5px] text-mute">
+                        <span>Received</span>
+                        <span className="text-brass-strong">Preparing</span>
+                        <span>Ready</span>
                       </div>
-                      <div className="mt-4 rounded-lg bg-forest-soft px-3 py-2.5 text-[9px] leading-relaxed text-forest">Cash, card or UPI at the counter.<br />Payment is checked and recorded by staff.</div>
-                    </>
-                  )}
-                </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-[13px] font-semibold tracking-[-0.01em]">At the counter</p>
+                    <p className="mt-0.5 text-[11px] text-mute">Order #1047 · Table 05</p>
+                    <div className="mt-3.5 space-y-2 text-[11.5px]">
+                      <div className="flex justify-between gap-2"><span>Butter Chicken</span><span className="tabular-nums">₹369</span></div>
+                      <div className="flex justify-between gap-2"><span>Paneer Tikka</span><span className="tabular-nums">₹249</span></div>
+                      <div className="flex justify-between gap-2 border-t border-[var(--screens-line)] pt-2 font-semibold"><span>Total</span><span className="tabular-nums">₹618</span></div>
+                    </div>
+                    <div className="mt-3 space-y-1.5 rounded-xl bg-[var(--screens-card)] px-2.5 py-2 text-[10.5px]">
+                      <div className="flex justify-between gap-2"><span className="text-mute">Recorded as paid</span><span className="tabular-nums">₹0</span></div>
+                      <div className="flex justify-between gap-2 font-semibold text-brass-strong"><span>Outstanding</span><span className="tabular-nums">₹618</span></div>
+                    </div>
+                    <p className="mt-2.5 text-[9.5px] leading-relaxed text-mute">Cash, card or UPI at the counter. Payment is checked and recorded by staff.</p>
+                  </>
+                )}
               </div>
-              <div className="flex flex-1 flex-col p-6">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-brass-strong">{String(index + 1).padStart(2, '0')} / {panel.kicker}</p>
-                <h3 className="mt-3 font-display text-[23px] leading-tight">{panel.title}</h3>
-                <p className="mt-2 text-[14px] leading-relaxed text-mute">{panel.body}</p>
+
+              <div className="mt-4 flex items-start justify-between gap-3 px-1 pb-1">
+                <div className="min-w-0">
+                  <h3 className="text-[13.5px] font-semibold tracking-[-0.01em]">
+                    {String(index + 1).padStart(2, '0')} / {panel.kicker}
+                  </h3>
+                  <p className="mt-1 text-[13px] leading-relaxed text-mute">{panel.title}</p>
+                </div>
+                <span aria-hidden="true" className="mt-0.5 shrink-0 text-[15px] text-brass-strong motion-safe:transition-transform motion-safe:duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 motion-reduce:transition-none">↗</span>
               </div>
             </article>
           ))}
