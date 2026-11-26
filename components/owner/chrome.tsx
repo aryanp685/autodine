@@ -21,12 +21,11 @@ import { RouteSkeleton } from '@/components/RouteSkeleton';
  *
  * THE SURFACE
  *
- * Warm paper, espresso ink, one copper. The paper is a real value
- * (`--p-paper`) and every card is LIGHTER than it by one step, so a panel is
- * a lit sheet lying on the page rather than a white rectangle drawn on beige.
- * Copper means exactly two things -- "this is where you are" and "this control
- * is on" -- and the action colour is ink, so a screen never has two objects
- * competing for the same emphasis.
+ * Warm paper, espresso ink, evergreen chrome and burnt-orange actions. The
+ * paper is a real value (`--p-paper`) and every card is LIGHTER than it by one
+ * step, so a panel is a lit sheet lying on the page rather than a white
+ * rectangle drawn on beige. Green remains a live/ready signal, while orange
+ * gives the primary action a consistent, visible emphasis.
  *
  * The tokens come from `[data-surface='owner']` in app/globals.css, so
  * `bg-paper` is warm here and a deeper cream on the guest flow: same utility,
@@ -526,19 +525,13 @@ export function btn(tone: BtnTone = 'solid', size: BtnSize = 'md'): string {
     'relative inline-flex items-center justify-center gap-2 rounded-full font-medium whitespace-nowrap transition-[background-color,border-color,color,box-shadow,transform] duration-150 ease-[var(--o-ease)] before:absolute before:-inset-1 before:rounded-full before:content-[\'\'] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--p-accent)] disabled:cursor-not-allowed disabled:opacity-45 disabled:active:translate-y-0 disabled:active:scale-100 active:translate-y-px active:scale-[0.98]';
   const box = size === 'sm' ? 'h-9 px-4 text-[12.5px]' : 'h-11 px-5 text-[13px]';
   const tones: Record<BtnTone, string> = {
-    /* ONE FILLED COLOUR IN THE PRODUCT.
-       There used to be a second filled tone -- the ink -- and it was the thing
-       that made a page look assembled from two systems: "Enable" on a table
-       card was a black pill sitting in a row of blue text actions, so the row
-       had two hierarchies and neither was obvious. A filled action is the
-       accent, full stop; the ink is for type and for the rail's scrim. */
+    /* Burnt-orange primary fill with a white label; green remains reserved
+       for live/ready status so controls and state do not compete. */
     solid:
-      'bg-grass text-cream hover:bg-grass-strong active:bg-grass-strong',
+      'bg-accent text-onink hover:bg-[var(--p-accent-strong)] active:bg-[var(--p-accent-strong)]',
     primary:
-      'bg-grass text-cream hover:bg-grass-strong active:bg-grass-strong',
-    /* The public-site action: deep forest with a white label. The product's
-       owner screens keep the grass tone; the marketing and auth surfaces use
-       this one so the premium white palette has a single, calm action colour. */
+      'bg-accent text-onink hover:bg-[var(--p-accent-strong)] active:bg-[var(--p-accent-strong)]',
+    /* Evergreen is available for a deliberate secondary action. */
     forest:
       'bg-forest text-white hover:bg-forest-strong active:bg-forest-strong',
     ghost:
@@ -707,7 +700,7 @@ export function chipClass(active: boolean): string {
     'transition-[background-color,color,box-shadow] duration-150 ease-[var(--o-ease)]',
     'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--p-accent)]',
     active
-      ? 'bg-grass text-cream'
+      ? 'bg-accent text-onink'
       : 'bg-[color-mix(in_oklab,var(--p-ink)_6%,transparent)] text-gink-64 hover:bg-[color-mix(in_oklab,var(--p-ink)_9%,transparent)] hover:text-gink',
   ].join(' ');
 }
@@ -869,7 +862,7 @@ export function Tag({ tone = 'neutral', children }: { tone?: PillTone; children:
     due: 'bg-[var(--p-due-soft)] text-[var(--p-due)]',
     failed: 'bg-[var(--p-due-soft)] text-[var(--p-due)]',
     neutral: 'bg-paper-deep text-gink-64',
-    ink: 'bg-grass text-cream',
+    ink: 'bg-forest text-white',
   };
   return (
     <span

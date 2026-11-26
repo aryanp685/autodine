@@ -9,10 +9,9 @@ import type { CSSProperties, ReactNode } from 'react';
  * component reads a `--p-*` token from `[data-surface='owner']`, which is what
  * lets a whole surface be retuned from one block. Menu and Tables are the two
  * screens restaurant staff keep open all day during service, so they carry the
- * ops direction: a cooler porcelain field, graphite ink, one copper accent for
- * "this is where you are / this control is on", and a tighter 8px control
- * radius. Every component inside keeps its contract untouched -- only the
- * values move.
+ * Signature direction too: warm paper, espresso ink, burnt-orange actions, and
+ * the same tighter 8px control radius. Every component inside keeps its
+ * contract untouched -- only the values move.
  *
  * SCOPE
  *
@@ -22,43 +21,43 @@ import type { CSSProperties, ReactNode } from 'react';
  * outside this wrapper by design: they are shared chrome, not part of these
  * two screens.
  *
- * Contrast: copper `#C2410C` on white is 4.6:1 and on the soft wash 4.5:1, so
- * it passes AA for the large/bold and UI uses it is given (accent fills carry
- * white at 4.6:1, accent labels sit on `--p-accent-soft`). Graphite
- * `#1C2321` on the field is over 14:1.
+ * Contrast: burnt orange `#B24A15` on white is over 5:1; accent fills use
+ * white text and muted labels use `--p-accent-soft`. Espresso `#3A2E23` on
+ * warm paper is comfortably above 10:1.
  */
 export const OPS_SURFACE_STYLE: CSSProperties = {
-  /* Surfaces: cooler porcelain than the default warm paper. */
-  '--p-paper': '#f7f5f1',
-  '--p-paper-deep': '#efece6',
-  '--p-paper-veil': 'rgba(28, 35, 33, 0.022)',
-  '--p-glass': 'rgba(250, 249, 246, 0.9)',
+  /* Surfaces: warm porcelain, shared with the Signature owner workspace. */
+  '--p-paper': '#faf6f0',
+  '--p-paper-deep': '#f4ecdf',
+  '--p-paper-veil': 'rgba(58, 46, 35, 0.022)',
+  '--p-glass': 'rgba(255, 253, 248, 0.9)',
 
-  /* Ink: graphite, not espresso. Same ramp shape at the same opacities. */
-  '--p-ink': '#1c2321',
-  '--p-ink-80': 'rgba(28, 35, 33, 0.86)',
-  '--p-ink-64': 'rgba(28, 35, 33, 0.72)',
-  '--p-ink-46': 'rgba(28, 35, 33, 0.66)',
-  '--p-ink-28': 'rgba(28, 35, 33, 0.38)',
-  '--p-ink-12': 'rgba(28, 35, 33, 0.14)',
-  '--p-ink-07': 'rgba(28, 35, 33, 0.07)',
+  /* Ink: espresso with the same ramp shape at the same opacities. */
+  '--p-ink': '#3a2e23',
+  '--p-ink-80': 'rgba(58, 46, 35, 0.86)',
+  '--p-ink-64': 'rgba(58, 46, 35, 0.72)',
+  '--p-ink-46': 'rgba(58, 46, 35, 0.62)',
+  '--p-ink-28': 'rgba(58, 46, 35, 0.38)',
+  '--p-ink-12': 'rgba(58, 46, 35, 0.14)',
+  '--p-ink-07': 'rgba(58, 46, 35, 0.07)',
 
-  /* Accent: the one copper. Pressed is one step darker, soft wash derived. */
-  '--p-accent': '#c2410c',
-  '--p-accent-strong': '#a3370a',
-  '--p-accent-soft': '#f8e8e2',
-  '--p-accent-wash': 'rgba(194, 65, 12, 0.05)',
+  /* Accent: burnt orange, with a darker pressed state and a quiet wash. */
+  '--p-accent': '#b24a15',
+  '--p-accent-strong': '#8f3910',
+  '--p-accent-soft': '#fbe7da',
+  '--p-accent-wash': 'rgba(234, 106, 42, 0.08)',
 
-  /* Rail and lines follow the new ink so the chrome stays one room. */
-  '--p-rail': '#fbfaf8',
-  '--p-rail-ink': '#1c2321',
-  '--p-rail-ink-64': 'rgba(28, 35, 33, 0.72)',
-  '--p-rail-ink-40': 'rgba(28, 35, 33, 0.64)',
-  '--p-rail-line': 'rgba(28, 35, 33, 0.09)',
-  '--p-rail-active': 'rgba(194, 65, 12, 0.1)',
-  '--p-line': 'rgba(28, 35, 33, 0.1)',
-  '--p-line-soft': 'rgba(28, 35, 33, 0.06)',
-  '--p-line-strong': 'rgba(28, 35, 33, 0.18)',
+  /* Rail and lines follow the evergreen-and-espresso Signature palette. */
+  '--p-rail': '#183d32',
+  '--p-rail-raised': '#214b40',
+  '--p-rail-ink': '#fffaf2',
+  '--p-rail-ink-64': 'rgba(255, 250, 242, 0.78)',
+  '--p-rail-ink-40': 'rgba(255, 250, 242, 0.64)',
+  '--p-rail-line': 'rgba(255, 250, 242, 0.14)',
+  '--p-rail-active': 'rgba(234, 106, 42, 0.2)',
+  '--p-line': 'rgba(58, 46, 35, 0.1)',
+  '--p-line-soft': 'rgba(58, 46, 35, 0.06)',
+  '--p-line-strong': 'rgba(58, 46, 35, 0.18)',
 
   /* Geometry: the 8px control radius from the direction, with the card one
      step larger so the hierarchy between a card and a control survives. */

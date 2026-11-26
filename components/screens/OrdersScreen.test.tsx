@@ -307,8 +307,8 @@ describe('OrdersScreen, the ledger as a page', () => {
 
     expect(html).toContain('aria-current="true"');
     // Selected = the accent fill with the on-ink label; unselected = a tint.
-    expect(today).toContain('bg-grass');
-    expect(today).toContain('text-cream');
+    expect(today).toContain('bg-accent');
+    expect(today).toContain('text-onink');
     expect(today).toContain('rounded-full');
   });
 

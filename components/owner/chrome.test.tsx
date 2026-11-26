@@ -112,6 +112,15 @@ describe('the owner kit, after the redesign', () => {
     }
   });
 
+  it('uses the Signature orange for primary actions and keeps green for state', () => {
+    for (const tone of ['solid', 'primary'] as const) {
+      const cls = btn(tone, 'md');
+      expect(cls).toContain('bg-accent');
+      expect(cls).toContain('text-onink');
+      expect(cls).not.toContain('bg-grass');
+    }
+  });
+
   it('gives every action the same two heights', () => {
     expect(btn('solid', 'sm')).toContain('h-9');
     expect(btn('solid', 'md')).toContain('h-11');
@@ -141,8 +150,8 @@ describe('the owner kit, after the redesign', () => {
     // A selected filter is an on-state, and the accent is what this surface
     // uses for a state. Filled, not tinted-with-a-blue-border: on a row of
     // three the fill is what the eye finds without reading.
-    expect(on).toContain('bg-grass');
-    expect(on).toContain('text-cream');
+    expect(on).toContain('bg-accent');
+    expect(on).toContain('text-onink');
     expect(on).not.toContain('bg-gink');
 
     // Neither state has a border, and both keep the same height and radius, so

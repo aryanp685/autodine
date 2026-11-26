@@ -143,7 +143,7 @@ export function SiteNav({
           </Link>
           <Link
             href="/signup"
-            className="inline-flex h-10 items-center rounded-full bg-grass px-5 text-[13px] font-medium text-cream transition-colors hover:bg-grass-strong"
+            className="inline-flex h-10 items-center rounded-full bg-brass-strong px-5 text-[13px] font-medium text-white transition-[filter,transform] hover:brightness-110 motion-safe:active:translate-y-px motion-reduce:transition-none"
           >
             Create account
           </Link>

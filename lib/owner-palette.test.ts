@@ -96,15 +96,19 @@ describe('owner palette tokens', () => {
     expect(contrast(rgb(tokens['p-accent']), rgb(tokens['p-accent-soft']))).toBeGreaterThanOrEqual(4.5);
   });
 
-  it('keeps body type and meta type readable on the field and on a card', () => {
-    for (const base of ['p-paper', 'p-card', 'p-rail']) {
+  it('keeps body and meta type readable on paper, cards, and the evergreen rail', () => {
+    for (const base of ['p-paper', 'p-card']) {
       const bg = rgb(tokens[base]);
       expect(contrast(over(tokens['p-ink'], tokens[base]), bg)).toBeGreaterThanOrEqual(7);
-      // 0.62 alpha is the quiet end of the ramp; below 4.5 it reads as
-      // switched off rather than as secondary.
+      // 0.62 alpha is the quiet end of the warm-ink ramp; below 4.5 it reads
+      // as switched off rather than as secondary.
       expect(contrast(over(tokens['p-ink-46'], tokens[base]), bg)).toBeGreaterThanOrEqual(4.5);
     }
-    expect(contrast(rgb(tokens['p-rail-ink']), rgb(tokens['p-rail']))).toBeGreaterThanOrEqual(7);
+
+    const rail = rgb(tokens['p-rail']);
+    expect(contrast(rgb(tokens['p-rail-ink']), rail)).toBeGreaterThanOrEqual(7);
+    expect(contrast(over(tokens['p-rail-ink-64'], tokens['p-rail']), rail)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(over(tokens['p-rail-ink-40'], tokens['p-rail']), rail)).toBeGreaterThanOrEqual(4.5);
   });
 
   it('keeps both status meanings readable on their own washes', () => {
@@ -121,10 +125,11 @@ describe('no colour survives from a palette that has been replaced', () => {
     expect(css).not.toMatch(/#0058b9/i);
   });
 
-  it('derives the ambient wash from the accent token, not from a remembered hex', () => {
-    const start = css.indexOf('/* The wash: barely there, on purpose.');
+  it('uses the Signature restaurant image under a readable paper wash', () => {
+    const start = css.indexOf('/* A soft wash over the Signature restaurant photo');
     expect(start).toBeGreaterThan(-1);
     const block = css.slice(start, css.indexOf('\n}', start));
-    expect(block).toContain('var(--p-accent)');
+    expect(block).toContain("url('/img/restaurant-signature.jpg')");
+    expect(block).toContain('var(--p-paper) 94%');
   });
 });

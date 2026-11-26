@@ -288,7 +288,7 @@ describe('the redesign', () => {
     const healthy = renderToStaticMarkup(
       <TablesScreen data={data({ tables: [table({}), table({ code: 'T2' })] })} />
     );
-    expect(count(healthy, 'bg-grass text-cream')).toBe(2);
+    expect(count(healthy, 'bg-accent text-onink')).toBe(2);
 
     // One table without a code: it, and only it, gains a solid button.
     const broken = renderToStaticMarkup(
@@ -298,7 +298,7 @@ describe('the redesign', () => {
         })}
       />
     );
-    expect(count(broken, 'bg-grass text-cream')).toBe(3);
+    expect(count(broken, 'bg-accent text-onink')).toBe(3);
     expect(broken).toContain('data-table-action="create"');
   });
 

@@ -180,7 +180,7 @@ export function InvoiceNotesPanel({ notes, sources }: { notes: InvoiceNoteRow[];
                     </label>
                     <div className="flex items-center gap-2">
                       <button type="submit" disabled={pending}
-                        className="rounded-[var(--p-r-control)] bg-grass px-3 py-2 text-[11.5px] font-semibold text-cream disabled:opacity-50">
+                        className="rounded-[var(--p-r-control)] bg-[var(--p-accent)] px-3 py-2 text-[11.5px] font-semibold text-onink disabled:opacity-50">
                         Issue {kindLabel(open.kind).toLowerCase()}
                       </button>
                       <button type="button" onClick={() => setIssueFor(null)}
@@ -250,7 +250,7 @@ export function InvoiceNotesPanel({ notes, sources }: { notes: InvoiceNoteRow[];
                     </label>
                     <div className="flex items-center gap-2">
                       <button type="submit" disabled={pending}
-                        className="rounded-[var(--p-r-control)] bg-grass px-3 py-2 text-[11.5px] font-semibold text-cream disabled:opacity-50">
+                        className="rounded-[var(--p-r-control)] bg-[var(--p-accent)] px-3 py-2 text-[11.5px] font-semibold text-onink disabled:opacity-50">
                         Void note
                       </button>
                       <button type="button" onClick={() => setVoidFor(null)}

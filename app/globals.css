@@ -416,20 +416,15 @@ body {
   --p-on-ink-64: rgba(255, 255, 255, 0.74);
   --p-on-ink-40: rgba(255, 255, 255, 0.52);
 
-  /* ---- accent ----------------------------------------------------------
-     ONE PLUM. A dining-room colour rather than a dashboard blue: aubergine on
-     porcelain is what a menu, a table cloth and a wine list already are.
-     8.6:1 as a fill behind white and 7.3:1 as a label on its own soft tint, so
-     the same token can be a button and a piece of type. `--p-accent-strong` is
-     the pressed state -- one step darker, because the surface is light -- and
-     the 10.5px tracked-out uppercase, which needs the extra weight.
-     `--p-brass` is not a colour of its own: it is the brand mark's dot on the
-     pale rail, and it carries the brand green so the mark stays the mark. */
-  --p-accent: #7d2b6b;
-  --p-accent-strong: #631f55;
-  --p-accent-soft: #f4e9f1;
-  --p-accent-wash: rgba(125, 43, 107, 0.05);
-  --p-brass: #2f7d4f;
+  /* ---- signature palette ------------------------------------------------
+     The supplied Signature frontend establishes evergreen navigation,
+     warm-paper work surfaces, and burnt-orange actions. Orange is the control
+     colour; the separate live/due tokens below continue to carry state. */
+  --p-accent: #b24a15;
+  --p-accent-strong: #8f3910;
+  --p-accent-soft: #fbe7da;
+  --p-accent-wash: rgba(234, 106, 42, 0.08);
+  --p-brass: #ea6a2a;
 
   /* ---- status ----------------------------------------------------------
      Two meanings, never borrowed for decoration: a deep leaf for
@@ -442,17 +437,15 @@ body {
   --p-due-soft: #fbeae7;
 
   /* ---- the rail --------------------------------------------------------
-     PALE, not dark. A warm white column on a porcelain room: the lightest
-     surface on screen, which is what stops the product reading as a console.
-     The current row is a 10% plum tint, and the type on it is the same
-     espresso. */
-  --p-rail: #fffdf9;
-  --p-rail-raised: #ffffff;
-  --p-rail-ink: #211a15;
-  --p-rail-ink-64: rgba(33, 26, 21, 0.72);
-  --p-rail-ink-40: rgba(33, 26, 21, 0.64);
-  --p-rail-line: rgba(33, 26, 21, 0.09);
-  --p-rail-active: rgba(125, 43, 107, 0.1);
+     Deep evergreen, like the supplied Signature workspace preview. The
+     warm-white type stays high-contrast; orange marks the selected section. */
+  --p-rail: #183d32;
+  --p-rail-raised: #214b40;
+  --p-rail-ink: #fffaf2;
+  --p-rail-ink-64: rgba(255, 250, 242, 0.78);
+  --p-rail-ink-40: rgba(255, 250, 242, 0.64);
+  --p-rail-line: rgba(255, 250, 242, 0.14);
+  --p-rail-active: rgba(234, 106, 42, 0.2);
 
   /* ---- lines -----------------------------------------------------------
      Warm hairlines. On a white surface an edge is a drawn line, not a shadow;
@@ -1065,26 +1058,19 @@ body {
      be changed from the component. The kit owns it now.
    ========================================================================= */
 
-/* The wash: barely there, on purpose.
-   A white bloom at the top left, the accent at the top right, and a neutral
-   breath under it, all far below the contrast at which the eye reads a
-   gradient -- 5% at the strongest -- so the room has a top and a bottom
-   without gaining a second colour. The point is not decoration -- it is that a 1440px field of
-   one flat cream reads as a screenshot of a colour, and a 5% bloom gives it a
-   top and a bottom without ever becoming a band. Fixed, so scrolling a long
-   table does not slide the light up the screen.
-
-   THE THIRD LAYER USED TO BE BLUE. It was written against the previous accent
-   and left behind when the accent changed, so a careful eye could find a cold
-   corner in the top right of an otherwise warm room -- the exact kind of
-   leftover that makes a palette feel accidental. It is a colour-mix of the
-   accent token now, so the room follows the accent instead of remembering an
-   older one. */
-[data-surface='owner'] {
+/* A soft wash over the Signature restaurant photo keeps the spacious work
+   area atmospheric without putting texture behind card copy. It is fixed so
+   the image does not drift under long tables while staff scroll. */
+[data-surface='owner'],
+[data-surface='owner'] [data-ops='counter-clarity'] {
   background-image:
-    radial-gradient(70% 46% at 8% -18%, rgba(255, 255, 255, 0.85), transparent 68%),
-    radial-gradient(64% 46% at 100% -6%, color-mix(in oklab, var(--p-accent) 5%, transparent), transparent 72%),
-    radial-gradient(58% 40% at 100% 8%, rgba(180, 122, 62, 0.055), transparent 70%);
+    linear-gradient(
+      color-mix(in srgb, var(--p-paper) 94%, transparent),
+      color-mix(in srgb, var(--p-paper) 94%, transparent)
+    ),
+    url('/img/restaurant-signature.jpg');
+  background-position: center, center 38%;
+  background-size: cover, cover;
   background-attachment: fixed;
 }
 
@@ -1262,27 +1248,25 @@ body {
   --color-ink-card: #ffffff;
   --color-ink-line: #e8e3da;
 
-  /* The public-site accent: deep forest, with a soft wash and a brass
-     highlight. The product's own owner/guest screens keep their olive
-     accent; these tokens are for the marketing and auth surfaces only. */
-  --color-forest: #1f4d3a;
-  --color-forest-strong: #163a2b;
-  --color-forest-soft: #e9f0ea;
-  --color-brass: #b98a4b;
-  --color-brass-strong: #9a6d34;
-  --color-brass-soft: #e5a26a;
+  /* Signature brand: evergreen for the product frame, burnt orange for
+     meaningful actions, and a softer forest tone for status marks. */
+  --color-forest: #183d32;
+  --color-forest-strong: #0f2a20;
+  --color-forest-soft: #e7efe9;
+  --color-brass: #ea6a2a;
+  --color-brass-strong: #b24a15;
+  --color-brass-soft: #f08a55;
 
-  /* ONE PLUM, per the finalized brief: the action hue of the product
-     (the same aubergine as --p-accent) carried onto the marketing surface.
-     Green stays state, never decoration. */
-  --color-plum: #7d2b6b;
-  --color-plum-strong: #631f55;
-  --color-plum-soft: #f4e9f1;
+  /* Legacy utility name retained for compatibility; visually it now carries
+     the warm orange action family instead of a separate plum. */
+  --color-plum: #b24a15;
+  --color-plum-strong: #8f3910;
+  --color-plum-soft: #fbe7da;
 
-  /* The action colour the owner chose: a light grass green on the buttons.
-     Espresso sits on it (10:1); white does not. */
-  --color-grass: #1fd655;
-  --color-grass-strong: #17b84a;
+  /* Green is reserved for live/ready marks and switch states, never primary
+     actions. Filled green marks use a light label for readable contrast. */
+  --color-grass: #2f7d4f;
+  --color-grass-strong: #24633e;
 
   --color-brand: #207030;
   --color-brand-soft: #2c8a3f;
@@ -1827,10 +1811,10 @@ body {
   --p-paper-deep: #f4ecdf;
   --p-card: #fffdf8;
   --p-ink: #3a2e23;
-  --p-accent: #183d32;
-  --p-accent-strong: #0f2a20;
-  --p-accent-soft: #e7efe9;
-  --p-accent-wash: rgba(24,61,50,.05);
+  --p-accent: #b24a15;
+  --p-accent-strong: #8f3910;
+  --p-accent-soft: #fbe7da;
+  --p-accent-wash: rgba(234,106,42,.08);
   --p-line: #e8dcc9;
   --auth-heading: #2b2015;
   --auth-accent: #ea6a2a;

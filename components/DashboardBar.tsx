@@ -214,10 +214,8 @@ export function DashboardBar({
             as well would put the same words twice in a 244px column. */}
         <div className="flex items-center justify-between border-b border-rail-line px-4 py-3.5 lg:px-5 lg:py-4">
           <Link href="/" aria-label="AutoDine" className="group text-rail-ink">
-            {/* BRASS is the token for the mark's dot, and on this surface it
-                carries the brand green: the rail is pale, so the dot has to be
-                the one saturated thing in the column rather than another grey
-                line. It stays a token, so the mark is one value in one place. */}
+            {/* The orange mark carries through the Signature palette while
+                keeping the wordmark legible on the evergreen rail. */}
             <BrandLockup size={21} ink="currentColor" dot="var(--p-brass)" />
           </Link>
 
@@ -225,7 +223,7 @@ export function DashboardBar({
             type="button"
             aria-label="Close navigation"
             onClick={() => setOpen(false)}
-            className="grid size-8 place-items-center rounded-[var(--p-r-chip)] text-[18px] leading-none text-rail-ink-64 transition-colors duration-150 hover:bg-gink-07 hover:text-rail-ink focus-visible:outline-[var(--p-rail-ink)] lg:hidden"
+            className="grid size-8 place-items-center rounded-[var(--p-r-chip)] text-[18px] leading-none text-rail-ink-64 transition-colors duration-150 hover:bg-[color-mix(in_srgb,var(--p-rail-ink)_8%,transparent)] hover:text-rail-ink focus-visible:outline-[var(--p-rail-ink)] lg:hidden"
           >
             ×
           </button>
@@ -271,7 +269,7 @@ export function DashboardBar({
                       'transition-[background-color,color] duration-150 ease-[var(--o-ease)]',
                       current
                         ? 'bg-[var(--p-rail-active)] font-medium text-rail-ink'
-                        : 'text-rail-ink-64 hover:bg-gink-07 hover:text-rail-ink',
+                        : 'text-rail-ink-64 hover:bg-[color-mix(in_srgb,var(--p-rail-ink)_8%,transparent)] hover:text-rail-ink',
                     ].join(' ')}
                   >
                     {/* The copper bar is centred on the row's own edge rather
@@ -282,7 +280,7 @@ export function DashboardBar({
                       aria-hidden="true"
                       className={[
                         'absolute top-1/2 left-0 h-[18px] w-[3px] -translate-y-1/2 rounded-r-full transition-opacity duration-150',
-                        current ? 'bg-grass opacity-100' : 'opacity-0',
+                        current ? 'bg-[var(--p-accent)] opacity-100' : 'opacity-0',
                       ].join(' ')}
                     />
                     <span
@@ -307,11 +305,11 @@ export function DashboardBar({
             person rather than a destination, so it gets its own surface -- one
             step lighter than the rail, with a hairline and a lit top edge. */}
         <div className="border-t border-rail-line p-2.5">
-          <div className="rounded-[var(--p-r-block)] border border-rail-line bg-[var(--p-rail-raised)] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+          <div className="rounded-[var(--p-r-block)] border border-rail-line bg-[var(--p-rail-raised)] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
             <div className="flex items-center gap-2.5">
               <span
                 aria-hidden="true"
-                className="grid size-9 shrink-0 place-items-center rounded-[10px] bg-grass text-[11.5px] font-semibold text-cream shadow-[inset_0_1px_0_rgba(255,255,255,0.25)]"
+                className="grid size-9 shrink-0 place-items-center rounded-[10px] bg-[var(--p-accent)] text-[11.5px] font-semibold text-onink shadow-[inset_0_1px_0_rgba(255,255,255,0.25)]"
               >
                 {initialsOf(activeOutlet?.name ?? 'AutoDine')}
               </span>
@@ -339,7 +337,7 @@ export function DashboardBar({
               <form action={signOutAction} className="mt-2 border-t border-rail-line pt-2">
                 <button
                   type="submit"
-                  className="w-auto rounded-full px-2.5 py-1.5 text-[11.5px] font-medium text-rail-ink-40 transition-colors duration-150 hover:bg-gink-07 hover:text-rail-ink focus-visible:outline-[var(--p-rail-ink)]"
+                  className="w-auto rounded-full px-2.5 py-1.5 text-[11.5px] font-medium text-rail-ink-40 transition-colors duration-150 hover:bg-[color-mix(in_srgb,var(--p-rail-ink)_8%,transparent)] hover:text-rail-ink focus-visible:outline-[var(--p-rail-ink)]"
                 >
                   Sign out
                 </button>

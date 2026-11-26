@@ -132,7 +132,7 @@ export function ImportShowcase() {
                 </p>
                 <div className="mt-1 flex items-center justify-between gap-1.5">
                   <span className="text-[11.5px] font-semibold tabular-nums text-gink">₹249</span>
-                  <span className="rounded-full bg-grass px-2 py-0.5 text-[10px] font-medium text-cream">
+                  <span className="rounded-full bg-grass px-2 py-0.5 text-[10px] font-medium text-white">
                     + Add
                   </span>
                 </div>

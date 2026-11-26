@@ -236,7 +236,7 @@ function Hero() {
           <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center" data-hero-step>
             <AuthHandoffLink
               href="/signup"
-              className="group inline-flex min-h-12 items-center justify-center gap-3 rounded-xl bg-brass px-6 text-[13px] font-semibold text-cream shadow-[0_16px_34px_-20px_rgba(191,84,28,0.55)] transition-[background-color,transform,box-shadow] duration-300 hover:-translate-y-0.5 hover:bg-brass-strong focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brass-strong motion-reduce:transition-none motion-reduce:hover:translate-y-0"
+              className="group inline-flex min-h-12 items-center justify-center gap-3 rounded-xl bg-brass px-6 text-[13px] font-semibold text-cream shadow-[0_16px_34px_-20px_rgba(191,84,28,0.55)] transition-[background-color,transform,box-shadow] duration-300 hover:-translate-y-0.5 hover:bg-brass-strong hover:text-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brass-strong motion-reduce:transition-none motion-reduce:hover:translate-y-0"
             >
               Start your {TRIAL_DAYS}-day trial
               <span aria-hidden="true" className="transition-transform duration-300 group-hover:translate-x-0.5 motion-reduce:transition-none">→</span>

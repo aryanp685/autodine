@@ -346,7 +346,7 @@ export function BrandingScreen({
                     <div className="truncate text-[12.5px] font-medium text-gink">{dish.name}</div>
                     <div className="text-[11.5px] text-gink-46 tabular-nums">{inr(dish.price)}</div>
                   </div>
-                  <span className="grid size-6 shrink-0 place-items-center rounded-full bg-grass text-[15px] leading-none text-cream">
+                  <span className="grid size-6 shrink-0 place-items-center rounded-full bg-grass text-[15px] leading-none text-white">
                     +
                   </span>
                 </div>

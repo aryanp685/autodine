@@ -316,7 +316,7 @@ describe('Settings, the redesign', () => {
     // Bill charges & round-off, Guest verification, Save promo code, Save printer,
     // and Save operating mode.
     const html = renderToStaticMarkup(<SettingsScreen data={data()} />);
-    expect(count(html, 'bg-grass text-cream')).toBe(9);
+    expect(count(html, 'bg-accent text-onink')).toBe(9);
     expect(html).toContain('Save operating mode');
     expect(html).toContain('Mode A · Alongside an existing POS');
     expect(html).toContain('Mode B · Primary operating system');
