@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from 'next';
 import { headers } from 'next/headers';
 import StructuredData from '@/components/StructuredData';
 import { Analytics } from '@/components/Analytics';
+import { SiteLoader } from '@/components/SiteLoader';
+import { SplashCounter } from '@/components/SplashCounter';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -83,6 +85,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               "(function(){var d=document.documentElement;" +
               "if(!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: no-preference)').matches))return;" +
               "d.classList.add('motion');" +
+              // Repeat visit: hide the first-visit splash before its first
+              // paint so it never flashes. The splash itself unmounts too.
+              "try{if(window.sessionStorage.getItem('autodine.splash.seen'))d.classList.add('splash-seen')}catch(e){}" +
               // Fail open. The hiding rule is the only thing standing between a
               // visitor and a blank page, and it depends on a client component
               // mounting. If HomeMotion never reports in (a hydration error, a
@@ -99,6 +104,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             so it belongs to the page that knows which restaurant this is --
             see the /menu routes. */}
         <div data-app>{children}</div>
+        {/* Signature splash: server-rendered so the veil is on the first
+            paint. Repeat visits never see it (pre-paint CSS hide + unmount). */}
+        <SplashCounter />
+        {/* Slow-load loader for the rest of the app (late routes). */}
+        <SiteLoader />
         {/* Privacy-conscious page-view tracking (path only). No-op unless demo mode. */}
         <Analytics />
       </body>

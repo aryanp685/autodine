@@ -47,7 +47,7 @@ export function RouteSkeleton({
        the width and the padding -- so every loading state was indented twice
        and drew a 1180px column inside a 1240px page. The skeleton now inherits
        the frame, and can only ever line up with the screen it stands in for. */
-    <div aria-hidden="true" className="grid w-full content-start gap-3.5">
+    <div aria-hidden="true" data-route-skeleton className="grid w-full content-start gap-3.5">
       <div className={`${bar} h-2 w-[92px]`} />
       <div className={`${bar} mt-2.5 h-[30px] w-[min(46%,420px)] max-sm:w-[74%] max-sm:h-6`} />
       <div className={`${bar} h-3 w-[min(62%,560px)] max-sm:w-full`} />

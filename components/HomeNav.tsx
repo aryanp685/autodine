@@ -99,7 +99,7 @@ export function HomeNav({ activePricing = false }: { activePricing?: boolean } =
                     href={link.href}
                     prefetch={false}
                     aria-current={current ? 'page' : undefined}
-                    className="group relative inline-flex h-9 items-center whitespace-nowrap rounded-full px-3 text-[13px] font-semibold text-mute transition-colors duration-300 hover:text-brass-strong aria-[current=page]:text-ink lg:px-3.5"
+                    className="group relative inline-flex h-9 items-center whitespace-nowrap rounded-full px-3 text-[13px] font-semibold text-cream/75 transition-colors duration-300 hover:text-brass-soft aria-[current=page]:text-white lg:px-3.5"
                   >
                     {link.label}
                     <span
@@ -120,7 +120,7 @@ export function HomeNav({ activePricing = false }: { activePricing?: boolean } =
           <AuthHandoffLink
             href="/login"
             prefetch={false}
-            className="hidden rounded-full px-3 text-[13px] font-semibold text-mute transition-colors duration-300 hover:text-brass-strong md:inline-flex md:h-9 md:items-center"
+            className="hidden rounded-full px-3 text-[13px] font-semibold text-cream/75 transition-colors duration-300 hover:text-brass-soft md:inline-flex md:h-9 md:items-center"
           >
             Sign in
           </AuthHandoffLink>

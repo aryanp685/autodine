@@ -207,6 +207,9 @@ function Hero() {
       aria-labelledby="hero-heading"
       className="relative isolate overflow-hidden border-b border-ink-line"
     >
+      {/* Reference hero: the dining-room photo runs edge-to-edge over the
+          whole section, warmed into the cream paper on the left. On top: a
+          deep-forest arc on the right, content on the left. */}
       <div className="pointer-events-none absolute inset-0 -z-20">
         <Image
           src="/img/restaurant-interior-light.jpg"
@@ -214,14 +217,14 @@ function Hero() {
           fill
           priority
           sizes="100vw"
-          className="object-cover object-[68%_50%] opacity-70"
+          className="object-cover object-[68%_50%]"
         />
+        {/* Warm the photo into the cream paper: strong on the left where the
+            text sits, clearing to the photo on the right. */}
+        <div className="absolute inset-0 bg-[linear-gradient(100deg,rgba(250,245,236,0.96)_0%,rgba(250,245,236,0.82)_34%,rgba(250,245,236,0.38)_58%,rgba(250,245,236,0.12)_100%)]" />
+        {/* Soft light wash so the text contrast holds over the busy parts. */}
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(250,245,236,0.55)_0%,rgba(250,245,236,0)_30%,rgba(250,245,236,0)_72%,rgba(250,245,236,0.5)_100%)]" />
       </div>
-      <div
-        aria-hidden="true"
-        className="absolute inset-0 -z-10 bg-[linear-gradient(105deg,rgba(251,250,247,0.90)_0%,rgba(251,250,247,0.73)_42%,rgba(251,250,247,0.24)_100%)]"
-      />
-      <div aria-hidden="true" className="absolute inset-0 -z-10 bg-gradient-to-t from-ink via-transparent to-ink/40" />
 
       <CornerGarden className="right-6 top-24 hidden lg:block" tone="text-forest" />
 
@@ -252,7 +255,7 @@ function Hero() {
           <div className="mt-9 flex flex-col gap-3 sm:flex-row sm:items-center" data-hero-step>
             <AuthHandoffLink
               href="/signup"
-              className="group inline-flex min-h-12 items-center justify-center gap-3 rounded-full bg-brass px-7 text-[14px] font-semibold text-cream shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_18px_34px_-20px_rgba(255,112,37,0.95)] transition-[background-color,transform,box-shadow] duration-300 hover:-translate-y-0.5 hover:bg-brass-strong hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brass motion-reduce:transition-none motion-reduce:hover:translate-y-0"
+              className="group inline-flex min-h-12 items-center justify-center gap-3 rounded-full bg-brass px-7 text-[14px] font-bold text-white shadow-[0_8px_16px_rgba(244,123,41,0.3)] transition-[background-color,transform,box-shadow] duration-300 hover:-translate-y-0.5 hover:bg-brass-strong focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brass motion-reduce:transition-none motion-reduce:hover:translate-y-0"
             >
               Start your {TRIAL_DAYS}-day trial
               <span aria-hidden="true" className="transition-transform duration-300 group-hover:translate-x-0.5 motion-reduce:transition-none">→</span>
@@ -276,7 +279,15 @@ function Hero() {
         <div className="relative z-10 mx-auto w-full max-w-[520px] lg:mx-0 lg:ml-auto" data-hero-step>
           <div data-hero-visual className="relative">
             <HeroVisualMotion className="relative">
-              <div className="hero-halo relative isolate aspect-[10/14] w-full overflow-hidden rounded-[42px] border border-white/70 bg-[radial-gradient(120%_100%_at_72%_8%,#fffdf8_0%,#f7efe0_52%,#ecdfc9_100%)] shadow-[0_40px_90px_-52px_rgba(28,59,43,0.45)] sm:aspect-[5/4.6] lg:aspect-[5/5]">
+              {/* The phone floats directly over the full-bleed photo, no card
+                  behind it — the framed card is a small-screen-only stage. */}
+              <div className="relative sm:w-[300px] lg:ml-auto lg:mr-6 lg:w-[320px] xl:mr-16">
+                <HeroMenuDemo />
+              </div>
+
+              {/* Small screens keep the framed card so the phone still has a
+                  stage. */}
+              <div className="hero-halo relative isolate aspect-[10/14] w-full overflow-hidden rounded-[42px] border border-white/70 bg-[radial-gradient(120%_100%_at_72%_8%,#fffdf8_0%,#f7efe0_52%,#ecdfc9_100%)] shadow-[0_40px_90px_-52px_rgba(28,59,43,0.45)] sm:hidden">
                 {/* Reference hero: real dining-room photo bleeding into the
                     paper, deep-forest arc on the right, phone floating over
                     both. Photo is from the signature frontend's own asset. */}
@@ -329,6 +340,8 @@ function Hero() {
               </div>
             </HeroVisualMotion>
 
+            {/* Reference-style floating "Order sent" toast + QR chip, over
+                the full-bleed photo on large screens. */}
             <div
               aria-hidden="true"
               className="absolute -left-3 bottom-6 hidden items-center gap-2.5 rounded-2xl border border-white/80 bg-ink-card/90 px-3.5 py-2.5 shadow-[0_18px_40px_-24px_rgba(28,59,43,0.45)] backdrop-blur sm:flex"
@@ -342,8 +355,30 @@ function Hero() {
 
             <div
               aria-hidden="true"
-              className="absolute -right-10 -top-16 -z-10 size-[380px] rounded-full bg-forest shadow-[0_40px_80px_-48px_rgba(23,72,61,0.6)]"
-            />
+              className="absolute bottom-8 right-4 hidden items-center gap-2 rounded-xl border border-white/80 bg-white/95 px-2.5 py-2 shadow-[0_16px_34px_-20px_rgba(28,59,43,0.55)] backdrop-blur lg:flex xl:right-16"
+            >
+              <svg viewBox="0 0 24 24" className="size-9" role="img">
+                <g fill="#17483d">
+                  <rect x="1" y="1" width="7" height="7" rx="1" fillOpacity="0.12" />
+                  <rect x="3" y="3" width="3" height="3" />
+                  <rect x="16" y="1" width="7" height="7" rx="1" fillOpacity="0.12" />
+                  <rect x="18" y="3" width="3" height="3" />
+                  <rect x="1" y="16" width="7" height="7" rx="1" fillOpacity="0.12" />
+                  <rect x="3" y="18" width="3" height="3" />
+                  <rect x="11" y="2" width="2" height="2" />
+                  <rect x="12" y="6" width="2" height="2" />
+                  <rect x="10" y="11" width="3" height="3" />
+                  <rect x="15" y="12" width="2" height="2" />
+                  <rect x="18" y="15" width="2" height="2" />
+                  <rect x="20" y="19" width="3" height="3" />
+                  <rect x="12" y="17" width="2" height="2" />
+                  <rect x="16" y="20" width="2" height="2" />
+                  <rect x="10" y="20" width="1.5" height="3" />
+                </g>
+              </svg>
+              <span className="text-[9px] font-semibold uppercase tracking-[0.14em] text-forest">Table 05</span>
+            </div>
+
             <div
               aria-hidden="true"
               className="absolute -bottom-10 -left-12 -z-10 size-[220px] rounded-full bg-brass/15"
@@ -480,7 +515,7 @@ function Problem() {
 
 function Steps() {
   return (
-    <section id="how" aria-labelledby="how-heading" className="border-t border-ink-line bg-white py-16 text-cream sm:py-24 lg:py-28">
+    <section id="how" aria-labelledby="how-heading" className="scroll-mt-20 border-t border-ink-line bg-white py-16 text-cream sm:py-24 lg:py-28">
       <div className="mx-auto max-w-[1180px] px-5 sm:px-8">
         <div className="grid gap-6 lg:grid-cols-[1fr_0.8fr] lg:items-end lg:gap-16">
           <div>
@@ -664,7 +699,7 @@ function Screens() {
     { kicker: 'Counter bill', title: 'Review, then record', body: 'See what is billed, what is recorded as paid and what is still outstanding. Staff verify payment before recording it.' },
   ];
   return (
-    <section id="screens" aria-labelledby="screens-heading" className="relative overflow-x-clip border-t border-ink-line bg-ink py-16 text-cream sm:py-24 lg:py-28">
+    <section id="screens" aria-labelledby="screens-heading" className="relative scroll-mt-20 overflow-x-clip border-t border-ink-line bg-ink py-16 text-cream sm:py-24 lg:py-28">
       <Sprig className="pointer-events-none absolute -left-10 top-24 hidden h-56 w-auto rotate-[18deg] text-forest opacity-[0.1] lg:block" />
       <div className="mx-auto max-w-[1180px] px-5 sm:px-8">
         <Eyebrow>A closer look</Eyebrow>
@@ -751,7 +786,7 @@ function Screens() {
 
 function Features() {
   return (
-    <section id="product" aria-labelledby="features-heading" className="relative overflow-x-clip border-t border-ink-line bg-ink py-16 sm:py-24 lg:py-28">
+    <section id="product" aria-labelledby="features-heading" className="relative scroll-mt-20 overflow-x-clip border-t border-ink-line bg-ink py-16 sm:py-24 lg:py-28">
       <div className="mx-auto max-w-[1180px] px-5 sm:px-8">
         <div data-draw aria-hidden="true" className="mb-10 h-px origin-left bg-gradient-to-r from-forest/40 via-brass/40 to-transparent" />
         <div className="grid gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:items-start lg:gap-16">

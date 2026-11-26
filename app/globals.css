@@ -1799,3 +1799,10 @@ body {
     to { transform: translateY(-6px); }
   }
 }
+
+/* The first-visit splash is server-rendered for a veil on the very first
+   paint. Repeat visits: the head script flags <html class=splash-seen>
+   before paint, and this rule removes the veil with zero flash. */
+html.splash-seen [data-splash] {
+  display: none !important;
+}
