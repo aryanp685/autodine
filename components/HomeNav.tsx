@@ -21,7 +21,14 @@ const NAV_LINKS = [
   { label: 'Pricing', href: '/pricing', id: 'pricing' },
 ] as const;
 
-export function HomeNav({ activePricing = false }: { activePricing?: boolean } = {}) {
+export function HomeNav({
+  activePricing = false,
+  glass = false,
+}: {
+  activePricing?: boolean;
+  /** Landing hero mode: the photo runs behind the bar until the page scrolls. */
+  glass?: boolean;
+} = {}) {
   const [open, setOpen] = useState(false);
   // The bar sits flush over the hero, then settles into a compact, slightly
   // more opaque pill once the page starts moving. Height only changes by one
@@ -35,13 +42,17 @@ export function HomeNav({ activePricing = false }: { activePricing?: boolean } =
     const sections = NAV_LINKS.map((link) => document.getElementById(link.id)).filter(
       (node): node is HTMLElement => node !== null,
     );
+    // Scrollspy must follow DOCUMENT order, not nav-label order: the product
+    // section sits after screens in the DOM, so a nav-ordered loop kept
+    // lighting "Screens" while the reader was on "Product".
+    const ordered = [...sections].sort((a, b) => a.offsetTop - b.offsetTop);
 
     const update = () => {
       frame = 0;
       setScrolled(window.scrollY > 14);
-      if (activePricing || sections.length === 0) return;
+      if (activePricing || ordered.length === 0) return;
       let current: string | null = null;
-      for (const section of sections) {
+      for (const section of ordered) {
         if (section.getBoundingClientRect().top <= 160) current = section.id;
       }
       setActive(current);
@@ -76,7 +87,9 @@ export function HomeNav({ activePricing = false }: { activePricing?: boolean } =
           'transition-[background-color,border-color,box-shadow,height] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]',
           scrolled || open
             ? 'border-ink-line/90 bg-ink shadow-[0_20px_50px_-34px_rgba(42,33,23,0.6)]'
-            : 'border-ink-line/60 bg-ink/90',
+            : glass
+              ? 'border-transparent bg-ink/55'
+              : 'border-ink-line/60 bg-ink/90',
           scrolled ? 'h-14' : 'h-16',
         ].join(' ')}
       >

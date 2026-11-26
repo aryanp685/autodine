@@ -19,7 +19,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { BrandLockup } from '@/components/BrandMark';
+import { BrandMark } from '@/components/BrandMark';
 
 export function SplashCounter({ force = false, minMs = 2800 }: { force?: boolean; minMs?: number }) {  const [pct, setPct] = useState(0);
   const [leaving, setLeaving] = useState(false);
@@ -78,7 +78,7 @@ export function SplashCounter({ force = false, minMs = 2800 }: { force?: boolean
     >
       <div aria-hidden="true" className="pointer-events-none absolute -top-24 left-1/2 size-[420px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(255,112,37,0.12),transparent_65%)]" />
 
-      <div className="relative grid size-[128px] place-items-center">
+      <div className="relative grid size-[132px] place-items-center">
         <svg viewBox="0 0 128 128" aria-hidden="true" className="absolute inset-0 size-full -rotate-90">
           <circle cx="64" cy="64" r="58" fill="none" stroke="rgba(23,72,61,0.1)" strokeWidth="3" />
           <circle
@@ -94,18 +94,28 @@ export function SplashCounter({ force = false, minMs = 2800 }: { force?: boolean
             style={{ transition: 'stroke-dashoffset 120ms linear' }}
           />
         </svg>
-        <BrandLockup size={34} ink="#17483d" dot="#ff7025" />
+        <BrandMark size={46} ink="#17483d" dot="#ff7025" />
       </div>
 
-      <p className="mt-7 text-[30px] font-bold tabular-nums tracking-[-0.03em] text-forest" aria-hidden="true">
-        {pct}
-        <span className="text-[18px] text-forest/60">%</span>
+      <p
+        className="mt-8 text-[38px] font-semibold leading-none tracking-[-0.04em] text-forest"
+        style={{ fontFamily: "'Fraunces', Georgia, serif", fontVariationSettings: "'SOFT' 40, 'WONK' 1" }}
+      >
+        autodine
       </p>
-      <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.28em] text-forest/60">
+      <p className="mt-2.5 text-[10px] font-semibold uppercase tracking-[0.34em] text-forest/55">
+        Smart Restaurant Solutions
+      </p>
+
+      <p className="mt-8 text-[28px] font-bold tabular-nums leading-none tracking-[-0.03em] text-forest" aria-hidden="true">
+        {pct}
+        <span className="text-[16px] text-forest/60">%</span>
+      </p>
+      <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.28em] text-forest/60">
         Setting your table…
       </p>
 
-      <div aria-hidden="true" className="mt-6 h-1 w-44 overflow-hidden rounded-full bg-forest/10">
+      <div aria-hidden="true" className="mt-6 h-1 w-48 overflow-hidden rounded-full bg-forest/10">
         <div className="h-full rounded-full bg-brass transition-[width] duration-150 ease-out" style={{ width: `${pct}%` }} />
       </div>
     </div>

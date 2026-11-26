@@ -180,7 +180,7 @@ export function Home() {
     <div className="public-landing min-h-screen overflow-x-clip bg-ink text-cream antialiased">
       <SiteMotion />
       <div data-page-progress className="page-progress" aria-hidden="true" />
-      <HomeNav />
+      <HomeNav glass />
       <SectionRail />
       <main>
         <Hero />
@@ -205,7 +205,7 @@ function Hero() {
     <section
       data-hero
       aria-labelledby="hero-heading"
-      className="relative isolate overflow-hidden border-b border-ink-line"
+      className="relative isolate -mt-[74px] overflow-hidden border-b border-ink-line"
     >
       {/* Reference hero: the dining-room photo runs edge-to-edge over the
           whole section, warmed into the cream paper on the left. On top: a
