@@ -7,9 +7,8 @@ import { SiteMotion } from '@/components/SiteMotion';
 import { SectionRail } from '@/components/marketing/SectionRail';
 import { HomeNav } from '@/components/HomeNav';
 import { BrandLockup } from '@/components/BrandMark';
-import { HeroTableScene } from '@/components/marketing/HeroTableScene';
-import { HeroVisualMotion } from '@/components/marketing/HeroVisualMotion';
 import { HeroMenuDemo } from '@/components/marketing/HeroMenuDemo';
+import { HeroVisualMotion } from '@/components/marketing/HeroVisualMotion';
 import { AuthHandoffLink } from '@/components/AuthHandoffLink';
 import { CornerGarden, LeafFrond, Sprig } from '@/components/marketing/Botanical';
 import { BRAND_GREEN } from '@/lib/brand';
@@ -278,11 +277,21 @@ function Hero() {
           <div data-hero-visual className="relative">
             <HeroVisualMotion className="relative">
               <div className="hero-halo relative isolate aspect-[10/14] w-full overflow-hidden rounded-[42px] border border-white/70 bg-[radial-gradient(120%_100%_at_72%_8%,#fffdf8_0%,#f7efe0_52%,#ecdfc9_100%)] shadow-[0_40px_90px_-52px_rgba(28,59,43,0.45)] sm:aspect-[5/4.6] lg:aspect-[5/5]">
+                {/* Reference hero: real dining-room photo bleeding into the
+                    paper, deep-forest arc on the right, phone floating over
+                    both. Photo is from the signature frontend's own asset. */}
+                <div
+                  aria-hidden="true"
+                  className="absolute -inset-x-6 -top-10 bottom-0 rounded-[45%_0_0_0] bg-[linear-gradient(90deg,#fbf5ec_0%,rgba(251,245,236,0)_34%),url('/restaurant.jpg')] bg-[position:center_54%] bg-cover"
+                />
+                <div
+                  aria-hidden="true"
+                  className="absolute -right-24 -top-28 h-[130%] w-[86%] rotate-[25deg] rounded-[50%] bg-forest shadow-[0_30px_70px_-40px_rgba(16,53,45,0.8)]"
+                />
                 <div
                   aria-hidden="true"
                   className="absolute inset-0 bg-[radial-gradient(60%_45%_at_18%_12%,rgba(28,59,43,0.08),transparent_62%)]"
                 />
-                <HeroTableScene />
                 <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-[#e9dcc4]/80 to-transparent" aria-hidden="true" />
 
                 <div className="absolute left-1/2 top-1/2 w-[276px] -translate-x-1/2 -translate-y-1/2 sm:left-auto sm:right-2 sm:w-[284px] sm:translate-x-0 sm:-translate-y-1/2">
