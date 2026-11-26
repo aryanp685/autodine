@@ -130,7 +130,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'npx next start -H 127.0.0.1 -p 3100',
+    command: 'node scripts/isolated-next.mjs start -H 127.0.0.1 -p 3100',
     url: 'http://127.0.0.1:3100/dashboard',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

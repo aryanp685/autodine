@@ -7,7 +7,7 @@
     "audit:definer": "node scripts/local-pg/with-embedded-postgres.mjs node scripts/local-pg/audit-definer-functions.mjs",
     "backup:run": "node scripts/backup/run-scheduled.mjs",
     "backup:verify-file": "node scripts/backup/verify-backup-file.mjs",
-    "build": "next build",
+    "build": "node scripts/isolated-next.mjs build",
     "d2:verify": "node scripts/d2/verify-acl-posture.mjs",
     "db:reconcile": "node scripts/reconcile/reconcile-migrations.mjs",
     "design:check": "node scripts/check-design-system.mjs",
