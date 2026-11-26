@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { Home } from './HomeScreen';
 import { PricingScreen } from './PricingScreen';
-import { BILLING, LIVE, NOT_CONNECTED, PLANS } from '@/lib/plans';
+import { BILLING, PLANS } from '@/lib/plans';
 import { TRIAL_DAYS } from '@/lib/trial';
 
 /**
@@ -97,20 +97,6 @@ describe('home', () => {
     expect(section).not.toMatch(/pay now|pay online|checkout/i);
   });
 
-  it('earns trust with enforced facts instead of badges', () => {
-    const section = home.match(/<section[^>]*id="trust"[\s\S]*?<\/section>/)?.[0] ?? '';
-    expect(section).toContain('aria-labelledby="trust-heading"');
-    expect(section).toContain('Built for the counter');
-    expect(section.match(/data-trust-point/g)).toHaveLength(4);
-    expect(section).toContain('Nothing is charged online.');
-    expect(section).toContain('Row-level security');
-    expect(section).toContain('whole paise');
-    expect(section).toContain('No guest accounts');
-    expect(section).toContain('href="/privacy"');
-    expect(section).toContain('href="/terms"');
-    expect(section).not.toMatch(/certified|bank-grade|PCI|GDPR|DPDP|100%/i);
-  });
-
   it('labels product mockups honestly and keeps decorative controls out of the tab order', () => {
     const section = home.match(/<section[^>]*id="screens"[\s\S]*?<\/section>/)?.[0] ?? '';
     expect(section).toContain('aria-labelledby="screens-heading"');
@@ -148,8 +134,6 @@ describe('home', () => {
     expect(tail).not.toContain('bg-grass');
     expect(tail).not.toContain('Recommended');
     expect(tail).toContain('bg-forest text-white');
-    expect(tail).toContain('How money moves today');
-    expect(tail).toContain('bg-mute-dim');
     expect(tail).toContain('href="/privacy"');
     expect(tail).toContain('href="/terms"');
     expect(tail).not.toContain('ink="#f7f3ea"');
@@ -157,16 +141,14 @@ describe('home', () => {
     expect(home).toContain('rgba(255,255,255,0.24)');
   });
 
-  it('keeps preview boundaries and capability lists visible without release-log counts', () => {
-    const status = home.slice(home.indexOf('id="status"'), home.indexOf('id="pricing"'));
-    for (const item of [...LIVE, ...NOT_CONNECTED]) expect(status).toContain(item.label.replaceAll('&', '&amp;'));
-    expect(status).toContain('no sample data mixed in');
-    expect(status).toContain('No SMS or WhatsApp receipts');
-    expect(status).toContain('through Cashfree');
-    expect(status).not.toContain('things work.');
+  it('drops the trust and status sections and links billing questions to pricing', () => {
+    expect(home).not.toContain('id="trust"');
+    expect(home).not.toContain('id="status"');
+    expect(home).not.toContain('href="/#status"');
+    expect(home).not.toContain('things work.');
     expect(home).toContain(`Start your ${TRIAL_DAYS}-day trial`);
     expect(home).toContain('No card needed at signup');
-    expect(home).toContain('href="/#status"');
+    expect(home).toContain('href="/pricing#questions"');
   });
 
   it('links every plan card to that plan, not to the top of pricing', () => {
@@ -177,10 +159,10 @@ describe('home', () => {
 
   it('indexes the sections once and marks only the forest bands as dark', () => {
     expect(home.match(/data-section-rail/g)).toHaveLength(1);
-    for (const id of ['how', 'screens', 'product', 'trust', 'status', 'pricing']) {
+    for (const id of ['how', 'screens', 'product', 'pricing']) {
       expect(home).toContain(`href="#${id}"`);
     }
-    expect(home.match(/data-rail-tone="dark"/g)).toHaveLength(2);
+    expect(home.match(/data-rail-tone="dark"/g)).toHaveLength(1);
   });
 });
 
@@ -214,7 +196,7 @@ describe('pricing', () => {
     expect(section).toContain('Not included');
     expect(section).not.toContain('Recommended');
     expect(section).toContain(`What the ${BILLING.trialDays} days look like`);
-    expect(section).toContain('Read-only, not deleted');
+    expect(section).toContain('Pick a plan, nothing deleted');
     expect(section).not.toMatch(/Choose|Buy now/);
   });
 

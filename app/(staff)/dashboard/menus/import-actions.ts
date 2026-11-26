@@ -38,6 +38,13 @@ import { MAX_IMPORT_TEXT, parseMenuText } from '@/lib/menus/bulk-parse';
 
 const MENUS_PATH = '/dashboard/menus';
 
+const IMPORT_NOT_IN_PLAN =
+  'Menu import is part of the Professional and Business plans. Upgrade under Subscription, or add dishes by hand.';
+
+function importAllowed(entitlement: { features: string[] } | null | undefined): boolean {
+  return Boolean(entitlement?.features.includes('import'));
+}
+
 export type ImportResult =
   | { ok: true; menuId: string; items: number; existing?: boolean }
   | { ok: false; error: string };
@@ -77,6 +84,9 @@ export async function createImportedMenuAction(payload: unknown): Promise<Import
   if (!staff.ok) {
     if (staff.reason === 'unconfigured') return { ok: false, error: 'The database is not connected.' };
     return { ok: false, error: 'You need to be signed in to import a menu.' };
+  }
+  if (!importAllowed(staff.context.entitlement)) {
+    return { ok: false, error: IMPORT_NOT_IN_PLAN };
   }
 
   const { supabase, restaurantId } = staff.context;
@@ -269,6 +279,9 @@ export async function extractMenuFromPhotoAction(formData: FormData): Promise<Ph
   }
   if (staff.context.role !== 'owner' && staff.context.role !== 'manager') {
     return { ok: false, code: 'not-allowed', error: 'Only an owner or manager can import a menu.' };
+  }
+  if (!importAllowed(staff.context.entitlement)) {
+    return { ok: false, code: 'not-in-plan', error: IMPORT_NOT_IN_PLAN };
   }
 
   const file = formData.get('photo');

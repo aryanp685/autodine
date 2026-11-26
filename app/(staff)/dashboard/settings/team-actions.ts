@@ -102,6 +102,9 @@ export async function createInviteAction(formData: FormData): Promise<void> {
   if (role === 'manager' && ctx.role !== 'owner') {
     fail('Only the owner can invite a manager.');
   }
+  if (role === 'manager' && ctx.entitlement && !ctx.entitlement.features.includes('roles')) {
+    fail('Manager access is part of the Professional and Business plans. Upgrade under Subscription to invite a manager.');
+  }
 
   const { data, error } = await ctx.supabase.rpc('create_staff_invite', {
     p_restaurant_id: ctx.restaurantId,

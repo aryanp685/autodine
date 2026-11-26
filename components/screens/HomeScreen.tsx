@@ -1,6 +1,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import { LIVE, NOT_CONNECTED, PLANS, capabilitiesFor } from '@/lib/plans';
+import { PLANS, capabilitiesFor } from '@/lib/plans';
 import { inr } from '@/lib/demo-data';
 import { ProductScene } from '@/components/ProductScene';
 import { SiteMotion } from '@/components/SiteMotion';
@@ -121,29 +121,6 @@ const FEATURES = [
   },
 ];
 
-const TRUST_POINTS = [
-  {
-    n: '01',
-    title: 'Payment ends at the counter.',
-    body: 'Nothing is charged online. Staff check the bill against what was served, then record the payment.',
-  },
-  {
-    n: '02',
-    title: 'One restaurant per row.',
-    body: 'Row-level security is enforced by the database, not just the screens — another restaurant’s rows are refused, even to a hand-made request.',
-  },
-  {
-    n: '03',
-    title: 'Amounts stay whole.',
-    body: 'Order and bill amounts are stored as whole paise, not floating-point numbers, so totals do not drift.',
-  },
-  {
-    n: '04',
-    title: 'No guest accounts.',
-    body: 'A guest needs a table, a menu and a phone — no sign-up, no card details and no marketing list.',
-  },
-];
-
 /* -------------------------------------------------------------- pieces */
 
 function Eyebrow({ children, tone = 'dark' }: { children: string; tone?: 'dark' | 'light' }) {
@@ -188,8 +165,6 @@ export function Home() {
         <Steps />
         <ServiceLoop />
         <Screens />
-        <Trust />
-        <Honest />
         <Pricing />
       </main>
       <Close />
@@ -935,114 +910,6 @@ function Features() {
   );
 }
 
-/* ---------------------------------------------------------------- trust */
-
-/**
- * Built for the counter.
- *
- * The four things an owner actually worries about behind the till -- who takes
- * the money, who can see the rows, how amounts are stored, and what a guest
- * has to hand over. Every line here is enforced in the product (or stated in
- * the privacy note); none of it is a badge, a percentage or a certification.
- */
-function Trust() {
-  return (
-    <section
-      id="trust"
-      aria-labelledby="trust-heading"
-      data-rail-tone="dark"
-      className="relative overflow-x-clip border-t border-forest-strong/40 bg-forest py-14 text-white sm:py-20"
-    >
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(70%_60%_at_12%_0%,rgba(191,84,28,0.2),transparent_60%)]"
-      />
-      <Sprig className="pointer-events-none absolute -left-6 top-6 hidden h-64 w-auto text-white opacity-[0.08] lg:block" />
-      <div className="relative mx-auto max-w-[1180px] px-5 sm:px-8">
-        <div className="grid gap-6 lg:grid-cols-[1fr_0.8fr] lg:items-end lg:gap-16">
-          <div>
-            <Eyebrow tone="light">Built for the counter</Eyebrow>
-            <h2 id="trust-heading" className="display mt-5 max-w-[22ch] text-[clamp(1.9rem,3.6vw,2.85rem)] leading-[1.03]" data-reveal>
-              The unglamorous parts,{' '}
-              <em className="font-normal italic text-brass-soft">handled.</em>
-            </h2>
-          </div>
-          <div className="max-w-[40ch]">
-            <p className="text-[15px] leading-[1.8] text-white" data-reveal>
-              Money, data and the bill are the quiet parts of service. They are also the parts that
-              should never be improvised.
-            </p>
-            <p className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-[12px] text-white">
-              <span>How guest data is handled:</span>
-              <Link href="/privacy" className="font-medium text-white underline decoration-white/30 underline-offset-4 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">Privacy note</Link>
-              <Link href="/terms" className="font-medium text-white underline decoration-white/30 underline-offset-4 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">Terms</Link>
-            </p>
-          </div>
-        </div>
-
-        <ol className="mt-10 grid gap-x-8 gap-y-8 sm:grid-cols-2 lg:mt-12 lg:grid-cols-4">
-          {TRUST_POINTS.map((point) => (
-            <li key={point.n} data-trust-point className="border-t border-white/15 pt-5">
-              <span aria-hidden="true" className="font-display text-[13px] italic text-brass-soft">({point.n})</span>
-              <h3 className="mt-3 font-display text-[20px] leading-snug">{point.title}</h3>
-              <p className="mt-2 text-[13px] leading-[1.7] text-white">{point.body}</p>
-            </li>
-          ))}
-        </ol>
-      </div>
-    </section>
-  );
-}
-
-/* --------------------------------------------------------------- honest */
-
-/** Keep the service boundary visible without presenting an internal release log. */
-function Honest() {
-  return (
-    <section id="status" aria-labelledby="status-heading" className="border-t border-ink-line bg-ink py-16 sm:py-24">
-      <div className="mx-auto max-w-[1180px] px-5 sm:px-8">
-        <div data-draw aria-hidden="true" className="mb-10 h-px origin-left bg-gradient-to-r from-forest/40 via-brass/40 to-transparent" />
-        <Eyebrow>Before you start</Eyebrow>
-        <h2 id="status-heading" className="display mt-5 max-w-[22ch] text-[clamp(2.1rem,4.2vw,3.35rem)] leading-[1.02]" data-reveal>
-          A clear picture.<br /><span className="text-forest">No <em className="font-normal italic">surprises.</em></span>
-        </h2>
-        <div data-rule className="rule-draw mt-6 h-px w-16" aria-hidden="true" />
-        <p className="mt-5 max-w-[55ch] text-[15px] leading-relaxed text-mute" data-reveal>
-          AutoDine runs as one system. Here is exactly what works together, and how billing
-          works, before you begin.
-        </p>
-        <div className="mt-10 grid gap-5 md:grid-cols-2" data-stagger>
-          <div className="group rounded-[24px] border border-forest/20 bg-white p-6 transition-colors duration-300 hover:border-forest/35 sm:p-8">
-            <p className="flex items-center gap-2.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-forest"><span aria-hidden="true" className="size-1.5 rounded-full bg-forest" />Explore the workflow</p>
-            <ul className="mt-5 grid gap-3 sm:grid-cols-2">
-              {LIVE.map(item => <li key={item.id} className="flex items-start gap-2.5 text-[14px] leading-relaxed"><Tick />{item.label}</li>)}
-            </ul>
-            <p className="mt-6 border-t border-ink-line pt-4 text-[12px] leading-relaxed text-mute">Every outlet, menu row and order lives in your workspace from day one — no sample data mixed in.</p>
-          </div>
-          <div className="rounded-[24px] border border-ink-line bg-white p-6 transition-colors duration-300 hover:border-brass/30 sm:p-8">
-            <p className="flex items-center gap-2.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-mute"><span aria-hidden="true" className="size-1.5 rounded-full bg-brass/70" />How money moves today</p>
-            <ul className="mt-5 space-y-4">
-              {NOT_CONNECTED.map(item => (
-                <li key={item.id} className="flex gap-3 text-[13px] leading-relaxed text-mute">
-                  <span aria-hidden="true" className="mt-2 size-1.5 shrink-0 rounded-full bg-mute-dim" />
-                  <span>
-                    <span className="font-medium text-cream">{item.label}</span><br />
-                    {item.id === 'payments'
-                      ? 'Guests pay at the counter. Your staff check and record it in one tap — no card details ever pass through AutoDine.'
-                      : item.id === 'billing'
-                        ? `Start free with the whole product for ${TRIAL_DAYS} days. Then pick a plan — checkout is handled securely through Cashfree.`
-                        : 'No SMS or WhatsApp receipts or reminders yet — nothing extra to set up or pay for.'}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 /* -------------------------------------------------------------- pricing */
 
 function Pricing() {
@@ -1174,7 +1041,7 @@ function Close() {
           </div>
 
           <nav aria-label="Footer" className="flex flex-wrap gap-x-8 gap-y-3 text-[12.5px] text-mute">
-            <Link href="/#status" className="transition-colors hover:text-brass-strong focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest">How billing works</Link>
+            <Link href="/pricing#questions" className="transition-colors hover:text-brass-strong focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest">How billing works</Link>
             <Link href="/pricing" className="transition-colors hover:text-brass-strong focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest">Pricing</Link>
             <Link href="/login" prefetch={false} className="transition-colors hover:text-brass-strong focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest">Sign in</Link>
             <AuthHandoffLink href="/signup" className="transition-colors hover:text-brass-strong focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest">Create account</AuthHandoffLink>

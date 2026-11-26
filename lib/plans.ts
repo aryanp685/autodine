@@ -26,15 +26,14 @@ export type PlanId = 'starter' | 'professional' | 'business';
 /**
  * What a plan may use, in code.
  *
- * This is the same six-line matrix as public.plan_features() in migration
- * 20261026001200, and lib/plans.test.ts parses that file and fails if the two
+ * This is the same matrix as public.plan_features() in migration
+ * 20261126200000, and lib/plans.test.ts parses that file and fails if the two
  * disagree. It exists client-side for one reason: a screen must be able to say
  * "menu import is on Professional" before it renders the control. The SERVER
- * still decides — lib/entitlements.ts asks the database — because a hidden
- * button is not a permission.
+ * still decides, because a hidden button is not a permission.
  *
- * `trial` carries everything. A restaurant evaluating the product for three
- * weeks and unable to import its menu is not evaluating the product.
+ * `trial` carries the Professional set for TRIAL_DAYS: menu import, manager
+ * roles and up to five outlets, but not the Business-only extras.
  */
 export type FeatureId =
   | 'menus'
@@ -63,7 +62,12 @@ export const ALL_FEATURES: FeatureId[] = [
 
 /** Deny by default: an unknown plan is not in this record at all. */
 export const ENTITLEMENTS: Record<PlanId | 'trial', FeatureId[]> = {
-  trial: ALL_FEATURES,
+  // The trial IS the Professional plan, free for TRIAL_DAYS: the same feature
+  // list, the same outlet allowance. When the trial ends, buying Starter must
+  // be a real step down and buying Business a real step up — a trial that
+  // carries Business would let an owner run the whole evaluation on features
+  // they are not buying.
+  trial: ['menus', 'qr', 'ordering', 'kitchen', 'cashier', 'reports', 'roles', 'import', 'outlets'],
   starter: ['menus', 'qr', 'ordering', 'kitchen', 'cashier', 'reports'],
   professional: ['menus', 'qr', 'ordering', 'kitchen', 'cashier', 'reports', 'roles', 'import', 'outlets'],
   business: ALL_FEATURES,
@@ -103,7 +107,7 @@ export const PLANS: Plan[] = [
   {
     id: 'professional',
     name: 'Professional',
-    price: 2699,
+    price: 1999,
     fit: 'A full floor, a kitchen board and a manager.',
     outlets: 5,
     recommended: true,
@@ -123,8 +127,8 @@ export const PLANS: Plan[] = [
  * `null` is unlimited (Business). `trial` is the same number the product has
  * always used as its self-serve stop: adding an outlet is free and anonymous
  * until a plan is chosen, so an unbounded "add outlet" button is an unbounded
- * free trial. The trial shows every feature; it is not a licence to mint
- * unlimited workspaces.
+ * free trial. The trial matches Professional, outlets included; it is not a
+ * licence to mint unlimited workspaces.
  */
 export const PLAN_OUTLET_LIMITS: Record<PlanId | 'trial', number | null> = {
   trial: 5,
@@ -166,7 +170,7 @@ export type Capability = {
 /**
  * The product as it exists today.
  *
- * Everything here is built and included in the full trial. The server still
+ * Everything here is built and included in the trial. The server still
  * enforces account access: a trial has a recorded end date, and a plan or
  * expired state can restrict writes. A plan card is not an authorization check.
  */
@@ -317,7 +321,7 @@ export const NOT_CONNECTED = [
     id: 'billing',
     label: 'Buying a plan',
     detail:
-      `No plan can be bought yet. A new account runs on the whole product for ${TRIAL_DAYS} days; after that it is read-only until access is extended by hand.`,
+      `A new account runs the Professional plan free for ${TRIAL_DAYS} days. After that, pick a plan at checkout — Starter ₹999, Professional ₹1,999 or Business ₹3,699 a month, billed through Cashfree.`,
   },
   {
     id: 'messages',

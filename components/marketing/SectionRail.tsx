@@ -15,8 +15,6 @@ const SECTIONS = [
   { id: 'how', label: 'How' },
   { id: 'screens', label: 'Screens' },
   { id: 'product', label: 'Product' },
-  { id: 'trust', label: 'Trust' },
-  { id: 'status', label: 'Status' },
   { id: 'pricing', label: 'Pricing' },
 ] as const;
 

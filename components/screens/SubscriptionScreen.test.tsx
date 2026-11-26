@@ -52,7 +52,7 @@ describe('the subscription screen an owner sees', () => {
       expect(ownerHtml).toContain(plan.name);
     }
     expect(ownerHtml).toContain('₹999.00');
-    expect(ownerHtml).toContain('₹2,699.00');
+    expect(ownerHtml).toContain('₹1,999.00');
     expect(ownerHtml).toContain('₹3,699.00');
     expect(ownerHtml).toContain('Unlimited outlets');
   });
@@ -108,7 +108,7 @@ describe('the same screen for a manager', () => {
   it('shows them the state of the account', () => {
     // Not knowing the account expires on Friday is the manager's problem too.
     expect(managerHtml).toContain('Free trial running');
-    expect(managerHtml).toContain('₹2,699.00');
+    expect(managerHtml).toContain('₹1,999.00');
   });
 
   it('does not offer them the owner\'s plan or cancellation actions', () => {

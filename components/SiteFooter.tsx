@@ -17,7 +17,6 @@ const COLUMNS = [
       { label: 'Overview', href: '/' },
       { label: 'How it works', href: '/#how' },
       { label: 'The screens', href: '/#screens' },
-      { label: 'What is live', href: '/#status' },
     ],
   },
   {

@@ -82,7 +82,7 @@ describe('plans', () => {
     // edit, so it is pinned rather than merely ordered.
     expect(Object.fromEntries(PLANS.map((plan) => [plan.id, plan.price]))).toEqual({
       starter: 999,
-      professional: 2699,
+      professional: 1999,
       business: 3699,
     });
   });
@@ -123,15 +123,20 @@ describe('plans', () => {
  * this test into a no-op.
  */
 describe('plan matrix cannot drift from the database', () => {
-  // Migration 20261110001000 is the current authority: it re-declares
-  // plan_features() for Model C and holds the outlet limits.
+  // Migration 20261110001000 holds the trial length and the outlet limits.
+  // plan_features() was last re-declared by 20261126200000 (pricing v2: the
+  // trial carries the Professional set), so the matrix is read from there.
   const SQL = readFileSync(
     new URL('../supabase/migrations/20261110001000_account_subscriptions.sql', import.meta.url),
     'utf8'
   );
+  const FEATURES_SQL = readFileSync(
+    new URL('../supabase/migrations/20261126200000_pricing_v2_and_professional_trial.sql', import.meta.url),
+    'utf8'
+  );
 
   function featuresInSql(plan: string): string[] {
-    const match = SQL.match(
+    const match = FEATURES_SQL.match(
       new RegExp(`when '${plan}' then array\\[([\\s\\S]*?)\\]`)
     );
     if (!match) throw new Error(`migration has no feature list for ${plan}`);
@@ -212,14 +217,20 @@ describe('plan matrix cannot drift from the database', () => {
  * the migration's own arithmetic is read back and compared to the catalog.
  */
 describe('prices in SQL and TypeScript are the same money', () => {
+  // The billing migration holds the currency and amount guards;
+  // 20261126200000 (pricing v2) is the latest declaration of plan_price_paise.
   const SQL = readFileSync(
     new URL('../supabase/migrations/20261110001100_subscription_billing.sql', import.meta.url),
     'utf8'
   );
+  const PRICE_SQL = readFileSync(
+    new URL('../supabase/migrations/20261126200000_pricing_v2_and_professional_trial.sql', import.meta.url),
+    'utf8'
+  );
 
-  const body = SQL.slice(
-    SQL.indexOf('create or replace function public.plan_price_paise'),
-    SQL.indexOf('create or replace function public.claim_account_trial')
+  const body = PRICE_SQL.slice(
+    PRICE_SQL.indexOf('create or replace function public.plan_price_paise'),
+    PRICE_SQL.indexOf('comment on function public.plan_price_paise')
   );
 
   it('exists at all, so the checks below cannot pass by matching nothing', () => {

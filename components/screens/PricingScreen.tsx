@@ -44,8 +44,8 @@ const TIMELINE = [
   },
   {
     when: `Day ${BILLING.trialDays + 1}`,
-    title: 'Read-only, not deleted',
-    body: 'If you have not picked a plan yet, writes pause — every row stays, nothing is deleted. Checkout through Cashfree reopens the account in minutes.',
+    title: 'Pick a plan, nothing deleted',
+    body: 'Signing in now asks which plan you want: Starter, Professional or Business. Your menu, tables and orders stay exactly as they are; checkout through Cashfree reopens everything in minutes.',
   },
 ];
 
@@ -225,7 +225,7 @@ export function PricingScreen({
                 <div>
                   <p className="text-[11px] font-semibold tracking-[0.18em] text-forest uppercase">After signup</p>
                   <h3 id="trial-heading" className="mt-3 max-w-[17ch] text-[clamp(22px,2.6vw,30px)] leading-[1.1] font-semibold tracking-[-0.035em]">What the {BILLING.trialDays} days look like.</h3>
-                  <p className="mt-3 max-w-[34ch] text-[13.5px] leading-relaxed text-mute">Every feature is on during the trial. No card, no automatic subscription, nothing to cancel.</p>
+                  <p className="mt-3 max-w-[34ch] text-[13.5px] leading-relaxed text-mute">The Professional plan is free for the whole trial. No card, no automatic subscription, nothing to cancel.</p>
                   <AuthHandoffLink href="/signup" className="mt-5 inline-flex min-h-11 items-center gap-3 rounded-full bg-forest px-5 text-[13px] font-medium text-white hover:bg-forest-strong focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest">Start the trial <span aria-hidden="true">↗</span></AuthHandoffLink>
                 </div>
                 <ol className="grid gap-6 sm:grid-cols-3 sm:gap-4">
@@ -255,7 +255,7 @@ export function PricingScreen({
           </div>
         </section>
 
-        <section aria-labelledby="questions-heading" className="px-5 py-12 sm:px-8 sm:py-16">
+        <section id="questions" aria-labelledby="questions-heading" className="px-5 py-12 sm:px-8 sm:py-16">
           <div className="mx-auto grid max-w-[1116px] gap-8 md:grid-cols-[0.8fr_1.2fr] md:gap-20">
             <h2 id="questions-heading" data-reveal className="text-[32px] leading-tight font-semibold tracking-[-0.04em]">Before you start.</h2>
             <div className="divide-y divide-cream/10 border-y border-cream/10">
