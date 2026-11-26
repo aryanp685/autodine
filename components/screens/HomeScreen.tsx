@@ -255,7 +255,7 @@ function Hero() {
           <div className="mt-9 flex flex-col gap-3 sm:flex-row sm:items-center" data-hero-step>
             <AuthHandoffLink
               href="/signup"
-              className="group inline-flex min-h-12 items-center justify-center gap-3 rounded-full bg-brass px-7 text-[14px] font-bold text-white shadow-[0_8px_16px_rgba(244,123,41,0.3)] transition-[background-color,transform,box-shadow] duration-300 hover:-translate-y-0.5 hover:bg-brass-strong focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brass motion-reduce:transition-none motion-reduce:hover:translate-y-0"
+              className="group inline-flex min-h-12 items-center justify-center gap-3 rounded-full bg-brass px-7 text-[14px] font-bold text-cream shadow-[0_8px_16px_rgba(244,123,41,0.3)] transition-[background-color,transform,box-shadow] duration-300 hover:-translate-y-0.5 hover:bg-brass-strong focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brass motion-reduce:transition-none motion-reduce:hover:translate-y-0"
             >
               Start your {TRIAL_DAYS}-day trial
               <span aria-hidden="true" className="transition-transform duration-300 group-hover:translate-x-0.5 motion-reduce:transition-none">→</span>
@@ -983,7 +983,7 @@ function Pricing() {
               }`}
             >
               {plan.recommended ? (
-                <span className="absolute -top-3 left-6 rounded-full bg-brass px-3 py-1 text-[9.5px] font-semibold uppercase tracking-[0.14em] text-white shadow-[0_8px_18px_-10px_rgba(191,84,28,0.9)]">
+                <span className="absolute -top-3 left-6 rounded-full bg-brass px-3 py-1 text-[9.5px] font-semibold uppercase tracking-[0.14em] text-cream shadow-[0_8px_18px_-10px_rgba(191,84,28,0.9)]">
                   Best fit for growing rooms
                 </span>
               ) : null}
@@ -1013,7 +1013,7 @@ function Pricing() {
                 href={`/pricing#plan-${plan.id}`}
                 className={`mt-7 inline-flex h-11 items-center justify-center rounded-full text-[13px] font-semibold transition-colors duration-300 focus-visible:outline-2 focus-visible:outline-offset-4 ${
                   plan.recommended
-                    ? 'bg-brass text-white hover:bg-brass-strong focus-visible:outline-brass'
+                    ? 'bg-brass text-cream hover:bg-brass-strong focus-visible:outline-brass'
                     : 'border border-forest/25 text-forest hover:bg-forest-soft focus-visible:outline-forest'
                 }`}
               >
@@ -1061,7 +1061,7 @@ function Close() {
           <div className="mt-9 flex flex-wrap justify-center gap-3" data-reveal>
             <AuthHandoffLink
               href="/signup"
-              className="inline-flex h-12 items-center gap-2 rounded-full bg-brass px-7 text-[14px] font-semibold text-white shadow-[0_18px_34px_-22px_rgba(191,84,28,0.95)] transition-[background-color,transform] duration-300 hover:-translate-y-0.5 hover:bg-brass-strong focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brass motion-reduce:transition-none motion-reduce:hover:translate-y-0"
+              className="inline-flex h-12 items-center gap-2 rounded-full bg-brass px-7 text-[14px] font-semibold text-cream shadow-[0_18px_34px_-22px_rgba(191,84,28,0.95)] transition-[background-color,transform] duration-300 hover:-translate-y-0.5 hover:bg-brass-strong focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brass motion-reduce:transition-none motion-reduce:hover:translate-y-0"
             >
               Start your {TRIAL_DAYS}-day trial <span aria-hidden="true">→</span>
             </AuthHandoffLink>
