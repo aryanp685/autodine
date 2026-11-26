@@ -29,6 +29,32 @@ const hermeticTestBuild = process.env.AUTODINE_TEST_DEMO_BUILD === 'true';
 const args = process.argv.slice(2);
 const command = args.length > 0 ? args : ['build'];
 
+/**
+ * An environment with NO Supabase credentials at all and no Vercel deployment
+ * context is an isolated verification run (CI, or a workspace that strips the
+ * credentials on purpose, as documented in .mlai/DEPLOY.md). Such a run opts
+ * itself into the hermetic demo build instead of dying on the runtime guard,
+ * which otherwise only recognises the exact four-flag CI combination. This is
+ * not a silent fallback: it is printed loudly, and it can never fire on a real
+ * deployment, where NEXT_PUBLIC_SUPABASE_URL is always configured.
+ */
+const hasNoSupabaseCredentials = !process.env.NEXT_PUBLIC_SUPABASE_URL &&
+  !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY &&
+  !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const isVercelDeploy = Boolean(process.env.VERCEL_ENV);
+
+if (hasNoSupabaseCredentials && !isVercelDeploy && !hermeticTestBuild) {
+  console.warn(
+    '[isolated-next] No Supabase credentials in the environment and no Vercel ' +
+      'deployment context: running a hermetic demo build (no database access). ' +
+      'A production deploy must configure Supabase and never sees this path.'
+  );
+  process.env.GITHUB_ACTIONS = 'true';
+  process.env.CI = 'true';
+  process.env.AUTODINE_TEST_DEMO_BUILD = 'true';
+  process.env.VERCEL_ENV = 'test';
+}
+
 if (hermeticTestBuild) {
   for (const name of [
     'NEXT_PUBLIC_SUPABASE_URL',
