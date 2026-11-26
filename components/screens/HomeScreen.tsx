@@ -1020,7 +1020,7 @@ function Honest() {
             <p className="mt-6 border-t border-ink-line pt-4 text-[12px] leading-relaxed text-mute">Every outlet, menu row and order lives in your workspace from day one — no sample data mixed in.</p>
           </div>
           <div className="rounded-[24px] border border-ink-line bg-white p-6 transition-colors duration-300 hover:border-brass/30 sm:p-8">
-            <p className="flex items-center gap-2.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-mute"><span aria-hidden="true" className="size-1.5 rounded-full bg-brass/70" />Not connected</p>
+            <p className="flex items-center gap-2.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-mute"><span aria-hidden="true" className="size-1.5 rounded-full bg-brass/70" />How money moves today</p>
             <ul className="mt-5 space-y-4">
               {NOT_CONNECTED.map(item => (
                 <li key={item.id} className="flex gap-3 text-[13px] leading-relaxed text-mute">
@@ -1028,10 +1028,10 @@ function Honest() {
                   <span>
                     <span className="font-medium text-cream">{item.label}</span><br />
                     {item.id === 'payments'
-                      ? 'Guests pay at the counter. Staff check and record payment; AutoDine does not collect it online.'
+                      ? 'Guests pay at the counter. Your staff check and record it in one tap — no card details ever pass through AutoDine.'
                       : item.id === 'billing'
-                        ? `New accounts start with a ${TRIAL_DAYS}-day trial. After it, pick a plan — checkout is handled securely through Cashfree.`
-                        : 'No SMS or WhatsApp receipts or reminders are sent.'}
+                        ? `Start free with the whole product for ${TRIAL_DAYS} days. Then pick a plan — checkout is handled securely through Cashfree.`
+                        : 'No SMS or WhatsApp receipts or reminders yet — nothing extra to set up or pay for.'}
                   </span>
                 </li>
               ))}

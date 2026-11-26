@@ -148,7 +148,7 @@ describe('home', () => {
     expect(tail).not.toContain('bg-grass');
     expect(tail).not.toContain('Recommended');
     expect(tail).toContain('bg-forest text-white');
-    expect(tail).toContain('Not connected');
+    expect(tail).toContain('How money moves today');
     expect(tail).toContain('bg-mute-dim');
     expect(tail).toContain('href="/privacy"');
     expect(tail).toContain('href="/terms"');
