@@ -1559,16 +1559,17 @@ body {
  * white on forest 12.0:1, espresso on saffron 5.0:1, saffron-strong on cream
  * 5.0:1, saffron-soft on forest 4.8:1. */
 .public-landing {
-  --color-ink: #faf6f0;
-  --color-ink-soft: #f4ecdf;
-  --color-ink-card: #fffdf8;
-  --color-ink-line: #e8dcc9;
-  --color-forest: #183d32;
-  --color-forest-strong: #0f2a20;
-  --color-forest-soft: #e7efe9;
-  --color-brass: #ea6a2a;
-  --color-brass-strong: #b24a15;
-  --color-brass-soft: #f08a55;
+  /* Signature palette: the same hexes the signature frontend uses. */
+  --color-ink: #faf5ec;
+  --color-ink-soft: #f2ecdf;
+  --color-ink-card: #fffaf1;
+  --color-ink-line: #eee7da;
+  --color-forest: #17483d;
+  --color-forest-strong: #11342b;
+  --color-forest-soft: #e3f1e7;
+  --color-brass: #ff7025;
+  --color-brass-strong: #b4531b;
+  --color-brass-soft: #ff9551;
   --color-cream: #2b2015;
   --color-mute: #6b5b49;
   --color-mute-dim: #7c6b57;
@@ -1645,22 +1646,22 @@ body {
   /* Swagat Warmth: the signed-out screens get the reference's cream-and-forest
      palette and a burnt-orange action accent. Scoped here -- staff and guest
      surfaces keep their own tokens. */
-  --p-paper: #faf6f0;
-  --p-paper-deep: #f4ecdf;
-  --p-card: #fffdf8;
+  --p-paper: #faf5ec;
+  --p-paper-deep: #efe6d4;
+  --p-card: #fffaf1;
   --p-ink: #3a2e23;
-  --p-accent: #183d32;
-  --p-accent-strong: #0f2a20;
-  --p-accent-soft: #e7efe9;
-  --p-accent-wash: rgba(24,61,50,.05);
-  --p-line: #e8dcc9;
+  --p-accent: #17483d;
+  --p-accent-strong: #11342b;
+  --p-accent-soft: #e3f1e7;
+  --p-accent-wash: rgba(23,72,61,.05);
+  --p-line: #eee7da;
   --auth-heading: #2b2015;
-  --auth-accent: #ea6a2a;
-  --auth-accent-strong: #f17b3e;
-  --auth-accent-soft: #fbe7da;
-  --auth-accent-bright: #f08a55;
-  --auth-accent-ink: #b24a15;
-  background: radial-gradient(ellipse at 10% 8%, rgba(234,106,42,.07), transparent 45%), var(--p-paper);
+  --auth-accent: #ff7025;
+  --auth-accent-strong: #ff8134;
+  --auth-accent-soft: #ffe3d0;
+  --auth-accent-bright: #ff9551;
+  --auth-accent-ink: #b4531b;
+  background: radial-gradient(ellipse at 10% 8%, rgba(255,112,37,.07), transparent 45%), var(--p-paper);
 }
 [data-auth-shell] input { min-width: 0; font-size: 16px; }
 [data-auth-shell] input:focus-visible {

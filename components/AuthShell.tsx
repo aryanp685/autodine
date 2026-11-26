@@ -8,7 +8,7 @@ import { BrandMark } from '@/components/BrandMark';
 import { AuthPanelArt } from '@/components/auth/AuthPanelArt';
 
 export const authButtonClass =
-  'inline-flex min-h-[46px] items-center justify-center gap-2 rounded-full bg-[var(--auth-accent)] px-5 py-3 text-[13.5px] font-semibold text-[var(--auth-heading)] shadow-[0_10px_26px_-14px_rgba(234,106,42,0.85)] transition-[background-color,transform,box-shadow] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-px hover:bg-[var(--auth-accent-strong)] hover:shadow-[0_16px_32px_-14px_rgba(234,106,42,0.8)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--auth-accent-ink)] disabled:cursor-not-allowed disabled:opacity-55 disabled:shadow-none disabled:hover:translate-y-0 motion-reduce:transition-none motion-reduce:hover:translate-y-0';
+  'inline-flex min-h-[46px] items-center justify-center gap-2 rounded-full bg-[var(--auth-accent)] px-5 py-3 text-[13.5px] font-semibold text-[var(--auth-heading)] shadow-[0_10px_26px_-14px_rgba(255,112,37,0.85)] transition-[background-color,transform,box-shadow] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-px hover:bg-[var(--auth-accent-strong)] hover:shadow-[0_16px_32px_-14px_rgba(255,112,37,0.8)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--auth-accent-ink)] disabled:cursor-not-allowed disabled:opacity-55 disabled:shadow-none disabled:hover:translate-y-0 motion-reduce:transition-none motion-reduce:hover:translate-y-0';
 
 /**
  * The shell every signed-out account screen wears.

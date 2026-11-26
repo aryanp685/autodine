@@ -253,7 +253,7 @@ function Hero() {
           <div className="mt-9 flex flex-col gap-3 sm:flex-row sm:items-center" data-hero-step>
             <AuthHandoffLink
               href="/signup"
-              className="group inline-flex min-h-12 items-center justify-center gap-3 rounded-full bg-brass px-7 text-[14px] font-semibold text-cream shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_18px_34px_-20px_rgba(234,106,42,0.95)] transition-[background-color,transform,box-shadow] duration-300 hover:-translate-y-0.5 hover:bg-brass-strong hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brass motion-reduce:transition-none motion-reduce:hover:translate-y-0"
+              className="group inline-flex min-h-12 items-center justify-center gap-3 rounded-full bg-brass px-7 text-[14px] font-semibold text-cream shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_18px_34px_-20px_rgba(255,112,37,0.95)] transition-[background-color,transform,box-shadow] duration-300 hover:-translate-y-0.5 hover:bg-brass-strong hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brass motion-reduce:transition-none motion-reduce:hover:translate-y-0"
             >
               Start your {TRIAL_DAYS}-day trial
               <span aria-hidden="true" className="transition-transform duration-300 group-hover:translate-x-0.5 motion-reduce:transition-none">→</span>
@@ -305,7 +305,7 @@ function Hero() {
               </span>
             </div>
 
-            <div aria-hidden="true" className="absolute -right-2 top-8 hidden rounded-2xl border border-brass/25 bg-brass px-3.5 py-2 text-cream shadow-[0_16px_34px_-20px_rgba(234,106,42,0.9)] sm:block">
+            <div aria-hidden="true" className="absolute -right-2 top-8 hidden rounded-2xl border border-brass/25 bg-brass px-3.5 py-2 text-cream shadow-[0_16px_34px_-20px_rgba(255,112,37,0.9)] sm:block">
               <span className="block font-display text-[19px] italic leading-none">₹600</span>
               <span className="mt-1 block text-[9px] uppercase tracking-[0.12em] text-cream">Sample bill · paid at counter</span>
             </div>
@@ -699,7 +699,7 @@ function Screens() {
         <div className="group relative mt-8 flex flex-col items-start justify-between gap-5 overflow-hidden rounded-[22px] border border-ink-line bg-white p-6 transition-colors duration-300 hover:border-brass/30 sm:flex-row sm:items-center">
           <span aria-hidden="true" className="absolute inset-y-0 left-0 w-px bg-brass" />
           <p className="max-w-[45ch] text-[14px] leading-relaxed text-mute">Your staff stay in control. Sending an order does not automatically mark its bill as paid.</p>
-          <AuthHandoffLink href="/signup" className="inline-flex min-h-11 shrink-0 items-center justify-center gap-3 rounded-full bg-brass px-6 py-3 text-[13px] font-semibold text-cream shadow-[0_14px_28px_-18px_rgba(234,106,42,0.9)] motion-safe:transition-[transform,background-color,color] motion-safe:duration-300 motion-safe:hover:-translate-y-0.5 motion-safe:hover:bg-brass-strong motion-safe:hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brass">
+          <AuthHandoffLink href="/signup" className="inline-flex min-h-11 shrink-0 items-center justify-center gap-3 rounded-full bg-brass px-6 py-3 text-[13px] font-semibold text-cream shadow-[0_14px_28px_-18px_rgba(255,112,37,0.9)] motion-safe:transition-[transform,background-color,color] motion-safe:duration-300 motion-safe:hover:-translate-y-0.5 motion-safe:hover:bg-brass-strong motion-safe:hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brass">
             Set up your restaurant <span aria-hidden="true" className="transition-transform duration-300 group-hover:translate-x-0.5 motion-reduce:transition-none">↗</span>
           </AuthHandoffLink>
         </div>
