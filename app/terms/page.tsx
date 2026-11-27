@@ -18,6 +18,16 @@ export default function TermsPage() {
       title="What this product promises, and what it does not."
       lede="These terms describe how AutoDine behaves — the account trial, how orders are priced and paid, and what a plan subscription covers."
     >
+      <LegalSection title="Who you are contracting with">
+        <p>
+          AutoDine is built and operated by Aryan Prashant Patil. The official contact channel for
+          merchants, account questions and data requests is{' '}
+          <a href="mailto:iamjarvis9896@gmail.com" className="underline underline-offset-2">iamjarvis9896@gmail.com</a>.
+          When you create an account, subscribe to a plan, or ask for data to be removed, you are
+          contracting with this operator.
+        </p>
+      </LegalSection>
+
       <LegalSection title="The trial">
         <p>
           A new account gets {TRIAL_DAYS} days on the whole product, measured from activation by the
@@ -34,7 +44,7 @@ export default function TermsPage() {
 
       <LegalSection title="Plans and prices">
         <p>
-          The approved monthly prices are Starter ₹999, Professional ₹2,699 and Business ₹3,699. One
+          The approved monthly prices are Starter ₹999, Professional ₹1,999 and Business ₹3,699. One
           subscription belongs to an account and is shared by its outlets. Plan subscriptions are
           billed through Cashfree checkout inside the app; the public pricing pages link to signup, not
           to a purchase.

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { BrandLockup } from '@/components/BrandMark';
+import { SITE_CONTACT } from '@/lib/site-contact';
 
 /* ============================================================================
    The footer is the last thing a page says, so it says the same thing on every
@@ -54,7 +55,7 @@ type Props = {
 export function SiteFooter({
   note = 'Table QR ordering and restaurant operations, built around the service a restaurant actually runs.',
   scope = 'QR ordering, kitchen and counter — ready for service.',
-  fineLeft = 'AutoDine',
+  fineLeft = `${SITE_CONTACT.line} · ${SITE_CONTACT.contactLine}`,
   fineRight = 'Built for Indian restaurants',
   address,
   phone,

@@ -95,6 +95,13 @@ export default function PrivacyPage() {
           Questions about a specific restaurant&rsquo;s data should go to the person who set that
           restaurant&rsquo;s account up. For anything else, contact the AutoDine team.
         </p>
+        <p>
+          Data requests — a copy of what is stored, a correction, or removal of a restaurant&rsquo;s
+          rows — go to the operator: Aryan Prashant Patil,{' '}
+          <a href="mailto:iamjarvis9896@gmail.com" className="underline underline-offset-2">iamjarvis9896@gmail.com</a>.
+          A request from a restaurant&rsquo;s owner is verified against the account before any data
+          is changed or removed.
+        </p>
       </LegalSection>
     </LegalPage>
   );

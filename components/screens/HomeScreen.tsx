@@ -1038,6 +1038,12 @@ function Close() {
             <p className="mt-3 max-w-[42ch] text-[12.5px] leading-relaxed text-mute-dim">
               QR menu, kitchen board, counter — one system.
             </p>
+            <p className="mt-3 max-w-[42ch] text-[12px] leading-relaxed text-mute-dim">
+              AutoDine — operated by Aryan Prashant Patil ·{' '}
+              <a href="mailto:iamjarvis9896@gmail.com" className="underline decoration-forest/40 underline-offset-2 transition-colors hover:text-brass-strong">
+                iamjarvis9896@gmail.com
+              </a>
+            </p>
           </div>
 
           <nav aria-label="Footer" className="flex flex-wrap gap-x-8 gap-y-3 text-[12.5px] text-mute">
