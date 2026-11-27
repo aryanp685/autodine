@@ -327,42 +327,37 @@ export function Dashboard({
         {/* ------------------------------------------------------------ hero */}
         <div
           data-hero="revenue"
-          className="relative flex flex-col justify-between overflow-hidden rounded-[var(--p-r-card)] border border-[var(--p-line-soft)] bg-card shadow-[var(--p-shadow-1)]"
+          className="relative flex flex-col justify-between overflow-hidden rounded-[var(--p-r-card)] bg-[var(--p-accent-deep)] text-[#f6efe3] shadow-[var(--p-shadow-2)]"
         >
-          {/* A 2px forest rule along the top, and a flat warm wash under the
-              whole card. Both are tokens: no gradient, no blur -- on an
-              eighteen-pixel radius a radial highlight read as a smudge. */}
+          {/* Reference-style COLORED hero card: deep forest fill, cream type.
+              One radial sheen keeps the fill from reading as flat ink. */}
           <span
             aria-hidden="true"
-            className="absolute inset-x-0 top-0 h-[2px] bg-[var(--p-accent)]"
-          />
-          <span
-            aria-hidden="true"
-            className="absolute inset-0 bg-[color-mix(in_oklab,var(--p-accent-wash)_70%,transparent)]"
+            className="pointer-events-none absolute -top-24 -right-16 size-64 rounded-full bg-[radial-gradient(closest-side,rgba(246,239,227,0.16),transparent)]"
           />
 
           <div className="relative flex flex-col gap-5 p-5 sm:p-6">
             {/* the figure */}
             <div className="min-w-0">
-              <p className="text-[10.5px] font-semibold tracking-[0.16em] text-[var(--p-accent-strong)] uppercase">
+              <p className="text-[10.5px] font-semibold tracking-[0.16em] text-[rgba(246,239,227,0.78)] uppercase">
                 {leadStat.label}
               </p>
               {/* The one display numeral on the surface. `tabular-nums` keeps
                   the rupee digits from shivering as the day grows, and the
                   clamp lets it be enormous on a laptop without wrapping on a
                   phone. */}
-              <div className="mt-2.5 text-[clamp(2.2rem,5.4vw,4rem)] leading-[0.9] font-semibold tracking-[-0.055em] text-gink tabular-nums">
+              <div className="mt-2.5 text-[clamp(2.2rem,5.4vw,4rem)] leading-[0.9] font-semibold tracking-[-0.055em] text-[#f6efe3] tabular-nums">
                 {leadStat.value}
               </div>
-              <p className="mt-3 max-w-[32ch] text-[12.5px] leading-[1.5] text-gink-64">
+              <p className="mt-3 max-w-[32ch] text-[12.5px] leading-[1.5] text-[rgba(246,239,227,0.74)]">
                 {leadStat.meta}
               </p>
             </div>
 
             {/* the shape of the day, under the figure across the card */}
-            <div className="min-w-0 border-t border-hair pt-4">
+            <div className="min-w-0 border-t border-[rgba(246,239,227,0.2)] pt-4">
               {chartable && chartHasValue ? (
-                <div className="text-[var(--p-ember)]" data-chart>
+                <div className="text-[#e8934f]" data-chart>
                   {/* The line draws itself once, on arrival: GSAP, lazily
                       loaded, and it can only ever ADD motion -- the server
                       sends the chart fully drawn, so a blocked bundle leaves a
@@ -385,16 +380,16 @@ export function Dashboard({
                           hour, not a measurement, and a grid would be a claim
                           about precision the buckets do not have. */}
                       <div className="mt-1.5 flex items-baseline justify-between gap-3">
-                        <span className="text-[10.5px] text-gink-46 tabular-nums">{hourLabel(0)}</span>
-                        <span className="text-[10.5px] text-gink-46 tabular-nums">
+                        <span className="text-[10.5px] text-[rgba(246,239,227,0.66)] tabular-nums">{hourLabel(0)}</span>
+                        <span className="text-[10.5px] text-[rgba(246,239,227,0.66)] tabular-nums">
                           {hourLabel(hourly.length - 1)}
                         </span>
                       </div>
                       {/* The line says the shape; this says the answer. */}
-                      <div className="mt-2.5 flex flex-wrap items-baseline gap-x-2 gap-y-1 border-t border-hair pt-2.5">
-                        <span className="text-[11.5px] font-medium text-gink">Busiest hour</span>
-                        <span className="text-[11.5px] text-gink-46">{hourRangeLabel(peakIndex)}</span>
-                        <span className="ml-auto text-[13px] font-semibold text-gink tabular-nums">
+                      <div className="mt-2.5 flex flex-wrap items-baseline gap-x-2 gap-y-1 border-t border-[rgba(246,239,227,0.2)] pt-2.5">
+                        <span className="text-[11.5px] font-medium text-[#f6efe3]">Busiest hour</span>
+                        <span className="text-[11.5px] text-[rgba(246,239,227,0.66)]">{hourRangeLabel(peakIndex)}</span>
+                        <span className="ml-auto text-[13px] font-semibold text-[#f6efe3] tabular-nums">
                           <Money value={hourly[peakIndex]} />
                         </span>
                       </div>
@@ -404,7 +399,7 @@ export function Dashboard({
                        it is labelled as a sample and given no axis: printing
                        midnight-to-11am under twelve invented buckets invented
                        a trading day the demo never had. */
-                    <p className="mt-2 text-[11.5px] leading-[1.45] text-gink-46">
+                    <p className="mt-2 text-[11.5px] leading-[1.45] text-[rgba(246,239,227,0.66)]">
                       Sample shape &middot; fictional
                     </p>
                   )}
@@ -421,26 +416,28 @@ export function Dashboard({
         </div>
 
         {/* ------------------------------------------------- the ledgers
-            Three figures, not four: the fourth is the hero. They live in one
-            sheet with hairline rules instead of three separate cards, so the
-            page opens with two objects -- the number you came for and the
-            ledger beside it -- rather than a row of equal boxes. */}
+            Three figures, not four: the fourth is the hero. The reference
+            dashboard gives each its own coloured card -- sage, then cream --
+            so the row reads as one band of colour beside the forest hero
+            rather than a sheet of ruled rows. Tint order is fixed so the
+            band always alternates the same way. */}
         <aside
           aria-label="Other figures for today"
-          className="flex flex-col overflow-hidden rounded-[var(--p-r-card)] border border-[var(--p-line-soft)] bg-card shadow-[var(--p-shadow-1)]"
+          className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-1"
         >
-          {otherStats.map((card) => {
+          {otherStats.map((card, index) => {
             /* Green means "somebody is working right now", so it belongs on
                open orders and only when there are some. */
             const tinted = card.label === 'Open orders' && openCount > 0;
+            const tint = tinted
+              ? 'bg-[color-mix(in_oklab,var(--p-accent-soft)_62%,var(--p-card))]'
+              : index % 2 === 0
+                ? 'bg-[color-mix(in_oklab,var(--p-accent-deep)_10%,var(--p-card))]'
+                : 'bg-[var(--p-accent-wash)]';
             return (
               <div
                 key={card.label}
-                className={`flex flex-1 flex-col justify-center border-b border-[var(--p-line-soft)] px-5 py-4 last:border-b-0 sm:px-6 ${
-                  tinted
-                    ? 'bg-[color-mix(in_oklab,var(--p-accent-soft)_62%,var(--p-card))]'
-                    : ''
-                }`}
+                className={`flex flex-1 flex-col justify-center rounded-[var(--p-r-card)] border border-[var(--p-line-soft)] px-5 py-4 shadow-[var(--p-shadow-1)] sm:px-6 ${tint}`}
               >
                 <p className="text-[11.5px] font-medium text-gink-46">{card.label}</p>
                 <span className="mt-1 text-[clamp(1.55rem,2.3vw,1.9rem)] leading-none font-semibold tracking-[-0.03em] text-gink tabular-nums">

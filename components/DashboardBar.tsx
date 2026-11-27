@@ -213,11 +213,13 @@ export function DashboardBar({
             named once, at the foot, where the account lives -- printing it here
             as well would put the same words twice in a 244px column. */}
         <div className="flex items-center justify-between border-b border-rail-line px-4 py-3.5 lg:px-5 lg:py-4">
-          <Link href="/" aria-label="AutoDine" className="group text-rail-ink">
-            {/* BRASS is the token for the mark's dot, and on this surface it
-                carries the brand green: the rail is pale, so the dot has to be
-                the one saturated thing in the column rather than another grey
-                line. It stays a token, so the mark is one value in one place. */}
+          <Link
+            href="/"
+            aria-label="AutoDine"
+            className="group inline-flex rounded-[10px] bg-[#f6efe3] px-2.5 py-1.5"
+          >
+            {/* On the dark forest column the lockup sits on a cream chip, the
+                way the reference dashboard mounts its logo on a light plate. */}
             <BrandLockup height={26} />
           </Link>
 
@@ -265,31 +267,26 @@ export function DashboardBar({
                     /* `data-rail-row` is the GSAP handle: the row is animated
                        only while the drawer is opening, and never on a laptop
                        where the rail is always on screen. */
+                    /* On a dark rail the current screen is a cream pill with
+                       forest type -- the one bright object in the column, the
+                       way the reference dashboard marks "you are here". Other
+                       rows lift on a cream wash. */
                     data-rail-row="true"
                     className={[
                       'group relative mb-0.5 flex items-center gap-2.5 rounded-[var(--p-r-control)] px-3 py-[9px] text-[13px]',
                       'transition-[background-color,color] duration-150 ease-[var(--o-ease)]',
                       current
-                        ? 'bg-[var(--p-rail-active)] font-medium text-rail-ink'
-                        : 'text-rail-ink-64 hover:bg-gink-07 hover:text-rail-ink',
+                        ? 'bg-[var(--p-rail-active)] font-semibold text-[var(--p-rail-active-ink)]'
+                        : 'text-rail-ink-64 hover:bg-[var(--p-rail-hover)] hover:text-rail-ink',
                     ].join(' ')}
                   >
-                    {/* The copper bar is centred on the row's own edge rather
-                        than floating outside the rail: at -left-3 it sat in the
-                        rail's padding, where on a phone sheet it looked like a
-                        stray mark with nothing to belong to. */}
-                    <span
-                      aria-hidden="true"
-                      className={[
-                        'absolute top-1/2 left-0 h-[18px] w-[3px] -translate-y-1/2 rounded-r-full transition-opacity duration-150',
-                        current ? 'bg-grass opacity-100' : 'opacity-0',
-                      ].join(' ')}
-                    />
                     <span
                       aria-hidden="true"
                       className={[
                         'shrink-0 transition-colors',
-                        current ? 'text-[var(--p-accent)]' : 'text-rail-ink-40 group-hover:text-rail-ink-64',
+                        current
+                          ? 'text-[var(--p-rail-active-ink)]'
+                          : 'text-rail-ink-40 group-hover:text-rail-ink-64',
                       ].join(' ')}
                     >
                       {ICONS[link.key]}
@@ -307,11 +304,11 @@ export function DashboardBar({
             person rather than a destination, so it gets its own surface -- one
             step lighter than the rail, with a hairline and a lit top edge. */}
         <div className="border-t border-rail-line p-2.5">
-          <div className="rounded-[var(--p-r-block)] border border-rail-line bg-[var(--p-rail-raised)] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+          <div className="rounded-[var(--p-r-block)] border border-rail-line bg-[var(--p-rail-raised)] p-2">
             <div className="flex items-center gap-2.5">
               <span
                 aria-hidden="true"
-                className="grid size-9 shrink-0 place-items-center rounded-[10px] bg-grass text-[11.5px] font-semibold text-cream shadow-[inset_0_1px_0_rgba(255,255,255,0.25)]"
+                className="grid size-9 shrink-0 place-items-center rounded-[10px] bg-[#f6efe3] text-[11.5px] font-semibold text-[var(--p-rail-active-ink)]"
               >
                 {initialsOf(activeOutlet?.name ?? 'AutoDine')}
               </span>

@@ -417,18 +417,19 @@ body {
   --p-on-ink-40: rgba(255, 255, 255, 0.52);
 
   /* ---- accent ----------------------------------------------------------
-     ONE PLUM. A dining-room colour rather than a dashboard blue: aubergine on
-     porcelain is what a menu, a table cloth and a wine list already are.
-     8.6:1 as a fill behind white and 7.3:1 as a label on its own soft tint, so
-     the same token can be a button and a piece of type. `--p-accent-strong` is
-     the pressed state -- one step darker, because the surface is light -- and
-     the 10.5px tracked-out uppercase, which needs the extra weight.
-     `--p-brass` is not a colour of its own: it is the brand mark's dot on the
-     pale rail, and it carries the brand green so the mark stays the mark. */
-  --p-accent: #7d2b6b;
-  --p-accent-strong: #631f55;
-  --p-accent-soft: #f4e9f1;
-  --p-accent-wash: rgba(125, 43, 107, 0.05);
+     ONE FOREST, matching the reference dashboard: the accent is a dining-room
+     green rather than a dashboard blue, with `--p-accent-deep` for the filled
+     hero card. 8.6:1 as a fill behind white and 7.3:1 as a label on its own
+     soft tint, so the same token can be a button and a piece of type.
+     `--p-accent-strong` is the pressed state -- one step darker, because the
+     surface is light -- and the 10.5px tracked-out uppercase, which needs the
+     extra weight. `--p-brass` is not a colour of its own: it is the brand
+     mark's dot, and it carries the brand green so the mark stays the mark. */
+  --p-accent: #1f4d3a;
+  --p-accent-strong: #16352a;
+  --p-accent-deep: #16352a;
+  --p-accent-soft: #e3f1e7;
+  --p-accent-wash: rgba(31, 77, 58, 0.05);
   --p-brass: #2f7d4f;
 
   /* ---- status ----------------------------------------------------------
@@ -442,20 +443,20 @@ body {
   --p-due-soft: #fbeae7;
 
   /* ---- the rail --------------------------------------------------------
-     PALE, not dark. A warm white column on a porcelain room: the lightest
-     surface on screen, which is what stops the product reading as a console.
-     The current row is a 10% plum tint, and the type on it is the same
-     espresso. */
-  --p-rail: #fffdf9;
-  --p-rail-raised: #ffffff;
-  --p-rail-ink: #211a15;
-  --p-rail-ink-64: rgba(33, 26, 21, 0.72);
-  --p-rail-ink-40: rgba(33, 26, 21, 0.64);
-  --p-rail-line: rgba(33, 26, 21, 0.09);
-  /* 2026-11-27: the current row is a 10% forest tint, not plum, so the rail
-     already speaks the landing page's green while screens are rebuilt one by
-     one against the welcome palette. Same espresso type on it. */
-  --p-rail-active: rgba(31, 77, 58, 0.1);
+     DARK FOREST, like the reference dashboard: a deep forest column on the
+     porcelain room, cream type on it. The current row is a cream pill with
+     forest-dark type -- the one bright object in the column -- and the other
+     rows lift on a white wash. 2026-11-27: was pale; the owner asked for the
+     reference's dark sidebar. */
+  --p-rail: #16352a;
+  --p-rail-raised: rgba(255, 255, 255, 0.05);
+  --p-rail-ink: #f6efe3;
+  --p-rail-ink-64: rgba(246, 239, 227, 0.74);
+  --p-rail-ink-40: rgba(246, 239, 227, 0.58);
+  --p-rail-line: rgba(246, 239, 227, 0.14);
+  --p-rail-active: #f6efe3;
+  --p-rail-active-ink: #1f4d3a;
+  --p-rail-hover: rgba(246, 239, 227, 0.08);
 
   /* ---- lines -----------------------------------------------------------
      Warm hairlines. On a white surface an edge is a drawn line, not a shadow;

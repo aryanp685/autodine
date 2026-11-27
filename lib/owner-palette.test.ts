@@ -97,14 +97,19 @@ describe('owner palette tokens', () => {
   });
 
   it('keeps body type and meta type readable on the field and on a card', () => {
-    for (const base of ['p-paper', 'p-card', 'p-rail']) {
+    for (const base of ['p-paper', 'p-card']) {
       const bg = rgb(tokens[base]);
       expect(contrast(over(tokens['p-ink'], tokens[base]), bg)).toBeGreaterThanOrEqual(7);
       // 0.62 alpha is the quiet end of the ramp; below 4.5 it reads as
       // switched off rather than as secondary.
       expect(contrast(over(tokens['p-ink-46'], tokens[base]), bg)).toBeGreaterThanOrEqual(4.5);
     }
-    expect(contrast(rgb(tokens['p-rail-ink']), rgb(tokens['p-rail']))).toBeGreaterThanOrEqual(7);
+    /* The rail is a dark forest column (2026-11-27), so it is read through its
+       own cream ramp, not the espresso one: rail-ink clears 7:1 on the fill,
+       and the quiet end of the rail ramp (0.58 alpha) clears 4.5:1. */
+    const rail = rgb(tokens['p-rail']);
+    expect(contrast(rgb(tokens['p-rail-ink']), rail)).toBeGreaterThanOrEqual(7);
+    expect(contrast(over(tokens['p-rail-ink-40'], tokens['p-rail']), rail)).toBeGreaterThanOrEqual(4.5);
   });
 
   it('keeps both status meanings readable on their own washes', () => {
