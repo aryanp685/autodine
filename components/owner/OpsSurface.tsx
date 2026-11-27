@@ -72,25 +72,21 @@ export const OPS_SURFACE_STYLE: CSSProperties = {
  * The public-facing welcome, carried inside the product.
  *
  * The landing page and the auth screens already speak one language: cream
- * paper (#FBF6EE), forest as the working colour (#1F4D3A), burnt saffron for
- * marks and emphasis (#B4531B), Fraunces for display type. The Overview is the
- * first screen after sign-in, so it should not feel like a different product
- * with a different accent.
- *
- * Two greens still mean different things and stay distinct: `--p-live` is the
- * settled/ready state and keeps its own value; `--p-accent` here is the
- * control/selection colour, exactly as the forest button on the landing page
- * is. Nothing else in this block is a new colour -- they are the landing's
- * values, at the same opacities the kit already uses.
+ * paper, Fraunces for display type. The Overview is the first screen after
+ * sign-in, so it should not feel like a different product. 2026-11-27: the
+ * accent moved from forest to the brand's burnt orange, to match the owner's
+ * reference dashboard -- sand rail, orange current row, white cards, orange
+ * marks. `--p-live` keeps its own green because "settled" is a state, not a
+ * brand colour.
  */
 export const WELCOME_SURFACE_STYLE: CSSProperties = {
-  /* Surfaces: the landing's cream field, warm sheet above it. */
-  '--p-paper': '#fbf6ee',
+  /* Surfaces: the reference's near-white cream field, white cards above it. */
+  '--p-paper': '#fffaf4',
   '--p-paper-deep': '#f3ebdd',
   '--p-paper-veil': 'rgba(43, 32, 21, 0.022)',
-  '--p-glass': 'rgba(253, 250, 244, 0.9)',
-  '--p-surface': '#fffdf9',
-  '--p-card': '#fffdf9',
+  '--p-glass': 'rgba(255, 255, 255, 0.9)',
+  '--p-surface': '#ffffff',
+  '--p-card': '#ffffff',
 
   /* Ink: the landing's heading colour, warmed through the ramp. */
   '--p-ink': '#2b2015',
@@ -101,15 +97,15 @@ export const WELCOME_SURFACE_STYLE: CSSProperties = {
   '--p-ink-12': 'rgba(43, 32, 21, 0.14)',
   '--p-ink-07': 'rgba(43, 32, 21, 0.07)',
 
-  /* Accent: forest, the landing's action colour. */
-  '--p-accent': '#1f4d3a',
-  '--p-accent-strong': '#173c2d',
-  '--p-accent-soft': '#e6eee7',
-  '--p-accent-wash': 'rgba(31, 77, 58, 0.045)',
+  /* Accent: burnt orange, the reference's action colour. 5.2:1 behind white. */
+  '--p-accent': '#c2410c',
+  '--p-accent-strong': '#a3370a',
+  '--p-accent-soft': '#fcefe8',
+  '--p-accent-wash': 'rgba(194, 65, 12, 0.045)',
 
-  /* The landing's burnt saffron, for the one warm mark on the page (the
-     revenue curve), never as a fill behind body copy. */
-  '--p-ember': '#b4531b',
+  /* The one warm mark on the page (the revenue curve), never a fill behind
+     body copy. */
+  '--p-ember': '#c2410c',
 
   /* Rail and lines follow the new ink so the chrome stays one room. */
   '--p-rail': '#fffdf9',

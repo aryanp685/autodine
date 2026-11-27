@@ -26,7 +26,13 @@ import type { DashboardScreenData } from '@/lib/db/dashboard-screen';
 import { MarkSessionPaidButton } from '@/components/owner/MarkSessionPaidButton';
 import { CloseSessionButton } from '@/components/owner/CloseSessionButton';
 import { accessSummary, planSentence } from '@/lib/access';
-import { clockTimeInZone, hourLabel, hourRangeLabel } from '@/lib/db/time';
+import {
+  clockTimeInZone,
+  hourInZone,
+  hourLabel,
+  hourRangeLabel,
+  RESTAURANT_TIME_ZONE,
+} from '@/lib/db/time';
 
 /**
  * 'refunded' reads as paid here for the same reason it does on the kitchen
@@ -72,6 +78,11 @@ export function Dashboard({
   const venueMeta = live ? (data?.tagline ?? '') : restaurant.tagline;
   // Times in the table are shown on the restaurant's clock, never the server's.
   const timezone = data?.timezone;
+
+  // The greeting follows the restaurant's clock, not the reader's: a kitchen
+  // that opens at 6pm should not be told "good morning" by a phone in London.
+  const localHour = hourInZone(timezone ?? RESTAURANT_TIME_ZONE, new Date());
+  const greeting = localHour < 12 ? 'Good morning' : localHour < 17 ? 'Good afternoon' : 'Good evening';
 
   const cards: Array<{ label: string; value: ReactNode; meta: string }> = live && stats
     ? [
@@ -153,45 +164,41 @@ export function Dashboard({
         <AutoRefresh enabled={live && !blocked} />
       {/*
         The masthead is drawn here rather than through `PageHead` because the
-        venue name is the one place the product speaks in the landing page's
-        display face: Fraunces on cream, with the burnt-saffron rule as the only
-        warm mark above the fold. Everything under it keeps the kit's own type.
+        greeting is the one place the product speaks in the display face:
+        Fraunces on a white card, like the reference dashboard's welcome panel.
+        Everything under it keeps the kit's own type.
       */}
-      <header className="mb-7 sm:mb-8">
-        <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-          <div className="min-w-0">
-            <p className="flex items-center gap-2 text-[10.5px] font-semibold tracking-[0.2em] text-[var(--p-ink-46)] uppercase">
-              <span aria-hidden="true" className="h-px w-[18px] bg-[var(--p-ember)]" />
-              {live ? 'Overview · today, restaurant time' : 'Sample dashboard · fictional data'}
-            </p>
-            <h1 className="ov-display mt-3 text-[clamp(2.1rem,3.4vw,3rem)] leading-[1.04] font-semibold tracking-[-0.02em] text-balance text-gink">
-              {venueName || 'Restaurant overview'}
-            </h1>
-            {venueMeta ? (
-              <p className="mt-2.5 max-w-[60ch] text-[13.5px] leading-[1.6] text-gink-64">
-                {venueMeta}
+      <header className="mb-6 sm:mb-7">
+        <div className="rounded-[var(--p-r-card)] border border-[var(--p-line-soft)] bg-[var(--p-card)] px-5 py-6 shadow-[var(--p-shadow-1)] sm:px-7 sm:py-7">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+            <div className="min-w-0">
+              <p className="text-[10.5px] font-semibold tracking-[0.2em] text-[var(--p-ink-46)] uppercase">
+                {live ? 'Your restaurant, at a glance' : 'Sample dashboard · fictional data'}
               </p>
-            ) : null}
-          </div>
-          <div className="flex flex-wrap items-center gap-2 sm:pb-1">
-            {outlet?.operatingMode === 'mode_a' ? (
-              <BtnLink href="/dashboard/orders" tone="ghost">
-                Orders &amp; KOT handoff
+              <h1 className="ov-display mt-3 text-[clamp(2.1rem,3.4vw,3rem)] leading-[1.04] font-semibold tracking-[-0.02em] text-balance text-gink">
+                {greeting}
+                {venueName ? `, ${venueName}.` : '.'}
+              </h1>
+              <p className="mt-2.5 max-w-[60ch] text-[13.5px] leading-[1.6] text-gink-64">
+                {live ? 'Here’s what’s happening in your restaurant today.' : venueMeta}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 sm:pb-1">
+              {outlet?.operatingMode === 'mode_a' ? (
+                <BtnLink href="/dashboard/orders" tone="ghost">
+                  Orders &amp; KOT handoff
+                </BtnLink>
+              ) : (
+                <BtnLink href="/cashier" tone="ghost">
+                  Open the counter
+                </BtnLink>
+              )}
+              <BtnLink href="/kitchen" tone="accent">
+                Open the kitchen board
               </BtnLink>
-            ) : (
-              <BtnLink href="/cashier" tone="ghost">
-                Open the counter
-              </BtnLink>
-            )}
-            <BtnLink href="/kitchen" tone="forest">
-              Open the kitchen board
-            </BtnLink>
+            </div>
           </div>
         </div>
-        <div
-          aria-hidden="true"
-          className="mt-6 h-px bg-[linear-gradient(90deg,var(--p-line),transparent)]"
-        />
       </header>
 
       {blocked && <SignInPrompt reason={blocked} screen="dashboard" />}
@@ -327,37 +334,38 @@ export function Dashboard({
         {/* ------------------------------------------------------------ hero */}
         <div
           data-hero="revenue"
-          className="relative flex flex-col justify-between overflow-hidden rounded-[var(--p-r-card)] bg-[var(--p-accent-deep)] text-[#f6efe3] shadow-[var(--p-shadow-2)]"
+          className="relative flex flex-col justify-between overflow-hidden rounded-[var(--p-r-card)] border border-[var(--p-line-soft)] bg-[var(--p-card)] text-gink shadow-[var(--p-shadow-1)]"
         >
-          {/* Reference-style COLORED hero card: deep forest fill, cream type.
-              One radial sheen keeps the fill from reading as flat ink. */}
+          {/* Reference-style white hero card: the figure in ink on white, the
+              day's curve in the one accent. A faint orange sheen keeps the
+              fill from reading as untouched paper. */}
           <span
             aria-hidden="true"
-            className="pointer-events-none absolute -top-24 -right-16 size-64 rounded-full bg-[radial-gradient(closest-side,rgba(246,239,227,0.16),transparent)]"
+            className="pointer-events-none absolute -top-24 -right-16 size-64 rounded-full bg-[radial-gradient(closest-side,rgba(194,65,12,0.08),transparent)]"
           />
 
           <div className="relative flex flex-col gap-5 p-5 sm:p-6">
             {/* the figure */}
             <div className="min-w-0">
-              <p className="text-[10.5px] font-semibold tracking-[0.16em] text-[rgba(246,239,227,0.78)] uppercase">
+              <p className="text-[10.5px] font-semibold tracking-[0.16em] text-[var(--p-ink-46)] uppercase">
                 {leadStat.label}
               </p>
               {/* The one display numeral on the surface. `tabular-nums` keeps
                   the rupee digits from shivering as the day grows, and the
                   clamp lets it be enormous on a laptop without wrapping on a
                   phone. */}
-              <div className="mt-2.5 text-[clamp(2.2rem,5.4vw,4rem)] leading-[0.9] font-semibold tracking-[-0.055em] text-[#f6efe3] tabular-nums">
+              <div className="mt-2.5 text-[clamp(2.2rem,5.4vw,4rem)] leading-[0.9] font-semibold tracking-[-0.055em] text-gink tabular-nums">
                 {leadStat.value}
               </div>
-              <p className="mt-3 max-w-[32ch] text-[12.5px] leading-[1.5] text-[rgba(246,239,227,0.74)]">
+              <p className="mt-3 max-w-[32ch] text-[12.5px] leading-[1.5] text-gink-64">
                 {leadStat.meta}
               </p>
             </div>
 
             {/* the shape of the day, under the figure across the card */}
-            <div className="min-w-0 border-t border-[rgba(246,239,227,0.2)] pt-4">
+            <div className="min-w-0 border-t border-[var(--p-line-soft)] pt-4">
               {chartable && chartHasValue ? (
-                <div className="text-[#e8934f]" data-chart>
+                <div className="text-[var(--p-accent)]" data-chart>
                   {/* The line draws itself once, on arrival: GSAP, lazily
                       loaded, and it can only ever ADD motion -- the server
                       sends the chart fully drawn, so a blocked bundle leaves a
@@ -380,16 +388,16 @@ export function Dashboard({
                           hour, not a measurement, and a grid would be a claim
                           about precision the buckets do not have. */}
                       <div className="mt-1.5 flex items-baseline justify-between gap-3">
-                        <span className="text-[10.5px] text-[rgba(246,239,227,0.66)] tabular-nums">{hourLabel(0)}</span>
-                        <span className="text-[10.5px] text-[rgba(246,239,227,0.66)] tabular-nums">
+                        <span className="text-[10.5px] text-gink-46 tabular-nums">{hourLabel(0)}</span>
+                        <span className="text-[10.5px] text-gink-46 tabular-nums">
                           {hourLabel(hourly.length - 1)}
                         </span>
                       </div>
                       {/* The line says the shape; this says the answer. */}
-                      <div className="mt-2.5 flex flex-wrap items-baseline gap-x-2 gap-y-1 border-t border-[rgba(246,239,227,0.2)] pt-2.5">
-                        <span className="text-[11.5px] font-medium text-[#f6efe3]">Busiest hour</span>
-                        <span className="text-[11.5px] text-[rgba(246,239,227,0.66)]">{hourRangeLabel(peakIndex)}</span>
-                        <span className="ml-auto text-[13px] font-semibold text-[#f6efe3] tabular-nums">
+                      <div className="mt-2.5 flex flex-wrap items-baseline gap-x-2 gap-y-1 border-t border-[var(--p-line-soft)] pt-2.5">
+                        <span className="text-[11.5px] font-medium text-gink">Busiest hour</span>
+                        <span className="text-[11.5px] text-gink-46">{hourRangeLabel(peakIndex)}</span>
+                        <span className="ml-auto text-[13px] font-semibold text-gink tabular-nums">
                           <Money value={hourly[peakIndex]} />
                         </span>
                       </div>
@@ -399,7 +407,7 @@ export function Dashboard({
                        it is labelled as a sample and given no axis: printing
                        midnight-to-11am under twelve invented buckets invented
                        a trading day the demo never had. */
-                    <p className="mt-2 text-[11.5px] leading-[1.45] text-[rgba(246,239,227,0.66)]">
+                    <p className="mt-2 text-[11.5px] leading-[1.45] text-gink-46">
                       Sample shape &middot; fictional
                     </p>
                   )}
@@ -417,33 +425,33 @@ export function Dashboard({
 
         {/* ------------------------------------------------- the ledgers
             Three figures, not four: the fourth is the hero. The reference
-            dashboard gives each its own coloured card -- sage, then cream --
-            so the row reads as one band of colour beside the forest hero
-            rather than a sheet of ruled rows. Tint order is fixed so the
-            band always alternates the same way. */}
+            dashboard gives each its own lightly tinted card -- warm peach, then
+            a whisper of paper -- so the row reads as one band of colour beside
+            the white hero rather than a sheet of ruled rows. Tint order is
+            fixed so the band always alternates the same way. */}
         <aside
           aria-label="Other figures for today"
           className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-1"
         >
-          {otherStats.map((card, index) => {
-            /* Green means "somebody is working right now", so it belongs on
-               open orders and only when there are some. */
+          {otherStats.map((card) => {
+            /* Open orders is the one card allowed a fill: it means "somebody
+               is working right now". Every other figure is a white card with a
+               hairline, like the reference dashboard's tiles -- colour is
+               reserved for the thing that needs a glance. */
             const tinted = card.label === 'Open orders' && openCount > 0;
             const tint = tinted
               ? 'bg-[color-mix(in_oklab,var(--p-accent-soft)_62%,var(--p-card))]'
-              : index % 2 === 0
-                ? 'bg-[color-mix(in_oklab,var(--p-accent-deep)_10%,var(--p-card))]'
-                : 'bg-[var(--p-accent-wash)]';
+              : 'bg-[var(--p-card)]';
             return (
               <div
                 key={card.label}
                 className={`flex flex-1 flex-col justify-center rounded-[var(--p-r-card)] border border-[var(--p-line-soft)] px-5 py-4 shadow-[var(--p-shadow-1)] sm:px-6 ${tint}`}
               >
-                <p className="text-[11.5px] font-medium text-gink-46">{card.label}</p>
+                <p className="text-[11.5px] font-medium text-gink-64">{card.label}</p>
                 <span className="mt-1 text-[clamp(1.55rem,2.3vw,1.9rem)] leading-none font-semibold tracking-[-0.03em] text-gink tabular-nums">
                   {card.value}
                 </span>
-                <span className="mt-1.5 text-[11.5px] leading-[1.4] text-gink-46">
+                <span className="mt-1.5 text-[11.5px] leading-[1.4] text-gink-64">
                   {card.meta}
                 </span>
               </div>

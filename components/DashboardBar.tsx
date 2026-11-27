@@ -198,7 +198,7 @@ export function DashboardBar({
           'fixed z-50 flex flex-col bg-rail text-rail-ink',
           /* Two shadows, both doing a job: an outer one to lift the sheet off
              the page, and an inner lit edge on the rail's right side so the
-             dark column has a boundary against the paper instead of ending in
+             sand column has a boundary against the paper instead of ending in
              a hard seam. On a phone the same edge reads as the top lip of the
              sheet, which is where a bottom sheet catches light. */
           'shadow-[var(--p-shadow-3)] lg:shadow-none',
@@ -216,10 +216,10 @@ export function DashboardBar({
           <Link
             href="/"
             aria-label="AutoDine"
-            className="group inline-flex rounded-[10px] bg-[#f6efe3] px-2.5 py-1.5"
+            className="group inline-flex rounded-[10px] px-1 py-1"
           >
-            {/* On the dark forest column the lockup sits on a cream chip, the
-                way the reference dashboard mounts its logo on a light plate. */}
+            {/* On the sand column the lockup sits straight on the rail, the way
+                the reference dashboard mounts it -- no chip behind it. */}
             <BrandLockup height={26} />
           </Link>
 
@@ -260,17 +260,16 @@ export function DashboardBar({
                     data-nav={link.key}
                     data-nav-active={current ? 'true' : undefined}
                     aria-current={current ? 'page' : undefined}
-                    /* On a dark rail the current screen is marked by a copper
-                       bar and a lifted row, not by a coloured block. A filled
-                       block here competed with the page's own primary action
-                       across the whole width of the screen. */
-                    /* `data-rail-row` is the GSAP handle: the row is animated
+                    /* On the sand rail the current screen is a filled orange
+                       pill with white type -- the one saturated object in the
+                       column, the way the reference dashboard marks "you are
+                       here". Other rows lift on an orange wash.
+                       `data-rail-row` is the GSAP handle: the row is animated
                        only while the drawer is opening, and never on a laptop
-                       where the rail is always on screen. */
-                    /* On a dark rail the current screen is a cream pill with
-                       forest type -- the one bright object in the column, the
-                       way the reference dashboard marks "you are here". Other
-                       rows lift on a cream wash. */
+                       where the rail is always on screen. Tapping any row --
+                       including the current one -- closes the sheet, because a
+                       tap that appears to do nothing reads as a broken menu. */
+                    onClick={() => setOpen(false)}
                     data-rail-row="true"
                     className={[
                       'group relative mb-0.5 flex items-center gap-2.5 rounded-[var(--p-r-control)] px-3 py-[9px] text-[13px]',
@@ -300,15 +299,15 @@ export function DashboardBar({
         </nav>
 
         {/* The account is a RAISED CARD at the foot of the rail, not a row of
-            loose text. It is the one object on this dark column that is about a
-            person rather than a destination, so it gets its own surface -- one
-            step lighter than the rail, with a hairline and a lit top edge. */}
+            loose text. It is the one object on this sand column that is about a
+            person rather than a destination, so it gets its own surface -- a
+            white card on the sand, with a hairline. */}
         <div className="border-t border-rail-line p-2.5">
           <div className="rounded-[var(--p-r-block)] border border-rail-line bg-[var(--p-rail-raised)] p-2">
             <div className="flex items-center gap-2.5">
               <span
                 aria-hidden="true"
-                className="grid size-9 shrink-0 place-items-center rounded-[10px] bg-[#f6efe3] text-[11.5px] font-semibold text-[var(--p-rail-active-ink)]"
+                className="grid size-9 shrink-0 place-items-center rounded-[10px] bg-[color-mix(in_oklab,var(--p-rail-active)_10%,transparent)] text-[11.5px] font-semibold text-[var(--p-rail-active)]"
               >
                 {initialsOf(activeOutlet?.name ?? 'AutoDine')}
               </span>
@@ -336,7 +335,7 @@ export function DashboardBar({
               <form action={signOutAction} className="mt-2 border-t border-rail-line pt-2">
                 <button
                   type="submit"
-                  className="w-auto rounded-full px-2.5 py-1.5 text-[11.5px] font-medium text-rail-ink-40 transition-colors duration-150 hover:bg-gink-07 hover:text-rail-ink focus-visible:outline-[var(--p-rail-ink)]"
+                  className="w-auto rounded-full px-2.5 py-1.5 text-[11.5px] font-medium text-[var(--p-rail-active)] transition-colors duration-150 hover:bg-[var(--p-rail-hover)] hover:text-[var(--p-accent-strong)] focus-visible:outline-[var(--p-rail-ink)]"
                 >
                   Sign out
                 </button>
@@ -370,6 +369,10 @@ export function DashboardBar({
             type="button"
             aria-expanded={open}
             aria-controls="app-rail"
+            /* Named as the pair of the sheet's own "Close navigation": the two
+               buttons do one job in two states. The word stays on screen as
+               "Menu", the name says what the tap does. */
+            aria-label="Open navigation"
             onClick={() => setOpen(true)}
             className="flex items-center gap-2 rounded-full bg-[color-mix(in_oklab,var(--p-ink)_7%,transparent)] py-2 pr-4 pl-3 text-[12.5px] font-medium text-gink transition-colors duration-150 ease-[var(--o-ease)] hover:bg-[color-mix(in_oklab,var(--p-ink)_11%,transparent)] lg:hidden"
           >

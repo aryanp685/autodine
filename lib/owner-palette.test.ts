@@ -104,9 +104,10 @@ describe('owner palette tokens', () => {
       // switched off rather than as secondary.
       expect(contrast(over(tokens['p-ink-46'], tokens[base]), bg)).toBeGreaterThanOrEqual(4.5);
     }
-    /* The rail is a dark forest column (2026-11-27), so it is read through its
-       own cream ramp, not the espresso one: rail-ink clears 7:1 on the fill,
-       and the quiet end of the rail ramp (0.58 alpha) clears 4.5:1. */
+    /* The rail is a sand column (2026-11-27) with the current row a filled
+       orange pill, so it is read through its own espresso ink, not the page's:
+       rail-ink clears 7:1 on the fill, and the quiet end of the rail ramp
+       (0.66 alpha) clears 4.5:1. */
     const rail = rgb(tokens['p-rail']);
     expect(contrast(rgb(tokens['p-rail-ink']), rail)).toBeGreaterThanOrEqual(7);
     expect(contrast(over(tokens['p-rail-ink-40'], tokens['p-rail']), rail)).toBeGreaterThanOrEqual(4.5);

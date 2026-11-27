@@ -483,7 +483,7 @@ export function Empty({ children, className = '' }: { children: ReactNode; class
 
 /* ------------------------------------------------------------------ buttons */
 
-export type BtnTone = 'solid' | 'primary' | 'ghost' | 'quiet' | 'danger' | 'forest';
+export type BtnTone = 'solid' | 'primary' | 'ghost' | 'quiet' | 'danger' | 'forest' | 'accent';
 export type BtnSize = 'sm' | 'md';
 
 /**
@@ -541,6 +541,11 @@ export function btn(tone: BtnTone = 'solid', size: BtnSize = 'md'): string {
        this one so the premium white palette has a single, calm action colour. */
     forest:
       'bg-forest text-white hover:bg-forest-strong active:bg-forest-strong',
+    /* The owner surface's own action: the burnt-orange accent as a fill with
+       the surface's own light ink, so a primary button reads the same orange
+       as the rail's current row. Used by the Overview's main call to action. */
+    accent:
+      'bg-[var(--p-accent)] text-[var(--p-on-ink)] hover:bg-[var(--p-accent-strong)] active:bg-[var(--p-accent-strong)]',
     ghost:
       'bg-[color-mix(in_oklab,var(--p-ink)_7%,transparent)] text-gink hover:bg-[color-mix(in_oklab,var(--p-ink)_11%,transparent)]',
     quiet:
