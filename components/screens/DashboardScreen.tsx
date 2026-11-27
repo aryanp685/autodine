@@ -442,7 +442,7 @@ export function Dashboard({
                     : ''
                 }`}
               >
-                <p className="text-[11px] font-medium text-gink-46">{card.label}</p>
+                <p className="text-[11.5px] font-medium text-gink-46">{card.label}</p>
                 <span className="mt-1 text-[clamp(1.55rem,2.3vw,1.9rem)] leading-none font-semibold tracking-[-0.03em] text-gink tabular-nums">
                   {card.value}
                 </span>
@@ -566,7 +566,7 @@ export function Dashboard({
                   key={t.name}
                   className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 border-b border-[var(--p-line-soft)] px-5 py-3.5 last:border-b-0"
                 >
-                  <span className="tnum w-6 text-[11px] font-semibold tracking-[0.08em] text-[var(--p-accent-strong)]">
+                  <span className="tnum w-6 text-[11.5px] font-semibold tracking-[0.08em] text-[var(--p-accent-strong)]">
                     {String(i + 1).padStart(2, '0')}
                   </span>
                   <div className="min-w-0">
@@ -587,7 +587,7 @@ export function Dashboard({
                     <p className="text-[13px] font-semibold text-gink tabular-nums">
                       <Money value={t.revenuePaise} />
                     </p>
-                    <p className="tnum mt-0.5 text-[11px] text-gink-46">{t.qty} sold</p>
+                    <p className="tnum mt-0.5 text-[11.5px] text-gink-46">{t.qty} sold</p>
                   </div>
                 </li>
               ))}
@@ -757,7 +757,7 @@ function OrderTable({
             <Tr key={o.key}>
               <Td className="tnum max-sm:px-2.5 font-medium whitespace-nowrap">
                 {o.code}
-                <span className="mt-0.5 block text-[11px] font-normal text-gink-46 sm:hidden">
+                <span className="mt-0.5 block text-[11.5px] font-normal text-gink-46 sm:hidden">
                   {o.table}
                 </span>
               </Td>
