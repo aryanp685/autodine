@@ -31,6 +31,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# Local Supabase CLI state (may hold runtime secrets)
+/supabase/.temp/
+
 # typescript
 *.tsbuildinfo
 

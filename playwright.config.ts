@@ -17,6 +17,13 @@ import { defineConfig, devices } from '@playwright/test';
  * proxy lets the routes through and each screen renders its own sample data.
  * That makes the test hermetic -- no secrets in CI, nothing to clean up -- and
  * it exercises the same shell, the same rail and the same links as production.
+ * The `webServer` below starts through `scripts/isolated-next.mjs`. When the
+ * run sets `AUTODINE_TEST_DEMO_BUILD=true` -- which `npm run e2e:demo`, the CI
+ * workflows and any shell that already exports the flag do -- that wrapper
+ * drops the Supabase variables the surrounding shell holds before spawning
+ * Next, so a workstation that also carries production credentials still runs
+ * the same demo build. A bare `npx playwright test` without the flag leaves
+ * the environment alone, which is what the `integration` project needs.
  *
  * PORT 3100, NOT 3000
  *
