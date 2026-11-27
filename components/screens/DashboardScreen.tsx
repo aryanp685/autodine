@@ -12,10 +12,8 @@ import {
   BtnLink,
   Empty,
   OwnerPage,
-  PageHead,
   Notice,
   Panel,
-  Stat,
   Td,
   Tag,
   Th,
@@ -148,17 +146,34 @@ export function Dashboard({
 
   return (
     <OwnerPage active="overview" outlet={outlet} signOut={!blocked}>
-      <OpsSurface>
+      <OpsSurface tone="welcome">
         {/* The overview is a read of the database, so it is only as true as the
             last render. This re-renders it on a slow timer while the tab is
             visible and nobody is typing -- see components/owner/AutoRefresh. */}
         <AutoRefresh enabled={live && !blocked} />
-      <PageHead
-        kicker={live ? 'Overview · today, restaurant time' : 'Sample dashboard · fictional data'}
-        title={venueName || 'Restaurant overview'}
-        meta={venueMeta || undefined}
-        actions={
-          <>
+      {/*
+        The masthead is drawn here rather than through `PageHead` because the
+        venue name is the one place the product speaks in the landing page's
+        display face: Fraunces on cream, with the burnt-saffron rule as the only
+        warm mark above the fold. Everything under it keeps the kit's own type.
+      */}
+      <header className="mb-7 sm:mb-8">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+          <div className="min-w-0">
+            <p className="flex items-center gap-2 text-[10.5px] font-semibold tracking-[0.2em] text-[var(--p-ink-46)] uppercase">
+              <span aria-hidden="true" className="h-px w-[18px] bg-[var(--p-ember)]" />
+              {live ? 'Overview · today, restaurant time' : 'Sample dashboard · fictional data'}
+            </p>
+            <h1 className="ov-display mt-3 text-[clamp(2.1rem,3.4vw,3rem)] leading-[1.04] font-semibold tracking-[-0.02em] text-balance text-gink">
+              {venueName || 'Restaurant overview'}
+            </h1>
+            {venueMeta ? (
+              <p className="mt-2.5 max-w-[60ch] text-[13.5px] leading-[1.6] text-gink-64">
+                {venueMeta}
+              </p>
+            ) : null}
+          </div>
+          <div className="flex flex-wrap items-center gap-2 sm:pb-1">
             {outlet?.operatingMode === 'mode_a' ? (
               <BtnLink href="/dashboard/orders" tone="ghost">
                 Orders &amp; KOT handoff
@@ -168,12 +183,16 @@ export function Dashboard({
                 Open the counter
               </BtnLink>
             )}
-            <BtnLink href="/kitchen" tone="primary">
+            <BtnLink href="/kitchen" tone="forest">
               Open the kitchen board
             </BtnLink>
-          </>
-        }
-      />
+          </div>
+        </div>
+        <div
+          aria-hidden="true"
+          className="mt-6 h-px bg-[linear-gradient(90deg,var(--p-line),transparent)]"
+        />
+      </header>
 
       {blocked && <SignInPrompt reason={blocked} screen="dashboard" />}
 
@@ -308,18 +327,21 @@ export function Dashboard({
         {/* ------------------------------------------------------------ hero */}
         <div
           data-hero="revenue"
-          className="relative flex flex-col justify-between overflow-hidden rounded-[var(--p-r-card)] border border-[color-mix(in_oklab,var(--p-accent)_24%,transparent)] bg-card shadow-[var(--p-shadow-1)]"
+          className="relative flex flex-col justify-between overflow-hidden rounded-[var(--p-r-card)] border border-[var(--p-line-soft)] bg-card shadow-[var(--p-shadow-1)]"
         >
-          {/* A 2px terracotta rule along the top, and a flat warm wash under
-              the whole card. Both are tokens: no gradient, no blur -- on a
-              20px-radius card a radial highlight read as a smudge. */}
+          {/* A 2px forest rule along the top, and a flat warm wash under the
+              whole card. Both are tokens: no gradient, no blur -- on an
+              eighteen-pixel radius a radial highlight read as a smudge. */}
           <span
             aria-hidden="true"
             className="absolute inset-x-0 top-0 h-[2px] bg-[var(--p-accent)]"
           />
-          <span aria-hidden="true" className="absolute inset-0 bg-[var(--p-accent-wash)]" />
+          <span
+            aria-hidden="true"
+            className="absolute inset-0 bg-[color-mix(in_oklab,var(--p-accent-wash)_70%,transparent)]"
+          />
 
-          <div className="relative grid gap-5 p-5 sm:p-6 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:items-center lg:gap-6">
+          <div className="relative flex flex-col gap-5 p-5 sm:p-6">
             {/* the figure */}
             <div className="min-w-0">
               <p className="text-[10.5px] font-semibold tracking-[0.16em] text-[var(--p-accent-strong)] uppercase">
@@ -337,10 +359,10 @@ export function Dashboard({
               </p>
             </div>
 
-            {/* the shape of the day, inside the hero */}
-            <div className="min-w-0 border-t border-hair pt-4 lg:border-t-0 lg:border-l lg:border-hair lg:pt-0 lg:pl-6">
+            {/* the shape of the day, under the figure across the card */}
+            <div className="min-w-0 border-t border-hair pt-4">
               {chartable && chartHasValue ? (
-                <div className="text-gink" data-chart>
+                <div className="text-[var(--p-ember)]" data-chart>
                   {/* The line draws itself once, on arrival: GSAP, lazily
                       loaded, and it can only ever ADD motion -- the server
                       sends the chart fully drawn, so a blocked bundle leaves a
@@ -353,7 +375,7 @@ export function Dashboard({
                       baseline="zero"
                       area
                       label="Revenue by hour of the day"
-                      className="h-[104px] w-full"
+                      className="h-auto w-full"
                       markIndex={hasPeak ? peakIndex : undefined}
                     />
                   </ChartMotion>
@@ -398,27 +420,39 @@ export function Dashboard({
           </div>
         </div>
 
-        {/* ------------------------------------------------- secondary figures
-            Three, not four: the fourth is the hero. They stack beside it on a
-            laptop and become a row under it on a tablet, so the page still
-            opens with figures rather than with a scroll. */}
-        <div
+        {/* ------------------------------------------------- the ledgers
+            Three figures, not four: the fourth is the hero. They live in one
+            sheet with hairline rules instead of three separate cards, so the
+            page opens with two objects -- the number you came for and the
+            ledger beside it -- rather than a row of equal boxes. */}
+        <aside
           aria-label="Other figures for today"
-          className="grid gap-3.5 sm:grid-cols-3 lg:grid-cols-1"
+          className="flex flex-col overflow-hidden rounded-[var(--p-r-card)] border border-[var(--p-line-soft)] bg-card shadow-[var(--p-shadow-1)]"
         >
-          {otherStats.map((card) => (
-            <Stat
-              key={card.label}
-              label={card.label}
-              value={card.value}
-              meta={card.meta}
-              /* Green means "somebody is working right now", so it belongs on
-                 open orders and only when there are some. A permanently tinted
-                 card is decoration. */
-              tone={card.label === 'Open orders' && openCount > 0 ? 'live' : 'plain'}
-            />
-          ))}
-        </div>
+          {otherStats.map((card) => {
+            /* Green means "somebody is working right now", so it belongs on
+               open orders and only when there are some. */
+            const tinted = card.label === 'Open orders' && openCount > 0;
+            return (
+              <div
+                key={card.label}
+                className={`flex flex-1 flex-col justify-center border-b border-[var(--p-line-soft)] px-5 py-4 last:border-b-0 sm:px-6 ${
+                  tinted
+                    ? 'bg-[color-mix(in_oklab,var(--p-accent-soft)_62%,var(--p-card))]'
+                    : ''
+                }`}
+              >
+                <p className="text-[11px] font-medium text-gink-46">{card.label}</p>
+                <span className="mt-1 text-[clamp(1.55rem,2.3vw,1.9rem)] leading-none font-semibold tracking-[-0.03em] text-gink tabular-nums">
+                  {card.value}
+                </span>
+                <span className="mt-1.5 text-[11.5px] leading-[1.4] text-gink-46">
+                  {card.meta}
+                </span>
+              </div>
+            );
+          })}
+        </aside>
       </section>
 
       {/* ------------------------------------------------------------- ranked
@@ -514,101 +548,110 @@ export function Dashboard({
         </section>
       ) : null}
 
-      <section aria-label="Top items" className="mt-6">
-        <SectionHead
+      {/* ------------------------------------------------------- the two reads
+          The ranked list and the order-health read sit side by side on a
+          laptop: both are "what sold / what is stuck", both are lists, and
+          neither needs the full width to be read. On a phone they stack in the
+          same order. */}
+      <div className="mt-6 grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] xl:items-start">
+        <Panel
           title="Top items"
           meta={live ? 'Today · by quantity' : 'Sample · fictional'}
-        />
-        {itemRows.length > 0 ? (
-          <ol data-top-items className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-            {itemRows.map((t, i) => (
-              <li
-                key={t.name}
-                className="relative overflow-hidden rounded-[var(--p-r-block)] border border-hair bg-card p-3.5 shadow-[var(--p-shadow-1)]"
-              >
-                <div className="flex items-baseline justify-between gap-2">
-                  <span className="tnum text-[10.5px] font-semibold tracking-[0.12em] text-[var(--p-accent-strong)]">
+          bodyClassName=""
+        >
+          {itemRows.length > 0 ? (
+            <ol data-top-items className="m-0 list-none p-0">
+              {itemRows.map((t, i) => (
+                <li
+                  key={t.name}
+                  className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 border-b border-[var(--p-line-soft)] px-5 py-3.5 last:border-b-0"
+                >
+                  <span className="tnum w-6 text-[11px] font-semibold tracking-[0.08em] text-[var(--p-accent-strong)]">
                     {String(i + 1).padStart(2, '0')}
                   </span>
-                  <span className="tnum text-[11.5px] text-gink-46">{t.qty} sold</span>
-                </div>
-                <p className="mt-2 truncate text-[13px] font-medium text-gink" title={t.name}>
-                  {t.name}
-                </p>
-                <p className="mt-0.5 text-[13px] font-semibold text-gink tabular-nums">
-                  <Money value={t.revenuePaise} />
-                </p>
-                <div
-                  aria-hidden="true"
-                  className="mt-2.5 h-1 overflow-hidden rounded-full bg-[color-mix(in_oklab,var(--p-ink)_7%,transparent)]"
-                >
-                  <div
-                    className="h-full rounded-full bg-[var(--p-accent)]"
-                    style={{ width: `${Math.max(6, Math.round((t.qty / topQty) * 100))}%` }}
-                  />
-                </div>
-              </li>
-            ))}
-          </ol>
-        ) : (
-          <Empty>
-            Nothing sold yet today. Items rank here once the first order of the day is placed.
-          </Empty>
-        )}
-      </section>
-
-      <div className="mt-5">
-        {live && !blocked && data?.orderHealth ? (
-          <div className="mb-5">
-            <Panel
-              data-order-health-panel
-              title="Order reliability & delays"
-              meta={
-                data.orderHealth.flaggedCount > 0
-                  ? `${data.orderHealth.flaggedCount} need attention · ${data.orderHealth.delayedCount} delayed`
-                  : 'All open orders on track'
-              }
-              action={
-                <BtnLink href="/dashboard/orders?status=delayed" tone="ghost" size="sm">
-                  View alerts
-                </BtnLink>
-              }
-            >
-              {data.orderHealth.flaggedOrders.length > 0 ? (
-                <ul className="m-0 flex list-none flex-col divide-y divide-hair p-0">
-                  {data.orderHealth.flaggedOrders.slice(0, 6).map((item) => (
-                    <li
-                      key={item.orderId}
-                      className="flex flex-wrap items-center justify-between gap-3 py-2.5"
+                  <div className="min-w-0">
+                    <p className="truncate text-[13px] font-medium text-gink" title={t.name}>
+                      {t.name}
+                    </p>
+                    <div
+                      aria-hidden="true"
+                      className="mt-2 h-1 overflow-hidden rounded-full bg-[color-mix(in_oklab,var(--p-ink)_7%,transparent)]"
                     >
-                      <div className="flex min-w-0 flex-wrap items-center gap-2">
-                        <Link
-                          href={`/bill/${item.orderId}`}
-                          className="text-[13px] font-semibold text-gink underline decoration-hair-strong underline-offset-2"
-                        >
-                          {item.code}
-                        </Link>
-                        <span className="text-[12.5px] text-gink-64">{item.tableLabel}</span>
-                        <Tag tone="due">{item.summary ?? 'Needs attention'}</Tag>
-                      </div>
+                      <div
+                        className="h-full rounded-full bg-[var(--p-accent)]"
+                        style={{ width: `${Math.max(6, Math.round((t.qty / topQty) * 100))}%` }}
+                      />
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[13px] font-semibold text-gink tabular-nums">
+                      <Money value={t.revenuePaise} />
+                    </p>
+                    <p className="tnum mt-0.5 text-[11px] text-gink-46">{t.qty} sold</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <div className="px-5 py-4">
+              <Empty>
+                Nothing sold yet today. Items rank here once the first order of the day is placed.
+              </Empty>
+            </div>
+          )}
+        </Panel>
+
+        {live && !blocked && data?.orderHealth ? (
+          <Panel
+            data-order-health-panel
+            title="Order reliability & delays"
+            meta={
+              data.orderHealth.flaggedCount > 0
+                ? `${data.orderHealth.flaggedCount} need attention · ${data.orderHealth.delayedCount} delayed`
+                : 'All open orders on track'
+            }
+            action={
+              <BtnLink href="/dashboard/orders?status=delayed" tone="ghost" size="sm">
+                View alerts
+              </BtnLink>
+            }
+          >
+            {data.orderHealth.flaggedOrders.length > 0 ? (
+              <ul className="m-0 flex list-none flex-col divide-y divide-hair p-0">
+                {data.orderHealth.flaggedOrders.slice(0, 6).map((item) => (
+                  <li
+                    key={item.orderId}
+                    className="flex flex-wrap items-center justify-between gap-3 py-2.5"
+                  >
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
                       <Link
                         href={`/bill/${item.orderId}`}
-                        className="text-[12.5px] font-medium text-gink-64 underline decoration-hair-strong underline-offset-2 hover:text-gink"
+                        className="text-[13px] font-semibold text-gink underline decoration-hair-strong underline-offset-2"
                       >
-                        Inspect trace →
+                        {item.code}
                       </Link>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="m-0 text-[12.5px] text-gink-64">
-                  No stalled tickets, unconfirmed tables, or failed kitchen alerts today.
-                </p>
-              )}
-            </Panel>
-          </div>
+                      <span className="text-[12.5px] text-gink-64">{item.tableLabel}</span>
+                      <Tag tone="due">{item.summary ?? 'Needs attention'}</Tag>
+                    </div>
+                    <Link
+                      href={`/bill/${item.orderId}`}
+                      className="text-[12.5px] font-medium text-gink-64 underline decoration-hair-strong underline-offset-2 hover:text-gink"
+                    >
+                      Inspect trace →
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="m-0 text-[12.5px] text-gink-64">
+                No stalled tickets, unconfirmed tables, or failed kitchen alerts today.
+              </p>
+            )}
+          </Panel>
         ) : null}
+      </div>
 
+      <div className="mt-5">
         <Panel
           /* "Orders today" is the label on the first-row card; this is the
              five most recent, so it says that. */
@@ -697,26 +740,36 @@ function OrderTable({
         <thead>
           <tr>
             <Th>Order</Th>
-            <Th>Table</Th>
-            <Th>Placed</Th>
-            <Th>Payment</Th>
-            <Th>Status</Th>
-            <Th align="right">Total</Th>
+            {/* On a phone the table number moves under the order code (see
+                the body cell) and the placed time is dropped, so status and
+                total fit without a sideways scroll. Both return from `sm`. */}
+            <Th className="hidden sm:table-cell">Table</Th>
+            <Th className="hidden sm:table-cell">Placed</Th>
+            <Th className="max-sm:px-2.5">Payment</Th>
+            <Th className="max-sm:px-2.5">Status</Th>
+            <Th align="right" className="max-sm:px-2.5">
+              Total
+            </Th>
           </tr>
         </thead>
         <tbody>
           {rows.map((o) => (
             <Tr key={o.key}>
-              <Td className="tnum font-medium">{o.code}</Td>
-              <Td>{o.table}</Td>
-              <Td className="tnum text-gink-64">{o.placed}</Td>
-              <Td>
+              <Td className="tnum max-sm:px-2.5 font-medium whitespace-nowrap">
+                {o.code}
+                <span className="mt-0.5 block text-[11px] font-normal text-gink-46 sm:hidden">
+                  {o.table}
+                </span>
+              </Td>
+              <Td className="hidden sm:table-cell">{o.table}</Td>
+              <Td className="tnum hidden text-gink-64 sm:table-cell">{o.placed}</Td>
+              <Td className="max-sm:px-2.5">
                 <PaymentPill state={o.payment} />
               </Td>
-              <Td>
+              <Td className="max-sm:px-2.5">
                 <PrepPill state={o.prep} />
               </Td>
-              <Td align="right">
+              <Td align="right" className="max-sm:px-2.5">
                 <Money value={o.totalPaise} strong />
               </Td>
             </Tr>

@@ -452,7 +452,10 @@ body {
   --p-rail-ink-64: rgba(33, 26, 21, 0.72);
   --p-rail-ink-40: rgba(33, 26, 21, 0.64);
   --p-rail-line: rgba(33, 26, 21, 0.09);
-  --p-rail-active: rgba(125, 43, 107, 0.1);
+  /* 2026-11-27: the current row is a 10% forest tint, not plum, so the rail
+     already speaks the landing page's green while screens are rebuilt one by
+     one against the welcome palette. Same espresso type on it. */
+  --p-rail-active: rgba(31, 77, 58, 0.1);
 
   /* ---- lines -----------------------------------------------------------
      Warm hairlines. On a white surface an edge is a drawn line, not a shadow;
@@ -1846,4 +1849,50 @@ body {
    before paint, and this rule removes the veil with zero flash. */
 html.splash-seen [data-splash] {
   display: none !important;
+}
+
+/* ---------------------------------------------------------------------------
+   THE WELCOME DISPLAY FACE, INSIDE THE PRODUCT
+
+   Fraunces is already self-hosted for the splash (see the @font-face at the
+   top of this file); the landing and auth screens draw their display lines in
+   Inter, so this is the one place the serif reaches the product. Used for a
+   screen's single headline only -- never for body copy, labels or figures,
+   which stay on Inter's tabular numerals.
+   ------------------------------------------------------------------------- */
+.ov-display {
+  font-family: 'Fraunces', Georgia, 'Times New Roman', serif;
+  font-variation-settings: 'SOFT' 28, 'WONK' 0;
+}
+
+/* The Overview's one arrival motion: the rows of the day's ledger settle into
+   place, 40ms apart. It is staged as `animation` on the row itself with
+   `backwards` fill, so the final state is what the server sends and a blocked
+   stylesheet leaves a complete page -- nothing here hides content. */
+@media (prefers-reduced-motion: no-preference) {
+  [data-ops='swagat-welcome'] [data-hero='revenue'] {
+    animation: ov-settle 480ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  [data-ops='swagat-welcome'] [aria-label='Other figures for today'] > * {
+    animation: ov-settle 460ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  [data-ops='swagat-welcome'] [aria-label='Other figures for today'] > :nth-child(1) {
+    animation-delay: 60ms;
+  }
+  [data-ops='swagat-welcome'] [aria-label='Other figures for today'] > :nth-child(2) {
+    animation-delay: 120ms;
+  }
+  [data-ops='swagat-welcome'] [aria-label='Other figures for today'] > :nth-child(3) {
+    animation-delay: 180ms;
+  }
+  @keyframes ov-settle {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
 }

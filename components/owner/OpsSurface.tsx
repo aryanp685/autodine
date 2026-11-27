@@ -69,15 +69,88 @@ export const OPS_SURFACE_STYLE: CSSProperties = {
 } as CSSProperties;
 
 /**
+ * The public-facing welcome, carried inside the product.
+ *
+ * The landing page and the auth screens already speak one language: cream
+ * paper (#FBF6EE), forest as the working colour (#1F4D3A), burnt saffron for
+ * marks and emphasis (#B4531B), Fraunces for display type. The Overview is the
+ * first screen after sign-in, so it should not feel like a different product
+ * with a different accent.
+ *
+ * Two greens still mean different things and stay distinct: `--p-live` is the
+ * settled/ready state and keeps its own value; `--p-accent` here is the
+ * control/selection colour, exactly as the forest button on the landing page
+ * is. Nothing else in this block is a new colour -- they are the landing's
+ * values, at the same opacities the kit already uses.
+ */
+export const WELCOME_SURFACE_STYLE: CSSProperties = {
+  /* Surfaces: the landing's cream field, warm sheet above it. */
+  '--p-paper': '#fbf6ee',
+  '--p-paper-deep': '#f3ebdd',
+  '--p-paper-veil': 'rgba(43, 32, 21, 0.022)',
+  '--p-glass': 'rgba(253, 250, 244, 0.9)',
+  '--p-surface': '#fffdf9',
+  '--p-card': '#fffdf9',
+
+  /* Ink: the landing's heading colour, warmed through the ramp. */
+  '--p-ink': '#2b2015',
+  '--p-ink-80': 'rgba(43, 32, 21, 0.86)',
+  '--p-ink-64': 'rgba(43, 32, 21, 0.72)',
+  '--p-ink-46': 'rgba(43, 32, 21, 0.62)',
+  '--p-ink-28': 'rgba(43, 32, 21, 0.38)',
+  '--p-ink-12': 'rgba(43, 32, 21, 0.14)',
+  '--p-ink-07': 'rgba(43, 32, 21, 0.07)',
+
+  /* Accent: forest, the landing's action colour. */
+  '--p-accent': '#1f4d3a',
+  '--p-accent-strong': '#173c2d',
+  '--p-accent-soft': '#e6eee7',
+  '--p-accent-wash': 'rgba(31, 77, 58, 0.045)',
+
+  /* The landing's burnt saffron, for the one warm mark on the page (the
+     revenue curve), never as a fill behind body copy. */
+  '--p-ember': '#b4531b',
+
+  /* Rail and lines follow the new ink so the chrome stays one room. */
+  '--p-rail': '#fffdf9',
+  '--p-rail-raised': '#ffffff',
+  '--p-rail-ink': '#2b2015',
+  '--p-rail-ink-64': 'rgba(43, 32, 21, 0.72)',
+  '--p-rail-ink-40': 'rgba(43, 32, 21, 0.64)',
+  '--p-rail-line': 'rgba(43, 32, 21, 0.09)',
+  '--p-rail-active': 'rgba(31, 77, 58, 0.1)',
+  '--p-line': 'rgba(43, 32, 21, 0.1)',
+  '--p-line-soft': 'rgba(43, 32, 21, 0.06)',
+  '--p-line-strong': 'rgba(43, 32, 21, 0.18)',
+
+  /* Geometry: the landing's softer cards, a 12px block inside them. */
+  '--p-r-card': '18px',
+  '--p-r-block': '12px',
+  '--p-r-control': '12px',
+  '--p-r-chip': '8px',
+} as CSSProperties;
+
+/**
  * Cancels the shell `main` padding while restoring it inside, so the ops field
  * reaches the edges of the content area exactly where the default paper does.
  */
 const FIELD_CLASS =
   '-mx-5 -mt-7 -mb-24 px-5 pt-7 pb-24 sm:-mx-8 sm:-mt-10 sm:px-8 sm:pt-10 lg:-mt-10 bg-paper text-gink antialiased';
 
-export function OpsSurface({ children }: { children: ReactNode }) {
+export function OpsSurface({
+  children,
+  tone = 'ops',
+}: {
+  children: ReactNode;
+  /** `welcome` carries the landing/auth palette; `ops` is the counter kit. */
+  tone?: 'ops' | 'welcome';
+}) {
   return (
-    <div data-ops="counter-clarity" style={OPS_SURFACE_STYLE} className={FIELD_CLASS}>
+    <div
+      data-ops={tone === 'welcome' ? 'swagat-welcome' : 'counter-clarity'}
+      style={tone === 'welcome' ? WELCOME_SURFACE_STYLE : OPS_SURFACE_STYLE}
+      className={FIELD_CLASS}
+    >
       {children}
     </div>
   );
