@@ -437,15 +437,15 @@ body {
   --p-due-soft: #fbeae7;
 
   /* ---- the rail --------------------------------------------------------
-     Deep evergreen, like the supplied Signature workspace preview. The
-     warm-white type stays high-contrast; orange marks the selected section. */
-  --p-rail: #183d32;
-  --p-rail-raised: #214b40;
-  --p-rail-ink: #fffaf2;
-  --p-rail-ink-64: rgba(255, 250, 242, 0.78);
-  --p-rail-ink-40: rgba(255, 250, 242, 0.64);
-  --p-rail-line: rgba(255, 250, 242, 0.14);
-  --p-rail-active: rgba(234, 106, 42, 0.2);
+     Warm, light navigation like the dashboard reference: the orange active
+     row is the single strong accent; ink and hairlines stay soft and legible. */
+  --p-rail: var(--p-paper-deep);
+  --p-rail-raised: var(--p-card);
+  --p-rail-ink: var(--p-ink);
+  --p-rail-ink-64: var(--p-ink-64);
+  --p-rail-ink-40: var(--p-ink-46);
+  --p-rail-line: var(--p-line);
+  --p-rail-active: var(--p-accent);
 
   /* ---- lines -----------------------------------------------------------
      Warm hairlines. On a white surface an edge is a drawn line, not a shadow;

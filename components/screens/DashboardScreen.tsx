@@ -12,7 +12,6 @@ import {
   Empty,
   Notice,
   OwnerPage,
-  PageHead,
   SectionHead,
   Tag,
 } from '@/components/owner/chrome';
@@ -68,50 +67,23 @@ function MetricCard({
   label,
   value,
   note,
-  icon,
-  tone,
   testId,
 }: {
   label: string;
   value: React.ReactNode;
   note: string;
-  icon: 'orders' | 'revenue' | 'ticket' | 'open';
-  tone: 'forest' | 'orange' | 'moss' | 'paper';
   testId: string;
 }) {
-  const toneClass = {
-    forest: 'bg-[var(--p-rail)] text-onink',
-    orange: 'bg-[var(--p-accent)] text-onink',
-    moss: 'bg-[var(--p-rail-raised)] text-onink',
-    paper: 'border border-hair bg-paper-deep text-gink',
-  }[tone];
-  const mutedClass = tone === 'paper' ? 'text-gink-64' : 'text-onink-64';
-
   return (
     <article
       data-metric={testId}
-      className={[
-        'group relative isolate min-w-0 overflow-hidden rounded-[var(--p-r-card)] p-4 shadow-[var(--p-shadow-1)] sm:p-5',
-        'motion-safe:transition-[transform,box-shadow] motion-safe:duration-300 motion-safe:ease-[var(--o-ease)]',
-        'motion-safe:hover:-translate-y-0.5 motion-safe:hover:shadow-[var(--p-shadow-2)]',
-        'motion-reduce:transition-none',
-        toneClass,
-      ].join(' ')}
+      className="min-w-0 rounded-[var(--p-r-card)] border border-hair bg-card p-4 shadow-[var(--p-shadow-1)] sm:p-5"
     >
-      <span aria-hidden="true" className="pointer-events-none absolute -right-7 -bottom-10 -z-10 size-28 rounded-full border border-current opacity-[0.08] transition-transform duration-500 group-hover:scale-110 motion-reduce:transition-none" />
-      <div className="flex items-center justify-between gap-3">
-        <p className={['m-0 text-[12.5px] font-medium tracking-[0.01em]', mutedClass].join(' ')}>{label}</p>
-        <span className={[
-          'grid size-9 shrink-0 place-items-center rounded-[11px]',
-          tone === 'paper' ? 'bg-card text-[var(--p-accent)]' : 'bg-white/10 text-current',
-        ].join(' ')}>
-          <DashboardGlyph name={icon} />
-        </span>
-      </div>
-      <p className="mt-4 mb-0 truncate text-[clamp(1.6rem,2.5vw,2.15rem)] leading-none font-semibold tracking-[-0.045em] tabular-nums">
+      <p className="m-0 text-[12.5px] font-medium text-gink-64">{label}</p>
+      <p className="mt-3 mb-0 truncate text-[24px] leading-none font-semibold tracking-[-0.04em] text-gink tabular-nums">
         {value}
       </p>
-      <p className={['mt-2.5 mb-0 text-[11.5px] leading-[1.4]', mutedClass].join(' ')}>{note}</p>
+      <p className="mt-2.5 mb-0 text-[11.5px] leading-[1.4] text-gink-46">{note}</p>
     </article>
   );
 }
@@ -194,37 +166,51 @@ export function Dashboard({
   const venueName = live ? data?.restaurantName ?? '' : restaurant.name;
   const venueMeta = live ? data?.tagline : restaurant.tagline;
   const demoOpenOrders = recentOrders.filter((order) => ['new', 'preparing', 'ready'].includes(order.state.toLowerCase())).length;
+  const activeTableCount = live && data ? data.activeSessions.length : 0;
+  const localHour = Number(new Intl.DateTimeFormat('en-IN', {
+    timeZone: timezone,
+    hour: 'numeric',
+    hourCycle: 'h23',
+  }).format(new Date()));
+  const greeting = localHour < 12 ? 'Good morning' : localHour < 17 ? 'Good afternoon' : 'Good evening';
 
-  const metrics = live && stats
+  const metrics = live && stats && data
     ? [
         {
-          id: 'orders', label: 'Orders today', value: String(stats.ordersToday),
-          note: 'Since midnight · restaurant time', icon: 'orders' as const, tone: 'forest' as const,
+          id: 'revenue', label: 'Revenue today', value: <Money value={stats.revenueTodayPaise} />,
+          note: 'Settled payments only',
         },
         {
-          id: 'revenue', label: 'Revenue today', value: <Money value={stats.revenueTodayPaise} />,
-          note: 'Settled payments only', icon: 'revenue' as const, tone: 'orange' as const,
+          id: 'orders', label: 'Orders today', value: String(stats.ordersToday),
+          note: stats.openOrders > 0 ? `${stats.openOrders} open · Since midnight` : 'Since midnight · restaurant time',
+        },
+        {
+          id: 'active-tables', label: 'Active tables', value: String(activeTableCount),
+          note: activeTableCount === 1 ? '1 open table session' : 'Open table sessions',
         },
         {
           id: 'ticket', label: 'Average ticket', value: <Money value={stats.averageTicketPaise} />,
           note: stats.ordersToday > 0 ? 'Revenue ÷ orders today' : 'No orders yet today',
-          icon: 'ticket' as const, tone: 'moss' as const,
-        },
-        {
-          id: 'open', label: 'Open orders', value: String(stats.openOrders),
-          note: 'New, preparing, or ready', icon: 'open' as const, tone: 'paper' as const,
         },
       ]
-    : dashboardStats.map((stat, index) => ({
-        id: ['orders', 'revenue', 'ticket', 'open'][index] ?? `sample-${index}`,
-        label: stat.label,
-        value: stat.value,
-        note: stat.delta,
-        icon: (['orders', 'revenue', 'ticket', 'open'][index] ?? 'orders') as 'orders' | 'revenue' | 'ticket' | 'open',
-        tone: (['forest', 'orange', 'moss', 'paper'][index] ?? 'paper') as 'forest' | 'orange' | 'moss' | 'paper',
-      })).map((stat, index) => index === 3
-        ? { ...stat, label: 'Open orders', value: String(demoOpenOrders), note: 'Sample tickets in service' }
-        : stat);
+    : [
+        {
+          id: 'revenue', label: 'Revenue today', value: dashboardStats[1].value,
+          note: 'Settled · sample figures',
+        },
+        {
+          id: 'orders', label: 'Orders today', value: dashboardStats[0].value,
+          note: `${demoOpenOrders} open · sample tickets`,
+        },
+        {
+          id: 'active-tables', label: 'Active tables', value: String(activeTableCount),
+          note: 'Open table sessions',
+        },
+        {
+          id: 'ticket', label: 'Average ticket', value: dashboardStats[2].value,
+          note: dashboardStats[2].delta,
+        },
+      ];
 
   const itemRows = live && data
     ? data.topItems
@@ -266,26 +252,6 @@ export function Dashboard({
     <OwnerPage active="overview" outlet={outlet} signOut={!blocked}>
       <OpsSurface>
         <AutoRefresh enabled={live && !blocked} />
-
-        <PageHead
-          kicker="Workspace / overview"
-          title="Dashboard"
-          meta={venueMeta ? `${venueName} · ${venueMeta}` : live ? venueName || 'Restaurant overview' : 'Your restaurant at a glance'}
-          actions={
-            <>
-              <span className="inline-flex h-9 items-center gap-2 rounded-full border border-hair bg-card px-3 text-[11.5px] font-medium text-gink-64" data-overview-date>
-                <span aria-hidden="true" className="text-[var(--p-accent)]">◷</span>
-                Today · {displayDate}
-              </span>
-              {outlet?.operatingMode === 'mode_a' ? (
-                <BtnLink href="/dashboard/orders" tone="ghost">Orders &amp; KOT handoff</BtnLink>
-              ) : (
-                <BtnLink href="/cashier" tone="ghost">Open counter</BtnLink>
-              )}
-              <BtnLink href="/kitchen" tone="primary">Kitchen board <span aria-hidden="true">→</span></BtnLink>
-            </>
-          }
-        />
 
         {blocked ? <SignInPrompt reason={blocked} screen="dashboard" /> : null}
 
@@ -346,7 +312,38 @@ export function Dashboard({
 
         {!blocked ? (
           <>
-            <section aria-label="Today's key figures" data-overview-metrics className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
+            <section
+              aria-label="Welcome"
+              data-overview-welcome
+              className="mb-5 flex flex-col justify-between gap-5 rounded-[var(--p-r-card)] border border-hair bg-card px-5 py-6 shadow-[var(--p-shadow-1)] sm:px-7 sm:py-7 lg:flex-row lg:items-center"
+            >
+              <div className="min-w-0">
+                <p className="m-0 text-[11.5px] font-semibold tracking-[0.14em] text-gink-46 uppercase">
+                  Your restaurant, at a glance
+                </p>
+                <h1 className="mt-3 mb-0 text-[30px] leading-[1.12] font-semibold tracking-[-0.035em] text-gink text-balance">
+                  {greeting}, {venueName || 'there'}.
+                </h1>
+                <p className="mt-2.5 mb-0 text-[15px] leading-[1.5] text-gink-64 sm:text-[17px]">
+                  Here&apos;s what&apos;s happening in your restaurant today.
+                </p>
+                {venueMeta ? <p className="mt-1.5 mb-0 text-[11.5px] text-gink-46">{venueMeta}</p> : null}
+              </div>
+              <div className="flex shrink-0 flex-wrap items-center gap-2">
+                <span className="mr-1 inline-flex h-9 items-center gap-2 rounded-full border border-hair bg-paper px-3 text-[11.5px] font-medium text-gink-64" data-overview-date>
+                  <span aria-hidden="true" className="text-[var(--p-accent)]">◷</span>
+                  Today · {displayDate}
+                </span>
+                {outlet?.operatingMode === 'mode_a' ? (
+                  <BtnLink href="/dashboard/orders" tone="ghost">Orders &amp; KOT handoff</BtnLink>
+                ) : (
+                  <BtnLink href="/cashier" tone="ghost">Open counter</BtnLink>
+                )}
+                <BtnLink href="/kitchen" tone="primary">Kitchen board <span aria-hidden="true">→</span></BtnLink>
+              </div>
+            </section>
+
+            <section aria-label="Today's key figures" data-overview-metrics className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
               {metrics.map((metric) => (
                 <MetricCard key={metric.id} {...metric} testId={metric.id} />
               ))}

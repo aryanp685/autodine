@@ -122,24 +122,25 @@ describe('DashboardBar', () => {
   });
 });
 
-/**
- * The dark rail, added 2026-10-24.
- *
- * The rail used to be white on a white page, separated from the content by a
- * single hairline. On the screenshot that prompted the redesign there was no
- * edge anywhere on the screen: navigation, page and cards were one value.
- */
+/** The shared light rail and orange active pill used by the staff screens. */
 describe('DashboardBar, the rail', () => {
-  it('is the one dark surface in the product', () => {
+  it('uses the shared warm rail surface and ink tokens', () => {
     const out = html({ active: 'overview' });
     expect(out).toContain('bg-rail');
     expect(out).toContain('text-rail-ink');
   });
 
-  it('marks the current screen with a copper edge, not a filled block', () => {
+  it('marks the current screen with a filled accent pill and readable on-ink text', () => {
     const out = html({ active: 'overview' });
     const active = out.slice(out.indexOf('data-nav-active="true"'));
     expect(active.slice(0, 700)).toContain('--p-rail-active');
+    expect(active.slice(0, 700)).toContain('text-onink');
+  });
+
+  it('keeps the sidebar visible from tablet widths with a matching content offset', () => {
+    const out = html({ active: 'overview' });
+    expect(out).toContain('md:inset-y-0');
+    expect(out).toContain('md:pl-[244px]');
   });
 
   it('keeps sign out beside the account instead of as a full-width pill', () => {

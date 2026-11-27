@@ -122,6 +122,119 @@ function href(
   return qs ? `/dashboard/orders?${qs}` : '/dashboard/orders';
 }
 
+type OrderMetricTone = 'forest' | 'orange' | 'moss' | 'paper';
+
+function OrdersIcon({ name }: { name: 'orders' | 'open' | 'alert' | 'settled' }) {
+  const paths = {
+    orders: <><rect x="5" y="4.5" width="14" height="16" rx="2.5" /><path d="M9 4.5v-1h6v1M8.5 9h7M8.5 12.5h7M8.5 16h4" /></>,
+    open: <><circle cx="12" cy="12" r="8.5" /><path d="M12 7v5l3.2 2" /></>,
+    alert: <><path d="m12 3.5 9 16H3z" /><path d="M12 9v4M12 16.4v.1" /></>,
+    settled: <><circle cx="12" cy="12" r="8.5" /><path d="m8 12.2 2.6 2.6 5.5-5.6" /></>,
+  } as const;
+
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="size-[18px]" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      {paths[name]}
+    </svg>
+  );
+}
+
+function OrderMetric({
+  label,
+  value,
+  note,
+  tone,
+  icon,
+}: {
+  label: string;
+  value: number;
+  note: string;
+  tone: OrderMetricTone;
+  icon: 'orders' | 'open' | 'alert' | 'settled';
+}) {
+  const toneClass = {
+    forest: 'bg-[var(--p-rail)] text-onink',
+    orange: 'bg-[var(--p-accent)] text-onink',
+    moss: 'bg-[var(--p-rail-raised)] text-onink',
+    paper: 'border border-hair bg-card text-gink',
+  }[tone];
+  const mutedClass = tone === 'paper' ? 'text-gink-64' : 'text-onink-64';
+
+  return (
+    <article
+      data-order-metric={label.toLowerCase().replaceAll(' ', '-')}
+      className={[
+      'group relative isolate min-w-0 overflow-hidden rounded-[var(--p-r-card)] p-4 shadow-[var(--p-shadow-1)] sm:p-5',
+      'motion-safe:transition-[transform,box-shadow] motion-safe:duration-300 motion-safe:ease-[var(--o-ease)] motion-safe:hover:-translate-y-0.5 motion-safe:hover:shadow-[var(--p-shadow-2)] motion-reduce:transition-none',
+      toneClass,
+    ].join(' ')}>
+      <span aria-hidden="true" className="pointer-events-none absolute -right-7 -bottom-10 -z-10 size-28 rounded-full border border-current opacity-[0.08] transition-transform duration-500 group-hover:scale-110 motion-reduce:transition-none" />
+      <div className="flex items-center justify-between gap-3">
+        <p className={['m-0 text-[12.5px] font-medium', mutedClass].join(' ')}>{label}</p>
+        <span className={[
+          'grid size-9 shrink-0 place-items-center rounded-[11px]',
+          tone === 'paper' ? 'bg-paper-deep text-[var(--p-accent)]' : 'bg-white/10 text-current',
+        ].join(' ')}>
+          <OrdersIcon name={icon} />
+        </span>
+      </div>
+      <p className="mt-4 mb-0 text-[clamp(1.6rem,2.5vw,2.15rem)] leading-none font-semibold tracking-[-0.045em] tabular-nums">{value}</p>
+      <p className={['mt-2.5 mb-0 text-[11.5px] leading-[1.4]', mutedClass].join(' ')}>{note}</p>
+    </article>
+  );
+}
+
+function OrderPrep({ order }: { order: OrderLedgerRow }) {
+  if (order.prepStatus === 'cancelled') return <Tag tone="neutral">Cancelled</Tag>;
+  return (
+    <PrepPill
+      state={
+        order.prepStatus === 'preparing' || order.prepStatus === 'ready' || order.prepStatus === 'served'
+          ? order.prepStatus
+          : 'new'
+      }
+    />
+  );
+}
+
+function OrderHandoff({
+  order,
+  live,
+  blocked,
+}: {
+  order: OrderLedgerRow;
+  live: boolean;
+  blocked: boolean;
+}) {
+  const cancelled = order.prepStatus === 'cancelled';
+  const entered = order.kotHandoffStatus === 'entered_in_pos' || order.kotHandoffStatus === 'webhook_sent';
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {cancelled ? <span className="text-[11.5px] text-gink-46">—</span> : (
+        <Tag tone={entered ? 'live' : 'due'}>
+          {kotHandoffLabel(normalizeKotHandoffStatus(order.kotHandoffStatus))}
+        </Tag>
+      )}
+      {live && !blocked && !cancelled ? (
+        <form action={toggleOrderKotHandoffAction}>
+          <input type="hidden" name="orderId" value={order.id} />
+          <input type="hidden" name="nextStatus" value={order.kotHandoffStatus === 'entered_in_pos' ? 'pending' : 'entered_in_pos'} />
+          <button type="submit" className={btn('quiet', 'sm')}>
+            {order.kotHandoffStatus === 'entered_in_pos' ? 'Reset' : 'Mark entered'}
+          </button>
+        </form>
+      ) : null}
+    </div>
+  );
+}
+
+function orderPaymentState(order: OrderLedgerRow): 'paid' | 'pending' | 'failed' {
+  if (order.paymentStatus === 'pending') return 'pending';
+  if (order.paymentStatus === 'failed') return 'failed';
+  return 'paid';
+}
+
 export function OrdersScreen({
   data,
   outlet,
@@ -240,520 +353,366 @@ export function OrdersScreen({
   return (
     <OwnerPage active="orders" outlet={outlet} wide>
       <OpsSurface>
-        {/* New orders land while the ledger is open. Slow, silent, and paused
-            while somebody is typing in the search box. */}
-        <AutoRefresh enabled={live && !blocked} />
-      <PageHead
-        kicker="Orders"
-        title="Order ledger"
-        meta={
+        <AutoRefresh enabled={live && !blocked && !query.trim()} />
+        <PageHead
+          kicker="Service / orders"
+          title="Orders"
+          meta={live && !blocked ? data?.range.label : 'Sample ledger · fictional orders'}
+          actions={
+            live && !blocked ? (
+              <>
+                <BtnLink href="/kitchen" tone="ghost">Kitchen board</BtnLink>
+                {canExport ? (
+                  <a className={btn('ghost')} href={exportHref} download>Download CSV</a>
+                ) : null}
+              </>
+            ) : null
+          }
+        />
+
+        {blocked ? <SignInPrompt reason={blocked} screen="orders" /> : null}
+
+        {!blocked ? (
+          <div className="mb-5 grid gap-2.5">
+            {!live ? (
+              <Notice
+                tone="accent"
+                className="mb-0"
+                label={<Tag tone="work">Sample data</Tag>}
+              >
+                Database not configured — the rows above are fictional sample data.
+              </Notice>
+            ) : null}
+
+            {isModeA ? (
+              <Notice
+                tone="plain"
+                className="mb-0"
+                label={<Tag tone="neutral">Mode A · Alongside {posIntegrationName || 'your existing POS'}</Tag>}
+                action={
+                  <Link href="/dashboard/settings#settings-operating-mode" className={btn('ghost', 'sm')}>
+                    Operating mode
+                  </Link>
+                }
+              >
+                Billing stays in your existing POS.{' '}
+                {pendingHandoffCount > 0
+                  ? `${pendingHandoffCount} active order${pendingHandoffCount === 1 ? ' is' : 's are'} awaiting POS entry — mark Entered in POS after punching the bill so nothing is duplicated.`
+                  : 'All orders in this range are handed off to your billing POS.'}
+              </Notice>
+            ) : null}
+          </div>
+        ) : null}
+
+        {!blocked ? (
           <>
-            {live && !blocked ? data?.range.label : 'Sample ledger · fictional orders'}
-            {' · '}
-            {openCount} open
-            {canViewFinance ? ` · ${unsettledCount} not settled` : ''}
-            {cancelledCount > 0 ? ` · ${cancelledCount} cancelled` : ''}
-          </>
-        }
-        actions={
-          live && !blocked ? (
-            <>
-              <BtnLink href="/kitchen" tone="ghost">
-                Kitchen board
-              </BtnLink>
-              {canExport ? (
-                <>
-                  {/* A route handler that answers with a file, so an anchor
-                      with `download` rather than <Link>: client-side navigation
-                      has no RSC payload to fetch here. */}
-                  <a className={btn('ghost')} href={exportHref} download>
-                    Order CSV
-                  </a>
-                </>
-              ) : null}
-            </>
-          ) : null
-        }
-      />
-
-      {blocked && <SignInPrompt reason={blocked} screen="order ledger" />}
-
-      {isModeA && !blocked && (
-        <Notice
-          tone="plain"
-          label={
-            <strong className="font-semibold text-gink">
-              Mode A · Alongside {posIntegrationName || 'your existing POS'}
-            </strong>
-          }
-          action={
-            <Link href="/dashboard/settings#settings-operating-mode" className={btn('ghost', 'sm')}>
-              Operating mode
-            </Link>
-          }
-        >
-          Billing stays in your existing POS.{' '}
-          {pendingHandoffCount > 0
-            ? `${pendingHandoffCount} active order${pendingHandoffCount === 1 ? ' is' : 's are'} awaiting POS entry — mark Entered in POS after punching the bill so nothing is duplicated.`
-            : 'All orders in this range are handed off to your billing POS.'}
-        </Notice>
-      )}
-
-      {!blocked && (
-        <div className="mb-3 flex flex-col gap-2">
-          {/* Two questions, two rows: which days, and which rows. They used to
-              share one wrapping row of identical chips, so "Last 7 days" and
-              "Open" looked like the same kind of choice. */}
-          <div className="flex flex-wrap items-center gap-1.5">
-            {RANGE_LINKS.map((r) => (
-              <Link
-                key={r.key}
-                href={href(r.key, activeFilter, query, dates)}
-                aria-current={rangeKey === r.key ? 'true' : undefined}
-                className={chipClass(rangeKey === r.key)}
-              >
-                {r.label}
-              </Link>
-            ))}
-
-            {/* The sales report has always had a custom range; the ledger
-                shares the same range controls so a dispute about one evening
-                can be reviewed here too.
-
-                `details` rather than a hidden panel: it opens without
-                JavaScript, it is keyboard-reachable, and it stays open when a
-                custom range is the one in force -- a range you cannot see is a
-                range you will forget you set. */}
-            <details open={rangeKey === 'custom'} className="w-full sm:w-auto">
-              <summary
-                className={`${chipClass(rangeKey === 'custom')} cursor-pointer list-none [&::-webkit-details-marker]:hidden`}
-              >
-                {rangeKey === 'custom' && customFrom && customTo
-                  ? `${customFrom} → ${customTo}`
-                  : 'Custom dates'}
-              </summary>
-              <form
-                method="get"
-                action="/dashboard/orders"
-                className="mt-2 flex flex-wrap items-end gap-2 rounded-[var(--p-r-block)] border border-hair bg-card p-2.5"
-              >
-                <input type="hidden" name="range" value="custom" />
-                {activeFilter !== 'all' && <input type="hidden" name="status" value={activeFilter} />}
-                {query ? <input type="hidden" name="q" value={query} /> : null}
-                <label className="block">
-                  <span className="mb-1 block text-[11.5px] font-medium text-gink-46">From</span>
-                  <input
-                    type="date"
-                    name="from"
-                    defaultValue={customFrom}
-                    required
-                    className={fieldSm('w-[150px] max-w-full')}
-                  />
-                </label>
-                <label className="block">
-                  <span className="mb-1 block text-[11.5px] font-medium text-gink-46">To</span>
-                  <input
-                    type="date"
-                    name="to"
-                    defaultValue={customTo}
-                    required
-                    className={fieldSm('w-[150px] max-w-full')}
-                  />
-                </label>
-                <button type="submit" className={btn('ghost', 'sm')}>
-                  Apply dates
-                </button>
-              </form>
-            </details>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-1.5">
-            {visibleFilters.map((f) => (
-              <Link
-                key={f.key}
-                href={href(rangeKey, f.key, query, dates)}
-                aria-current={activeFilter === f.key ? 'true' : undefined}
-                className={`${chipClass(activeFilter === f.key)} gap-1.5`}
-              >
-                {f.label}
-                <span
-                  className={[
-                    'tnum text-[11.5px]',
-                    activeFilter === f.key ? 'text-[var(--p-accent)]' : 'text-gink-46',
-                  ].join(' ')}
-                >
-                  {filterCounts[f.key]}
-                </span>
-              </Link>
-            ))}
-
-            <form
-              method="get"
-              action="/dashboard/orders"
-              className="ml-auto flex flex-wrap items-end gap-2"
+            <section
+              aria-label="Order summary"
+              className={[
+                'grid gap-3 sm:gap-4',
+                canViewFinance ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-2 sm:grid-cols-3',
+              ].join(' ')}
             >
-              {rangeKey !== 'today' && <input type="hidden" name="range" value={rangeKey} />}
-              {rangeKey === 'custom' && customFrom ? (
-                <input type="hidden" name="from" value={customFrom} />
-              ) : null}
-              {rangeKey === 'custom' && customTo ? (
-                <input type="hidden" name="to" value={customTo} />
-              ) : null}
-              {activeFilter !== 'all' && <input type="hidden" name="status" value={activeFilter} />}
-              <input
-                type="search"
-                name="q"
-                defaultValue={query}
-                placeholder="Table or reference"
-                aria-label="Find an order by table or reference"
-                className={fieldSm('w-[180px] max-w-full')}
+              <OrderMetric
+                label="Orders in range"
+                value={orders.length}
+                note={data?.ordersTruncated ? 'Most recent 100 shown' : data?.range.label ?? 'Sample range'}
+                tone="forest"
+                icon="orders"
               />
-              <button type="submit" className={btn('ghost', 'sm')}>
-                Search
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
+              <OrderMetric
+                label="Open orders"
+                value={openCount}
+                note="New, preparing, or ready"
+                tone="orange"
+                icon="open"
+              />
+              <OrderMetric
+                label="Needs attention"
+                value={delayedCount}
+                note={live ? 'Delayed or unacknowledged' : 'Live alerts appear with real orders'}
+                tone="moss"
+                icon="alert"
+              />
+              {canViewFinance ? (
+                <OrderMetric
+                  label="Not settled"
+                  value={unsettledCount}
+                  note="Cancelled orders excluded"
+                  tone="paper"
+                  icon="settled"
+                />
+              ) : null}
+            </section>
 
-      {!blocked && (
-        <Panel
-          /* The same headed card as every other panel on the surface. This one
-             was a bare card with a hand-made title row, so the ledger's own
-             heading sat at a different height and on a different background
-             from the panels two screens away. */
-          title={`${visible.length} order${visible.length === 1 ? '' : 's'}`}
-          meta={
-            <>
-              {query ? `Matching “${query}”` : 'Newest first'}
-              {data?.ordersTruncated ? ' · showing the most recent hundred' : ''}
-            </>
-          }
-          bodyClassName=""
-        >
-
-          {visible.length > 0 ? (
-            <>
-              {/* The finance columns fit a wide screen; on a phone the same
-                  orders are cards below. Exactly one layout is shown, so
-                  neither is read twice by a screen reader. */}
-              <div className="hidden lg:block">
-                <TableWrap>
-                  <table className={tableClass}>
-                    <thead>
-                      <tr>
-                        <Th>Time</Th>
-                        <Th>Reference</Th>
-                        <Th>Table</Th>
-                        <Th>Kitchen</Th>
-                        {isModeA ? <Th>POS handoff</Th> : null}
-                        {canViewFinance ? (
-                          <>
-                            <Th>Payment</Th>
-                            <Th align="right">Total</Th>
-                            <Th align="right">Outstanding</Th>
-                          </>
-                        ) : (
-                          <Th align="right">Open</Th>
-                        )}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {visible.map((order) => {
-                        const outstanding = Math.max(0, (order.totalPaise ?? 0) - (order.paidPaise ?? 0));
-                        const cancelled = order.prepStatus === 'cancelled';
-                        return (
-                          <Tr key={order.id} className={cancelled ? 'opacity-55' : undefined}>
-                            <Td className="tnum whitespace-nowrap text-gink-64">
-                              {dateTimeInZone(timezone, order.placedAt)}
-                            </Td>
-                            <Td>
-                              {live && !blocked ? (
-                                // The code is the safe door into this specific
-                                // bill; order identity is never taken from the URL.
-                                <Link
-                                  href={`/bill/${order.id}`}
-                                  title="Open this bill"
-                                  className="font-medium underline decoration-hair-strong underline-offset-2 hover:text-gink"
-                                >
-                                  {order.code}
-                                </Link>
-                              ) : (
-                                <span className="text-gink-64">{order.code}</span>
-                              )}
-                            </Td>
-                            <Td>{order.tableLabel ?? 'Takeaway'}</Td>
-                            <Td>
-                              <div className="flex flex-wrap items-center gap-1.5">
-                                {cancelled ? (
-                                  <Tag tone="neutral">Cancelled</Tag>
-                                ) : (
-                                  <PrepPill
-                                    state={
-                                      order.prepStatus === 'preparing' ||
-                                      order.prepStatus === 'ready' ||
-                                      order.prepStatus === 'served'
-                                        ? order.prepStatus
-                                        : 'new'
-                                    }
-                                  />
-                                )}
-                                {healthById.get(order.id)?.summary ? (
-                                  <Tag tone="due">{healthById.get(order.id)?.summary}</Tag>
-                                ) : null}
-                              </div>
-                            </Td>
-                            {isModeA ? (
-                              <Td>
-                                {cancelled ? (
-                                  <span className="text-[11.5px] text-gink-46">—</span>
-                                ) : (
-                                  <div className="flex flex-wrap items-center gap-1.5">
-                                    <Tag
-                                      tone={
-                                        order.kotHandoffStatus === 'entered_in_pos' ||
-                                        order.kotHandoffStatus === 'webhook_sent'
-                                          ? 'live'
-                                          : 'due'
-                                      }
-                                    >
-                                      {kotHandoffLabel(
-                                        normalizeKotHandoffStatus(order.kotHandoffStatus),
-                                      )}
-                                    </Tag>
-                                    {live && !blocked ? (
-                                      <form action={toggleOrderKotHandoffAction}>
-                                        <input type="hidden" name="orderId" value={order.id} />
-                                        <input
-                                          type="hidden"
-                                          name="nextStatus"
-                                          value={
-                                            order.kotHandoffStatus === 'entered_in_pos'
-                                              ? 'pending'
-                                              : 'entered_in_pos'
-                                          }
-                                        />
-                                        <button type="submit" className={btn('quiet', 'sm')}>
-                                          {order.kotHandoffStatus === 'entered_in_pos'
-                                            ? 'Reset'
-                                            : 'Mark entered'}
-                                        </button>
-                                      </form>
-                                    ) : null}
-                                  </div>
-                                )}
-                              </Td>
-                            ) : null}
-                            {canViewFinance ? (
-                              <>
-                                <Td>
-                                  <PaymentPill
-                                    state={
-                                      order.paymentStatus === 'pending'
-                                        ? 'pending'
-                                        : order.paymentStatus === 'failed'
-                                          ? 'failed'
-                                          : 'paid'
-                                    }
-                                  />
-                                </Td>
-                                <Td align="right">
-                                  <Money value={order.totalPaise ?? 0} />
-                                </Td>
-                                <Td align="right">
-                                  {outstanding > 0 && !cancelled ? (
-                                    <Link
-                                      href={`/cashier?order=${encodeURIComponent(live && !blocked ? order.id : order.code)}`}
-                                      title={`Take payment for ${order.code} at the counter`}
-                                      className={btn('ghost', 'sm')}
-                                    >
-                                      Collect <Money value={outstanding} />
-                                    </Link>
-                                  ) : (
-                                    <span className="text-[11.5px] text-gink-46">
-                                      {cancelled ? 'Not collectable' : 'Settled'}
-                                    </span>
-                                  )}
-                                </Td>
-                              </>
-                            ) : (
-                              <Td align="right">
-                                {!cancelled && live && !blocked ? (
-                                  <Link
-                                    href={`/cashier?order=${encodeURIComponent(order.id)}`}
-                                    title={`Open ${order.code} at the counter`}
-                                    className={btn('ghost', 'sm')}
-                                  >
-                                    Open at counter
-                                  </Link>
-                                ) : null}
-                              </Td>
-                            )}
-                          </Tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </TableWrap>
+            <section
+              aria-label="Order filters"
+              className="mt-5 rounded-[var(--p-r-card)] border border-hair bg-card p-4 shadow-[var(--p-shadow-1)] sm:p-5"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                <div>
+                  <h2 className="m-0 text-[13.5px] font-semibold tracking-[-0.014em] text-gink">Find orders</h2>
+                  <p className="mt-1 mb-0 text-[11.5px] text-gink-46">Choose a date range, filter by status, or search a table or reference.</p>
+                </div>
+                <form method="get" action="/dashboard/orders" className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+                  {rangeKey !== 'today' ? <input type="hidden" name="range" value={rangeKey} /> : null}
+                  {rangeKey === 'custom' && customFrom ? <input type="hidden" name="from" value={customFrom} /> : null}
+                  {rangeKey === 'custom' && customTo ? <input type="hidden" name="to" value={customTo} /> : null}
+                  {activeFilter !== 'all' ? <input type="hidden" name="status" value={activeFilter} /> : null}
+                  <input
+                    type="search"
+                    name="q"
+                    defaultValue={query}
+                    placeholder="Table or reference"
+                    aria-label="Find an order by table or reference"
+                    className={fieldSm('w-[220px] max-w-full')}
+                  />
+                  <button type="submit" className={btn('ghost', 'sm')}>Search</button>
+                </form>
               </div>
 
-              <ul className="flex flex-col divide-y divide-hair lg:hidden">
-                {visible.map((order) => {
-                  const outstanding = Math.max(0, (order.totalPaise ?? 0) - (order.paidPaise ?? 0));
-                  const cancelled = order.prepStatus === 'cancelled';
-                  return (
-                    <li key={order.id} className={['px-4 py-3', cancelled ? 'opacity-55' : ''].join(' ')}>
-                      <div className="flex items-baseline justify-between gap-3">
-                        <span className="text-[13px] font-semibold text-gink">
-                          {live && !blocked ? (
-                            <Link href={`/bill/${order.id}`} title="Open this bill">
-                              {order.code}
-                            </Link>
-                          ) : (
-                            order.code
-                          )}
-                        </span>
-                        <span className="tnum text-[11.5px] text-gink-46">
-                          {dateTimeInZone(timezone, order.placedAt)}
-                        </span>
-                      </div>
+              <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-hair pt-3">
+                <span className="mr-1 text-[11.5px] font-semibold text-gink-46">Date range</span>
+                <nav aria-label="Order date range" className="flex flex-wrap items-center gap-1.5">
+                  {RANGE_LINKS.map((range) => (
+                    <Link
+                      key={range.key}
+                      href={href(range.key, activeFilter, query, dates)}
+                      aria-current={rangeKey === range.key ? 'true' : undefined}
+                      className={chipClass(rangeKey === range.key)}
+                    >
+                      {range.label}
+                    </Link>
+                  ))}
+                </nav>
 
-                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                        <span className="text-[13px] text-gink-64">{order.tableLabel ?? 'Takeaway'}</span>
-                        {cancelled ? (
-                          <Tag tone="neutral">Cancelled</Tag>
-                        ) : (
-                          <PrepPill
-                            state={
-                              order.prepStatus === 'preparing' ||
-                              order.prepStatus === 'ready' ||
-                              order.prepStatus === 'served'
-                                ? order.prepStatus
-                                : 'new'
-                            }
-                          />
-                        )}
-                        {healthById.get(order.id)?.summary ? (
-                          <Tag tone="due">{healthById.get(order.id)?.summary}</Tag>
-                        ) : null}
-                        {isModeA && !cancelled ? (
-                          <Tag
-                            tone={
-                              order.kotHandoffStatus === 'entered_in_pos' ||
-                              order.kotHandoffStatus === 'webhook_sent'
-                                ? 'live'
-                                : 'due'
-                            }
-                          >
-                            {kotHandoffLabel(normalizeKotHandoffStatus(order.kotHandoffStatus))}
-                          </Tag>
-                        ) : null}
-                        {canViewFinance ? (
-                          <PaymentPill
-                            state={
-                              order.paymentStatus === 'pending'
-                                ? 'pending'
-                                : order.paymentStatus === 'failed'
-                                  ? 'failed'
-                                  : 'paid'
-                            }
-                          />
-                        ) : null}
-                      </div>
-
-                      {canViewFinance ? (
-                        <div className="mt-2 flex items-center justify-between gap-3">
-                          <span className="text-[13.5px] font-semibold text-gink">
-                            <Money value={order.totalPaise ?? 0} />
-                          </span>
-                          {outstanding > 0 && !cancelled ? (
-                            <Link
-                              href={`/cashier?order=${encodeURIComponent(live && !blocked ? order.id : order.code)}`}
-                              title={`Take payment for ${order.code} at the counter`}
-                              className={btn('ghost', 'sm')}
-                            >
-                              Collect <Money value={outstanding} />
-                            </Link>
-                          ) : (
-                            <span className="text-[11.5px] text-gink-46">
-                              {cancelled ? 'Not collectable' : 'Settled'}
-                            </span>
-                          )}
-                        </div>
-                      ) : !cancelled && live && !blocked ? (
-                        <div className="mt-2 flex justify-end">
-                          <Link
-                            href={`/cashier?order=${encodeURIComponent(order.id)}`}
-                            title={`Open ${order.code} at the counter`}
-                            className={btn('ghost', 'sm')}
-                          >
-                            Open at counter
-                          </Link>
-                        </div>
-                      ) : null}
-                    </li>
-                  );
-                })}
-              </ul>
-            </>
-          ) : (
-            <div className="px-4 py-5 sm:px-5">
-              <Empty>
-                <span className="block">
-                  {orders.length === 0
-                    ? 'No orders in this range.'
-                    : 'No orders match this filter.'}
-                </span>
-                {/* An empty view of a full ledger is not the same thing as an
-                    empty day, and the way out has to be on the screen. */}
-                {orders.length > 0 && narrowed ? (
-                  <Link
-                    href={href(rangeKey, 'all', '', dates)}
-                    className="mt-2 inline-block text-[12.5px] font-medium text-[var(--p-accent)] underline decoration-[color-mix(in_oklab,var(--p-accent)_35%,transparent)] underline-offset-2 hover:decoration-[var(--p-accent)]"
+                <details open={rangeKey === 'custom'} className="relative">
+                  <summary className={`${chipClass(rangeKey === 'custom')} cursor-pointer list-none [&::-webkit-details-marker]:hidden`}>
+                    {rangeKey === 'custom' && customFrom && customTo
+                      ? `${customFrom} → ${customTo}`
+                      : 'Custom dates'}
+                  </summary>
+                  <form
+                    method="get"
+                    action="/dashboard/orders"
+                    className="absolute top-full left-0 z-10 mt-2 flex min-w-[min(100vw-2rem,380px)] flex-wrap items-end gap-2 rounded-[var(--p-r-card)] border border-hair bg-card p-3 shadow-[var(--p-shadow-2)]"
                   >
-                    Show all {orders.length} in this range
-                  </Link>
-                ) : null}
-              </Empty>
-            </div>
-          )}
-        </Panel>
-      )}
+                    <input type="hidden" name="range" value="custom" />
+                    {activeFilter !== 'all' ? <input type="hidden" name="status" value={activeFilter} /> : null}
+                    {query ? <input type="hidden" name="q" value={query} /> : null}
+                    <label className="block">
+                      <span className="mb-1 block text-[11.5px] font-medium text-gink-46">From</span>
+                      <input type="date" name="from" defaultValue={customFrom} required className={fieldSm('w-[145px] max-w-full')} />
+                    </label>
+                    <label className="block">
+                      <span className="mb-1 block text-[11.5px] font-medium text-gink-46">To</span>
+                      <input type="date" name="to" defaultValue={customTo} required className={fieldSm('w-[145px] max-w-full')} />
+                    </label>
+                    <button type="submit" className={btn('primary', 'sm')}>Apply dates</button>
+                  </form>
+                </details>
+              </div>
 
-      {!blocked && (
-        <p className="mt-4 max-w-[92ch] text-[11.5px] leading-[1.6] text-gink-46">
-          {canViewFinance ? (
-            <>
-              Outstanding is what the table still owes on that bill;{' '}
-              <strong className="font-semibold text-gink-64">Collect</strong> opens the counter on
-              that exact ticket, and the queue as a whole is at{' '}
-              <Link href="/cashier" className="underline underline-offset-2">
-                the counter
-              </Link>
-              . Cancelled bills stay here so the day&apos;s history is complete, and are excluded
-              from every figure on the sales report.
-            </>
-          ) : (
-            <>
-              Payment details are not included in this ledger. Open an order to view its bill, or go
-              to{' '}
-              <Link href="/cashier" className="underline underline-offset-2">
-                the counter
-              </Link>{' '}
-              to manage it. Cancelled orders remain here so the day&apos;s history is complete.
-            </>
-          )}
-        </p>
-      )}
-      {!live && !blocked && (
-        <Notice
-          tone="accent"
-          label={<Tag tone="work">Sample data</Tag>}
-          className="mt-4 mb-0"
-        >
-          Database not configured — the rows above are fictional sample data.
-        </Notice>
-      )}
+              <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-hair pt-3">
+                <span className="mr-1 text-[11.5px] font-semibold text-gink-46">Status</span>
+                <nav aria-label="Order status filter" className="flex flex-wrap items-center gap-1.5">
+                  {visibleFilters.map((item) => (
+                    <Link
+                      key={item.key}
+                      href={href(rangeKey, item.key, query, dates)}
+                      aria-current={activeFilter === item.key ? 'true' : undefined}
+                      className={`${chipClass(activeFilter === item.key)} gap-1.5`}
+                    >
+                      {item.label}
+                      <span className={[
+                        'tnum text-[11.5px]',
+                        activeFilter === item.key ? 'text-[var(--p-accent)]' : 'text-gink-46',
+                      ].join(' ')}>
+                        {filterCounts[item.key]}
+                      </span>
+                    </Link>
+                  ))}
+                </nav>
+              </div>
+            </section>
+
+            <Panel
+              title={`${visible.length} order${visible.length === 1 ? '' : 's'}`}
+              meta={
+                <>
+                  {query ? `Matching “${query}”` : 'Newest first'}
+                  {data?.ordersTruncated ? ' · showing the most recent hundred' : ''}
+                </>
+              }
+              className="mt-5"
+              bodyClassName=""
+            >
+              {visible.length > 0 ? (
+                <>
+                  <div className="hidden xl:block">
+                    <TableWrap>
+                      <table className={tableClass}>
+                        <thead>
+                          <tr>
+                            <Th>Order</Th>
+                            <Th>Table</Th>
+                            <Th>Placed</Th>
+                            <Th>Kitchen</Th>
+                            {isModeA ? <Th>POS handoff</Th> : null}
+                            {canViewFinance ? <Th>Payment</Th> : null}
+                            {canViewFinance ? <Th align="right">Total</Th> : <Th align="right">Counter</Th>}
+                            {canViewFinance ? <Th align="right">Balance</Th> : null}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {visible.map((order) => {
+                            const outstanding = Math.max(0, (order.totalPaise ?? 0) - (order.paidPaise ?? 0));
+                            const cancelled = order.prepStatus === 'cancelled';
+                            const health = healthById.get(order.id);
+                            return (
+                              <Tr key={order.id} data-order-row={order.id} className={cancelled ? 'opacity-55' : undefined}>
+                                <Td>
+                                  <span className="flex items-center gap-2">
+                                    <span className="grid size-8 shrink-0 place-items-center rounded-[10px] bg-paper-deep text-[var(--p-accent)]">
+                                      <OrdersIcon name="orders" />
+                                    </span>
+                                    {live && !blocked ? (
+                                      <Link href={`/bill/${order.id}`} title="Open this bill" className="font-semibold text-gink underline decoration-hair-strong underline-offset-2 hover:text-[var(--p-accent)]">
+                                        {order.code}
+                                      </Link>
+                                    ) : <span className="font-semibold text-gink">{order.code}</span>}
+                                  </span>
+                                </Td>
+                                <Td>{order.tableLabel ?? 'Takeaway'}</Td>
+                                <Td className="tnum whitespace-nowrap text-gink-64">{dateTimeInZone(timezone, order.placedAt)}</Td>
+                                <Td>
+                                  <div className="flex flex-wrap items-center gap-1.5">
+                                    <OrderPrep order={order} />
+                                    {health?.summary ? <Tag tone="due">{health.summary}</Tag> : null}
+                                  </div>
+                                </Td>
+                                {isModeA ? <Td><OrderHandoff order={order} live={live} blocked={Boolean(blocked)} /></Td> : null}
+                                {canViewFinance ? <Td><PaymentPill state={orderPaymentState(order)} /></Td> : null}
+                                {canViewFinance ? <Td align="right"><Money value={order.totalPaise ?? 0} /></Td> : null}
+                                <Td align="right">
+                                  {canViewFinance ? (
+                                    outstanding > 0 && !cancelled ? (
+                                      <Link
+                                        href={`/cashier?order=${encodeURIComponent(live && !blocked ? order.id : order.code)}`}
+                                        title={`Take payment for ${order.code} at the counter`}
+                                        className={btn('ghost', 'sm')}
+                                      >
+                                        Collect <Money value={outstanding} />
+                                      </Link>
+                                    ) : <span className="text-[11.5px] text-gink-46">{cancelled ? 'Not collectable' : 'Settled'}</span>
+                                  ) : !cancelled && live && !blocked ? (
+                                    <Link href={`/cashier?order=${encodeURIComponent(order.id)}`} title={`Open ${order.code} at the counter`} className={btn('ghost', 'sm')}>
+                                      Open at counter
+                                    </Link>
+                                  ) : <span className="text-[11.5px] text-gink-46">{cancelled ? 'Cancelled' : '—'}</span>}
+                                </Td>
+                              </Tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </TableWrap>
+                  </div>
+
+                  <ul aria-label="Orders" className="grid gap-2.5 p-3 sm:grid-cols-2 sm:p-4 xl:hidden">
+                    {visible.map((order) => {
+                      const outstanding = Math.max(0, (order.totalPaise ?? 0) - (order.paidPaise ?? 0));
+                      const cancelled = order.prepStatus === 'cancelled';
+                      const health = healthById.get(order.id);
+                      return (
+                        <li key={order.id} data-order-row={order.id} className={[
+                          'min-w-0 rounded-[var(--p-r-card)] border border-hair bg-card p-3.5 shadow-[var(--p-shadow-1)]',
+                          cancelled ? 'opacity-55' : '',
+                        ].join(' ')}>
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex min-w-0 items-center gap-2.5">
+                              <span className="grid size-9 shrink-0 place-items-center rounded-[11px] bg-paper-deep text-[var(--p-accent)]"><OrdersIcon name="orders" /></span>
+                              <div className="min-w-0">
+                                {live && !blocked ? (
+                                  <Link href={`/bill/${order.id}`} title="Open this bill" className="text-[13.5px] font-semibold text-gink underline decoration-hair-strong underline-offset-2">
+                                    {order.code}
+                                  </Link>
+                                ) : <span className="text-[13.5px] font-semibold text-gink">{order.code}</span>}
+                                <span className="mt-0.5 block truncate text-[11.5px] text-gink-64">{order.tableLabel ?? 'Takeaway'}</span>
+                              </div>
+                            </div>
+                            <span className="shrink-0 text-right text-[10.5px] leading-[1.4] text-gink-46 tabular-nums">{dateTimeInZone(timezone, order.placedAt)}</span>
+                          </div>
+
+                          <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                            <OrderPrep order={order} />
+                            {health?.summary ? <Tag tone="due">{health.summary}</Tag> : null}
+                            {canViewFinance ? <PaymentPill state={orderPaymentState(order)} /> : null}
+                          </div>
+
+                          {isModeA && !cancelled ? (
+                            <div className="mt-2"><OrderHandoff order={order} live={live} blocked={Boolean(blocked)} /></div>
+                          ) : null}
+
+                          <div className="mt-3 flex items-center justify-between gap-3 border-t border-hair pt-3">
+                            {canViewFinance ? (
+                              <div>
+                                <span className="block text-[10.5px] text-gink-46">Order total</span>
+                                <span className="mt-0.5 block text-[13.5px] font-semibold text-gink"><Money value={order.totalPaise ?? 0} /></span>
+                              </div>
+                            ) : <span className="text-[11.5px] text-gink-46">Payment details hidden</span>}
+                            {canViewFinance ? (
+                              outstanding > 0 && !cancelled ? (
+                                <Link
+                                  href={`/cashier?order=${encodeURIComponent(live && !blocked ? order.id : order.code)}`}
+                                  title={`Take payment for ${order.code} at the counter`}
+                                  className={btn('primary', 'sm')}
+                                >
+                                  Collect <Money value={outstanding} />
+                                </Link>
+                              ) : <span className="text-[11.5px] font-medium text-gink-46">{cancelled ? 'Not collectable' : 'Settled'}</span>
+                            ) : !cancelled && live && !blocked ? (
+                              <Link href={`/cashier?order=${encodeURIComponent(order.id)}`} title={`Open ${order.code} at the counter`} className={btn('ghost', 'sm')}>
+                                Open at counter
+                              </Link>
+                            ) : null}
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </>
+              ) : (
+                <div className="px-4 py-5 sm:px-5">
+                  <Empty>
+                    <span className="block">{orders.length === 0 ? 'No orders in this range.' : 'No orders match this filter.'}</span>
+                    {orders.length > 0 && narrowed ? (
+                      <Link href={href(rangeKey, 'all', '', dates)} className="mt-2 inline-block text-[12.5px] font-medium text-[var(--p-accent)] underline decoration-[color-mix(in_oklab,var(--p-accent)_35%,transparent)] underline-offset-2 hover:decoration-[var(--p-accent)]">
+                        Show all {orders.length} in this range
+                      </Link>
+                    ) : null}
+                  </Empty>
+                </div>
+              )}
+            </Panel>
+
+            <p className="mt-4 max-w-[92ch] text-[11.5px] leading-[1.6] text-gink-46">
+              {canViewFinance ? (
+                <>
+                  Outstanding is what the table still owes on that bill;{' '}
+                  <strong className="font-semibold text-gink-64">Collect</strong> opens the counter on that exact ticket.{' '}
+                  <Link href="/cashier" className="underline underline-offset-2">Open the counter queue</Link>.
+                  {' '}Cancelled bills stay in the history and are excluded from sales-report totals.
+                </>
+              ) : (
+                <>
+                  Payment details are not included in this list. Open an order to view its bill, or go to{' '}
+                  <Link href="/cashier" className="underline underline-offset-2">the counter</Link>. Cancelled orders remain in the history.
+                </>
+              )}
+            </p>
+          </>
+        ) : null}
       </OpsSurface>
     </OwnerPage>
   );

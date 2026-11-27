@@ -105,12 +105,14 @@ describe('Kitchen board', () => {
     expect(html).toContain('aria-current="page"');
   });
 
-  it('does not fall back to the old full-screen escape hatch', () => {
+  it('uses the rail Dashboard link without adding a duplicate escape link', () => {
     const html = renderToStaticMarkup(<Kitchen />);
 
-    // The lone "Dashboard" button existed because there was no rail. With the
-    // rail present it is a second, worse way to do the same thing.
-    expect(html).not.toMatch(/>Dashboard<\/a>/);
+    // The shared rail owns the only Dashboard destination. A second link in
+    // the board content would reintroduce the old full-screen escape hatch.
+    expect(html.match(/href="\/dashboard"/g) ?? []).toHaveLength(1);
+    const at = html.indexOf('data-nav="overview"');
+    expect(html.slice(at, html.indexOf('</a>', at))).toContain('Dashboard');
   });
 
   it('renders the sample tickets so the layout can be judged', () => {

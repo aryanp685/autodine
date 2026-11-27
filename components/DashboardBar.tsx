@@ -27,24 +27,20 @@ export { DASHBOARD_LINKS };
  * WHY IT CHANGED FROM A HORIZONTAL STRIP
  *
  * The old bar carried eight destinations in one row. Adding Branding and
- * Import menu made ten, which does not fit a 390px screen and does not fit a
- * 1024px tablet either -- the row scrolled sideways, so the two newest screens
- * were the two a person could not see. A vertical rail has room to grow and is
+ * Import menu made ten, which did not fit a 390px screen or a tablet either --
+ * the row scrolled sideways, so the newest screens were the ones a person
+ * could not see. A vertical rail has room to grow and is
  * the shape every operations product this is competing with uses.
  *
  * THE THREE LAYOUTS, AND WHY EACH ONE
  *
- *   laptop and up   a fixed 232px rail, always visible. The content column is
+ *   tablet and up  a fixed 244px rail, always visible. The content column is
  *                   padded by exactly its width, so nothing is ever hidden
  *                   behind it.
- *   tablet          the rail becomes a drawer with a scrim, opened from the
- *                   top bar. 1100px is where a 232px column stops being free
- *                   space and starts being a quarter of the working area.
- *   phone           the same contents as a sheet that rises from the bottom
- *                   edge, with the current screen in the top bar. A drawer
- *                   that slides in from the side puts its first item at the
- *                   top of the screen, out of a thumb's reach; the bottom
- *                   third is where the hand already is.
+ *   phone          the same contents as a sheet that rises from the bottom
+ *                   edge, with the current screen in the top bar. Below 768px
+ *                   a side drawer would put its first item out of thumb reach;
+ *                   the bottom third is where the hand already is.
  *
  * Only the box changes between those three: one tree, one order, one set of
  * names, so a destination cannot exist on a laptop and not on a phone.
@@ -181,7 +177,7 @@ export function DashboardBar({
         tabIndex={open ? 0 : -1}
         onClick={() => setOpen(false)}
         className={[
-          'fixed inset-0 z-40 bg-gink/40 transition-opacity duration-200 ease-[var(--o-ease)] lg:hidden',
+          'fixed inset-0 z-40 bg-gink/40 transition-opacity duration-200 ease-[var(--o-ease)] md:hidden',
           open ? 'opacity-100' : 'pointer-events-none opacity-0',
         ].join(' ')}
       />
@@ -196,23 +192,18 @@ export function DashboardBar({
              Tablet: the same sheet. Laptop: a fixed rail that is part of the
              layout and never moves. One tree, three positions. */
           'fixed z-50 flex flex-col bg-rail text-rail-ink',
-          /* Two shadows, both doing a job: an outer one to lift the sheet off
-             the page, and an inner lit edge on the rail's right side so the
-             dark column has a boundary against the paper instead of ending in
-             a hard seam. On a phone the same edge reads as the top lip of the
-             sheet, which is where a bottom sheet catches light. */
-          'shadow-[var(--p-shadow-3)] lg:shadow-none',
+          /* A soft lift separates the light navigation sheet from the page on
+             phones; at desktop the warm hairline is enough to define the rail. */
+          'shadow-[var(--p-shadow-3)] md:shadow-none',
           'inset-x-0 bottom-0 max-h-[80dvh] rounded-t-[20px] border-t border-rail-line pb-[env(safe-area-inset-bottom)]',
           'transition-transform duration-[280ms] ease-[var(--o-ease)] will-change-transform',
           open ? 'translate-y-0' : 'translate-y-full',
-          'lg:inset-y-0 lg:left-0 lg:w-[244px] lg:max-h-none lg:translate-y-0 lg:rounded-none lg:border-t-0 lg:border-r lg:pb-0',
+          'md:inset-y-0 md:left-0 md:w-[244px] md:max-h-none md:translate-y-0 md:rounded-none md:border-t-0 md:border-r md:pb-0',
         ].join(' ')}
       >
-        {/* The brand block is a band with a hairline under it, so the rail has a
-            top edge instead of a wordmark floating in dark space. The venue is
-            named once, at the foot, where the account lives -- printing it here
-            as well would put the same words twice in a 244px column. */}
-        <div className="flex items-center justify-between border-b border-rail-line px-4 py-3.5 lg:px-5 lg:py-4">
+        {/* A quiet brand header gives the wordmark its own breathing room; the
+            venue is named once in the account card at the foot of the rail. */}
+        <div className="flex items-center justify-between border-b border-rail-line px-4 py-3.5 md:px-5 md:py-4">
           <Link href="/" aria-label="AutoDine" className="group text-rail-ink">
             {/* The orange mark carries through the Signature palette while
                 keeping the wordmark legible on the evergreen rail. */}
@@ -223,7 +214,7 @@ export function DashboardBar({
             type="button"
             aria-label="Close navigation"
             onClick={() => setOpen(false)}
-            className="grid size-8 place-items-center rounded-[var(--p-r-chip)] text-[18px] leading-none text-rail-ink-64 transition-colors duration-150 hover:bg-[color-mix(in_srgb,var(--p-rail-ink)_8%,transparent)] hover:text-rail-ink focus-visible:outline-[var(--p-rail-ink)] lg:hidden"
+            className="grid size-8 place-items-center rounded-[var(--p-r-chip)] text-[18px] leading-none text-rail-ink-64 transition-colors duration-150 hover:bg-[color-mix(in_srgb,var(--p-rail-ink)_8%,transparent)] hover:text-rail-ink focus-visible:outline-[var(--p-rail-ink)] md:hidden"
           >
             ×
           </button>
@@ -233,7 +224,7 @@ export function DashboardBar({
             foot of the rail already names the venue, and printing the same name
             twice in a 232px column reads as a bug. */}
         {outlet && outlet.outlets.length > 1 && (
-          <div className="border-b border-rail-line px-4 py-3 lg:px-5">
+          <div className="border-b border-rail-line px-4 py-3 md:px-5">
             <span className="mb-1.5 block text-[10px] font-semibold tracking-[0.16em] text-rail-ink-40 uppercase">
               Switch outlet
             </span>
@@ -256,20 +247,18 @@ export function DashboardBar({
                     data-nav={link.key}
                     data-nav-active={current ? 'true' : undefined}
                     aria-current={current ? 'page' : undefined}
-                    /* On a dark rail the current screen is marked by a copper
-                       bar and a lifted row, not by a coloured block. A filled
-                       block here competed with the page's own primary action
-                       across the whole width of the screen. */
+                    /* The orange active pill is the route's clear location cue;
+                       the other rows remain quiet so the selection is easy to scan. */
                     /* `data-rail-row` is the GSAP handle: the row is animated
                        only while the drawer is opening, and never on a laptop
                        where the rail is always on screen. */
                     data-rail-row="true"
                     className={[
-                      'group relative mb-0.5 flex items-center gap-2.5 rounded-[var(--p-r-control)] px-3 py-[9px] text-[13px]',
+                      'group relative mb-1 flex items-center gap-3 rounded-[var(--p-r-control)] px-3 py-3 text-[13.5px]',
                       'transition-[background-color,color] duration-150 ease-[var(--o-ease)]',
                       current
-                        ? 'bg-[var(--p-rail-active)] font-medium text-rail-ink'
-                        : 'text-rail-ink-64 hover:bg-[color-mix(in_srgb,var(--p-rail-ink)_8%,transparent)] hover:text-rail-ink',
+                        ? 'bg-[var(--p-rail-active)] font-semibold text-onink'
+                        : 'text-rail-ink-64 hover:bg-[color-mix(in_srgb,var(--p-rail-ink)_6%,transparent)] hover:text-rail-ink',
                     ].join(' ')}
                   >
                     {/* The copper bar is centred on the row's own edge rather
@@ -280,14 +269,14 @@ export function DashboardBar({
                       aria-hidden="true"
                       className={[
                         'absolute top-1/2 left-0 h-[18px] w-[3px] -translate-y-1/2 rounded-r-full transition-opacity duration-150',
-                        current ? 'bg-[var(--p-accent)] opacity-100' : 'opacity-0',
+                        current ? 'bg-[var(--p-on-ink)] opacity-100' : 'opacity-0',
                       ].join(' ')}
                     />
                     <span
                       aria-hidden="true"
                       className={[
                         'shrink-0 transition-colors',
-                        current ? 'text-[var(--p-accent)]' : 'text-rail-ink-40 group-hover:text-rail-ink-64',
+                        current ? 'text-onink' : 'text-rail-ink-40 group-hover:text-rail-ink-64',
                       ].join(' ')}
                     >
                       {ICONS[link.key]}
@@ -358,7 +347,7 @@ export function DashboardBar({
           /* The sheet colour, not the field: the bar is chrome, and on a pale
              field a white bar with a hairline reads as a bar, while a grey one
              reads as a band of the page that forgot to scroll. */
-          'sticky top-0 z-30 border-b border-hair bg-card lg:pl-[244px]',
+          'sticky top-0 z-30 border-b border-hair bg-card md:pl-[244px]',
           'transition-shadow duration-200 ease-[var(--o-ease)]',
           /* One elevation token, not a hand-tuned shadow: the bar lifts to the
              same contact shadow as a card, so the shell and the content agree
@@ -372,7 +361,7 @@ export function DashboardBar({
             aria-expanded={open}
             aria-controls="app-rail"
             onClick={() => setOpen(true)}
-            className="flex items-center gap-2 rounded-full bg-[color-mix(in_oklab,var(--p-ink)_7%,transparent)] py-2 pr-4 pl-3 text-[12.5px] font-medium text-gink transition-colors duration-150 ease-[var(--o-ease)] hover:bg-[color-mix(in_oklab,var(--p-ink)_11%,transparent)] lg:hidden"
+            className="flex items-center gap-2 rounded-full bg-[color-mix(in_oklab,var(--p-ink)_7%,transparent)] py-2 pr-4 pl-3 text-[12.5px] font-medium text-gink transition-colors duration-150 ease-[var(--o-ease)] hover:bg-[color-mix(in_oklab,var(--p-ink)_11%,transparent)] md:hidden"
           >
             <span aria-hidden="true" className="flex flex-col gap-[3px]">
               <i className="block h-px w-3.5 bg-current" />
@@ -396,7 +385,7 @@ export function DashboardBar({
                 {ICONS[active]}
               </span>
             ) : null}
-            <span className="truncate text-[13px] font-semibold tracking-[-0.015em] text-gink">
+            <span className="truncate text-[17px] font-semibold tracking-[-0.02em] text-gink">
               {activeLink?.label ?? 'Dashboard'}
             </span>
             {activeOutlet && (

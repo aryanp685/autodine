@@ -65,7 +65,7 @@ const FLOOR = ['owner', 'manager', 'cashier', 'waiter'] as const;
 const KITCHEN = ['owner', 'manager', 'kitchen'] as const;
 
 export const DASHBOARD_LINKS: ReadonlyArray<ShellLink> = [
-  { key: 'overview', label: 'Overview', href: '/dashboard', group: 'Today', roles: MANAGE },
+  { key: 'overview', label: 'Dashboard', href: '/dashboard', group: 'Today', roles: MANAGE },
 
   { key: 'orders', label: 'Orders', href: '/dashboard/orders', group: 'Service', roles: FLOOR },
   {

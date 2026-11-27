@@ -34,7 +34,17 @@ function ownerTokens(): Record<string, string> {
 
 const tokens = ownerTokens();
 
+function resolveToken(value: string, seen = new Set<string>()): string {
+  const ref = value.match(/^var\(--([\w-]+)\)$/);
+  if (!ref) return value;
+  const name = ref[1];
+  if (seen.has(name) || !tokens[name]) throw new Error(`unresolvable owner token: --${name}`);
+  seen.add(name);
+  return resolveToken(tokens[name], seen);
+}
+
 function rgb(value: string): [number, number, number] {
+  value = resolveToken(value);
   const hex = value.match(/^#([0-9a-f]{6})$/i);
   if (hex) {
     const n = hex[1];
@@ -50,6 +60,8 @@ function rgb(value: string): [number, number, number] {
 
 /** Flatten an alpha token onto an opaque background, the way the browser does. */
 function over(alpha: string, base: string): [number, number, number] {
+  alpha = resolveToken(alpha);
+  base = resolveToken(base);
   const a = Number(alpha.match(/rgba\([^)]*,\s*([\d.]+)\s*\)/)?.[1] ?? 1);
   const [fr, fg, fb] = rgb(alpha);
   const [br, bg, bb] = rgb(base);
@@ -83,6 +95,7 @@ describe('owner palette tokens', () => {
       'p-due',
       'p-rail',
       'p-rail-ink',
+      'p-rail-active',
     ]) {
       expect(tokens[name], `--${name} is missing`).toBeTruthy();
     }
@@ -96,7 +109,7 @@ describe('owner palette tokens', () => {
     expect(contrast(rgb(tokens['p-accent']), rgb(tokens['p-accent-soft']))).toBeGreaterThanOrEqual(4.5);
   });
 
-  it('keeps body and meta type readable on paper, cards, and the evergreen rail', () => {
+  it('keeps body and meta type readable on paper, cards, and the warm rail', () => {
     for (const base of ['p-paper', 'p-card']) {
       const bg = rgb(tokens[base]);
       expect(contrast(over(tokens['p-ink'], tokens[base]), bg)).toBeGreaterThanOrEqual(7);
@@ -107,6 +120,7 @@ describe('owner palette tokens', () => {
 
     const rail = rgb(tokens['p-rail']);
     expect(contrast(rgb(tokens['p-rail-ink']), rail)).toBeGreaterThanOrEqual(7);
+    expect(contrast(rgb(tokens['p-on-ink']), rgb(tokens['p-rail-active']))).toBeGreaterThanOrEqual(4.5);
     expect(contrast(over(tokens['p-rail-ink-64'], tokens['p-rail']), rail)).toBeGreaterThanOrEqual(4.5);
     expect(contrast(over(tokens['p-rail-ink-40'], tokens['p-rail']), rail)).toBeGreaterThanOrEqual(4.5);
   });

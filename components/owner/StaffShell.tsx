@@ -90,10 +90,10 @@ export function StaffShell({
           <DashboardBar outlet={outlet} signOut={signOut}>
             <AnnouncementInbox />
           </DashboardBar>
-          <div className="lg:pl-[244px]">
+          <div className="md:pl-[244px]">
             <main
               className={[
-                'mx-auto w-full px-5 pt-7 pb-24 sm:px-8 lg:pt-10',
+                'mx-auto w-full px-5 pt-7 pb-24 sm:px-8 md:pt-10',
                 wide ? 'max-w-[1380px]' : 'max-w-[1240px]',
               ].join(' ')}
               /* The page's own current section, for anything that needs it

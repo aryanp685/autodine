@@ -144,10 +144,16 @@ describe('OrdersScreen', () => {
       />,
     );
 
-    // One open, one unsettled (the open one), and the cancelled bill is not
-    // counted as money owed.
-    expect(html).toContain('1 open · 1 not settled');
+    // The open and unsettled counts are surfaced in their summary cards; the
+    // cancelled bill remains in the history but is not counted as money owed.
+    expect(html).toContain('data-order-metric="orders-in-range"');
+    expect(html).toContain('data-order-metric="open-orders"');
+    expect(html).toContain('data-order-metric="not-settled"');
     expect(html).toContain('3 orders');
+    const openCard = html.slice(html.indexOf('data-order-metric="open-orders"'), html.indexOf('</article>', html.indexOf('data-order-metric="open-orders"')));
+    const unsettledCard = html.slice(html.indexOf('data-order-metric="not-settled"'), html.indexOf('</article>', html.indexOf('data-order-metric="not-settled"')));
+    expect(openCard).toContain('>1</p>');
+    expect(unsettledCard).toContain('>1</p>');
   });
 
   it('sends a signed-out visitor to sign in rather than showing a ledger', () => {
@@ -186,7 +192,7 @@ describe('OrdersScreen', () => {
     // Both shapes are in the DOM and exactly one of them is displayed at any
     // width: a table with seven columns on a phone is a sideways scroll.
     expect(html).toMatch(/<table/);
-    expect(html).toMatch(/<ul[^>]*lg:hidden/);
+    expect(html).toMatch(/<ul[^>]*xl:hidden/);
   });
 
   it('renders the sample report the demo range asks for', () => {
@@ -299,17 +305,16 @@ describe('OrdersScreen, the ledger as a page', () => {
     expect(chip('Cancelled')).toContain('>1<');
   });
 
-  it('marks the chosen window as current, in the accent, as a filled pill', () => {
+  it('marks the chosen window as current with the shared pill treatment', () => {
     const html = renderToStaticMarkup(<OrdersScreen data={three()} />);
-    // Scoped to the chip row: the rail has a group heading called "Today" too.
-    const row = html.slice(html.indexOf('mb-3 flex flex-col gap-2'));
-    const today = row.slice(0, row.indexOf('</a>'));
+    const start = html.indexOf('<nav aria-label="Order date range"');
+    const end = html.indexOf('</nav>', start);
+    const ranges = html.slice(start, end);
+    const current = ranges.slice(ranges.indexOf('aria-current="true"'));
 
-    expect(html).toContain('aria-current="true"');
-    // Selected = the accent fill with the on-ink label; unselected = a tint.
-    expect(today).toContain('bg-accent');
-    expect(today).toContain('text-onink');
-    expect(today).toContain('rounded-full');
+    expect(current).toContain('bg-accent');
+    expect(current).toContain('text-onink');
+    expect(current).toContain('rounded-full');
   });
 
   it('keeps the custom dates behind a summary that opens without JavaScript', () => {

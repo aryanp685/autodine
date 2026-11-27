@@ -126,7 +126,7 @@ describe('Dashboard, live and empty', () => {
     const html = renderToStaticMarkup(<Dashboard data={EMPTY} />);
     expect(html).toContain('data-metric="orders"');
     expect(html).toContain('data-metric="revenue"');
-    expect(html).toContain('data-metric="open"');
+    expect(html).toContain('data-metric="active-tables"');
     expect(html).toContain('0 open sessions');
   });
 
@@ -294,31 +294,51 @@ describe('Dashboard chart scale', () => {
  * an owner opens the screen for happened to be second.
  */
 describe('Dashboard, the figures', () => {
-  it('keeps the metric cards in a predictable service-first order', () => {
+  it('places the welcome masthead and existing quick actions ahead of the summary', () => {
     const html = renderToStaticMarkup(<Dashboard data={live()} />);
-    const metricRow = html.slice(html.indexOf('data-overview-metrics'), html.indexOf('aria-label="Today at a glance"'));
-    expect(metricRow.indexOf('Orders today')).toBeLessThan(metricRow.indexOf('Revenue today'));
-    expect(metricRow.indexOf('Revenue today')).toBeLessThan(metricRow.indexOf('Average ticket'));
-    expect(metricRow.indexOf('Average ticket')).toBeLessThan(metricRow.indexOf('Open orders'));
+    const welcomeAt = html.indexOf('data-overview-welcome');
+    const metricsAt = html.indexOf('data-overview-metrics');
+
+    expect(welcomeAt).toBeGreaterThan(-1);
+    expect(welcomeAt).toBeLessThan(metricsAt);
+    expect(html).toContain('Your restaurant, at a glance');
+    expect(html).toContain('Here&#x27;s what&#x27;s happening in your restaurant today.');
+    expect(html).toContain('data-overview-date');
+    expect(html).toContain('Open counter');
+    expect(html).toContain('Kitchen board');
   });
 
-  it('uses the new four-card overview with a clear revenue accent', () => {
+  it('keeps the summary cards in the screenshot order', () => {
     const html = renderToStaticMarkup(<Dashboard data={live()} />);
-    expect(html).toContain('grid-cols-2 gap-3 sm:grid-cols-4');
+    const metricRow = html.slice(html.indexOf('data-overview-metrics'), html.indexOf('aria-label="Today at a glance"'));
+    expect(metricRow.indexOf('Revenue today')).toBeLessThan(metricRow.indexOf('Orders today'));
+    expect(metricRow.indexOf('Orders today')).toBeLessThan(metricRow.indexOf('Active tables'));
+    expect(metricRow.indexOf('Active tables')).toBeLessThan(metricRow.indexOf('Average ticket'));
+  });
+
+  it('uses four light, consistent cards with a warm hairline and quiet notes', () => {
+    const html = renderToStaticMarkup(<Dashboard data={live()} />);
+    expect(html).toContain('grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4');
     expect(html).toContain('data-metric="revenue"');
-    expect(html).toContain('bg-[var(--p-accent)]');
+    expect(html).toContain('border border-hair bg-card');
     expect(html).toContain('Settled payments only');
   });
 
-  it('keeps the open-order count accurate at zero and above', () => {
-    const busy = renderToStaticMarkup(<Dashboard data={live()} />);
-    expect(busy).toContain('data-metric="open"');
-    expect(busy).toContain('New, preparing, or ready');
+  it('keeps the active-table count and the open-order detail accurate', () => {
+    const session = {
+      id: 's1', table: 'T1', openedAt: '2026-11-07T10:00:00.000Z', orderCount: 1,
+      orderCodes: ['A-1'], items: [], totalPaise: 0, paidPaise: 0, outstandingPaise: 0, paidAt: null,
+    };
+    const busy = renderToStaticMarkup(<Dashboard data={live({ activeSessions: [session] })} />);
+    expect(busy).toContain('data-metric="active-tables"');
+    expect(busy).toContain('1 open table session');
+    expect(busy).toContain('1 open · Since midnight');
 
     const quiet = renderToStaticMarkup(
-      <Dashboard data={{ ...live(), stats: { ...live().stats!, openOrders: 0 } }} />,
+      <Dashboard data={{ ...live(), activeSessions: [], stats: { ...live().stats!, openOrders: 0 } }} />,
     );
-    expect(quiet).toContain('data-metric="open"');
+    expect(quiet).toContain('data-metric="active-tables"');
+    expect(quiet).not.toContain('1 open · Since midnight');
   });
 });
 
@@ -388,10 +408,10 @@ describe('Dashboard, top items', () => {
  * explained the restaurant clock to a screen that says so under its title.
  */
 describe('Dashboard, what it does not repeat', () => {
-  it('does not duplicate the open-orders figure as a sentence elsewhere', () => {
+  it('shows the open-order detail once without duplicating it below the metrics', () => {
     const html = renderToStaticMarkup(<Dashboard data={live()} />);
-    expect(html.match(/Open orders/g) ?? []).toHaveLength(1);
-    expect(html).toContain('data-metric="open"');
+    expect(html.match(/1 open · Since midnight/g) ?? []).toHaveLength(1);
+    expect(html).toContain('data-metric="orders"');
   });
 
   it('does not tag the chart Live when the page already says it', () => {
