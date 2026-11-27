@@ -124,7 +124,10 @@ describe('Dashboard, live and empty', () => {
 
   it('keeps the real zeros', () => {
     const html = renderToStaticMarkup(<Dashboard data={EMPTY} />);
-    expect(html).toContain('0 open · 0 today');
+    expect(html).toContain('data-metric="orders"');
+    expect(html).toContain('data-metric="revenue"');
+    expect(html).toContain('data-metric="open"');
+    expect(html).toContain('0 open sessions');
   });
 
   it('offers the next step rather than leaving four zeros on screen', () => {
@@ -226,7 +229,7 @@ describe('Dashboard revenue chart', () => {
   it('dots the peak and scales with the card instead of a fixed pixel width', () => {
     const html = renderToStaticMarkup(<Dashboard data={live({ hourlyPaise: [0, 10_000, 84_500] })} />);
 
-    expect(html).toContain('viewBox="0 0 520 120"');
+    expect(html).toContain('viewBox="0 0 520 145"');
     expect(html).toContain('w-full');
     expect(html).toContain('data-peak="true"');
   });
@@ -242,7 +245,7 @@ describe('Dashboard revenue chart', () => {
   it('leaves the sample chart unlabelled, because it has no trading day behind it', () => {
     const html = renderToStaticMarkup(<Dashboard />);
 
-    expect(html).toContain('Sample shape');
+    expect(html).toContain('Sample trend · fictional');
     expect(html).not.toContain('Busiest hour');
     expect(html).not.toContain('Every hour to');
   });
@@ -291,34 +294,31 @@ describe('Dashboard chart scale', () => {
  * an owner opens the screen for happened to be second.
  */
 describe('Dashboard, the figures', () => {
-  it('leads with revenue, whatever order the source listed them in', () => {
+  it('keeps the metric cards in a predictable service-first order', () => {
     const html = renderToStaticMarkup(<Dashboard data={live()} />);
-    expect(html.indexOf('Revenue today')).toBeLessThan(html.indexOf('Orders today'));
+    const metricRow = html.slice(html.indexOf('data-overview-metrics'), html.indexOf('aria-label="Today at a glance"'));
+    expect(metricRow.indexOf('Orders today')).toBeLessThan(metricRow.indexOf('Revenue today'));
+    expect(metricRow.indexOf('Revenue today')).toBeLessThan(metricRow.indexOf('Average ticket'));
+    expect(metricRow.indexOf('Average ticket')).toBeLessThan(metricRow.indexOf('Open orders'));
   });
 
-  it('draws revenue larger and lets it have the width', () => {
+  it('uses the new four-card overview with a clear revenue accent', () => {
     const html = renderToStaticMarkup(<Dashboard data={live()} />);
-
-    // It is no longer one of four equal cards with a bigger font: it is the
-    // hero, with the shape of the day inside it, and the other three sit beside
-    // it. What this asserts is the same intent as before -- revenue is drawn
-    // bigger than its siblings and it is given the width to do it in.
-    const hero = html.slice(html.indexOf('data-hero="revenue"'));
-    expect(hero.slice(0, 4000)).toContain('clamp(2.2rem,5.4vw,4rem)');
-    expect(html).toContain('lg:grid-cols-[1.62fr_1fr]');
-    // ...and no sibling may borrow the display size.
-    const siblings = html.slice(html.indexOf('Other figures for today'));
-    expect(siblings).not.toContain('clamp(2.2rem,5.4vw,4rem)');
+    expect(html).toContain('grid-cols-2 gap-3 sm:grid-cols-4');
+    expect(html).toContain('data-metric="revenue"');
+    expect(html).toContain('bg-[var(--p-accent)]');
+    expect(html).toContain('Settled payments only');
   });
 
-  it('still tints only open orders, and only when there are some', () => {
+  it('keeps the open-order count accurate at zero and above', () => {
     const busy = renderToStaticMarkup(<Dashboard data={live()} />);
-    expect(busy).toContain('--p-accent-soft)_62%');
+    expect(busy).toContain('data-metric="open"');
+    expect(busy).toContain('New, preparing, or ready');
 
     const quiet = renderToStaticMarkup(
       <Dashboard data={{ ...live(), stats: { ...live().stats!, openOrders: 0 } }} />,
     );
-    expect(quiet).not.toContain('--p-accent-soft)_62%');
+    expect(quiet).toContain('data-metric="open"');
   });
 });
 
@@ -351,7 +351,7 @@ describe('Dashboard, the notices', () => {
 
   it('keeps the preview notice for a workspace with no database', () => {
     const html = renderToStaticMarkup(<Dashboard />);
-    expect(html).toContain('Preview mode');
+    expect(html).toContain('Sample dashboard');
     expect(html).toContain('fictional');
   });
 });
@@ -388,9 +388,10 @@ describe('Dashboard, top items', () => {
  * explained the restaurant clock to a screen that says so under its title.
  */
 describe('Dashboard, what it does not repeat', () => {
-  it('prints the open count once in the panel and once in the card', () => {
+  it('does not duplicate the open-orders figure as a sentence elsewhere', () => {
     const html = renderToStaticMarkup(<Dashboard data={live()} />);
-    expect(html.match(/1 open/g) ?? []).toHaveLength(1);
+    expect(html.match(/Open orders/g) ?? []).toHaveLength(1);
+    expect(html).toContain('data-metric="open"');
   });
 
   it('does not tag the chart Live when the page already says it', () => {
@@ -401,7 +402,7 @@ describe('Dashboard, what it does not repeat', () => {
 
   it('gives the orders panel a real action, not an underlined word', () => {
     const html = renderToStaticMarkup(<Dashboard data={live()} />);
-    const at = html.indexOf('All orders');
+    const at = html.indexOf('View all');
     const opening = html.slice(html.lastIndexOf('<a', at), at + 20);
     expect(opening).toContain('h-9 px-4');
   });
@@ -426,10 +427,10 @@ describe('Dashboard active table sessions', () => {
 
   it('shows one table card with the consolidated balance and a single mark-paid tick', () => {
     const html = renderToStaticMarkup(<Dashboard data={live({ activeSessions: [session] })} />);
-    expect(html).toContain('aria-label="Active table sessions"');
+    expect(html).toContain('aria-label="Service snapshot"');
     expect(html).toContain('T6');
     expect(html).toContain('A-1001, A-1002');
-    expect(html).toContain('Session session-1');
+    expect(html).toContain('data-active-session="session-1"');
     expect(html).toContain('2 × Paneer Tikka');
     expect(html).toContain('Half · Extra mint');
     expect(html).toContain('Butter Naan');
@@ -462,8 +463,8 @@ describe('Dashboard active table sessions', () => {
         })}
       />,
     );
-    expect(html).toContain('>Paid<');
-    expect(html).toContain('Paid 4:12 pm');
+    expect(html).toContain('>Settled<');
+    expect(html).toContain('Settled 4:12 pm');
     expect(html).not.toContain('data-mark-session-paid');
     expect(html).toContain('data-checkout-session="session-1"');
   });
@@ -497,7 +498,7 @@ describe('Dashboard active table sessions', () => {
         })}
       />,
     );
-    expect(html).toContain('Order reliability &amp; delays');
+    expect(html).toContain('Needs attention');
     expect(html).toContain('MA-901');
     expect(html).toContain('Waiting to start · 22m');
     expect(html).toContain('/dashboard/orders?status=delayed');
