@@ -46,7 +46,7 @@ import {
 export type OrderFilter = 'all' | 'open' | 'delayed' | 'settled' | 'cancelled';
 
 const FILTERS: Array<{ key: OrderFilter; label: string }> = [
-  { key: 'all', label: 'All' },
+  { key: 'all', label: 'All orders' },
   { key: 'open', label: 'Open' },
   { key: 'delayed', label: 'Delayed / alerts' },
   { key: 'settled', label: 'Settled' },
