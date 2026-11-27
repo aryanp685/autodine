@@ -96,12 +96,12 @@ describe.skipIf(!URL_VALUE)('Model C subscription and billing', () => {
 
   // ─────────────────────────────────────────────────────────────────────────
   describe('the plan catalog', () => {
-    it('prices the three plans at 999, 2699 and 3699 rupees a month', async () => {
+    it('prices the three plans at 999, 1999 and 3699 rupees a month', async () => {
       const prices = (await db.query(
         "select plan_price_paise('starter') starter, plan_price_paise('professional') professional, plan_price_paise('business') business",
       )).rows[0];
       expect(Number(prices.starter)).toBe(99900);
-      expect(Number(prices.professional)).toBe(269900);
+      expect(Number(prices.professional)).toBe(199900);
       expect(Number(prices.business)).toBe(369900);
     });
 
@@ -524,7 +524,7 @@ describe.skipIf(!URL_VALUE)('Model C subscription and billing', () => {
           expect(roleReads.payments, reader.role).toHaveLength(50);
           expect(roleReads.payments?.map((row) => row.id), reader.role).toEqual(expectedPaymentIds);
           expect(roleReads.receipt, reader.role).toBeTruthy();
-          expect(Number(roleReads.receipt.amountPaise), reader.role).toBe(269900);
+          expect(Number(roleReads.receipt.amountPaise), reader.role).toBe(199900);
           expect(roleReads.accountRows.rows, `${reader.role} direct accounts RLS`).toHaveLength(1);
           for (const visible of roleReads.directRows) {
             expect(visible.rows.length, `${reader.role} direct billing RLS`).toBeGreaterThan(0);
@@ -631,7 +631,7 @@ describe.skipIf(!URL_VALUE)('Model C subscription and billing', () => {
 
       const mine = await staff(a.owner, async () => (await db.query('select account_receipt($1) r', [receiptId])).rows[0].r);
       expect(mine).toBeTruthy();
-      expect(Number(mine.amountPaise)).toBe(269900);
+      expect(Number(mine.amountPaise)).toBe(199900);
 
       const stranger = randomUUID();
       await db.query('insert into profiles(id) values($1)', [stranger]);
@@ -655,7 +655,7 @@ describe.skipIf(!URL_VALUE)('Model C subscription and billing', () => {
 
       const payments = (await db.query('select id, status, amount_paise from subscription_payments where account_id=$1', [a.account])).rows;
       expect(payments).toHaveLength(1);
-      expect(Number(payments[0].amount_paise)).toBe(269900);
+      expect(Number(payments[0].amount_paise)).toBe(199900);
 
       const receipts = (await db.query('select receipt_number, amount_paise from subscription_receipts where account_id=$1', [a.account])).rows;
       expect(receipts).toHaveLength(1);
