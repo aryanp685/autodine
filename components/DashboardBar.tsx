@@ -144,7 +144,6 @@ export function DashboardBar({
   const role = outlet?.outlets.find((entry) => entry.id === outlet.activeId)?.role ?? null;
   const operatingMode = outlet?.operatingMode ?? 'mode_b';
   const groups = groupsForRole(role, operatingMode);
-  const hasOrders = groups.some((group) => group.links.some((link) => link.key === 'orders'));
 
   const activeLink = DASHBOARD_LINKS.find((link) => link.key === activeSection);
   const activeOutlet =
@@ -217,12 +216,12 @@ export function DashboardBar({
           <Link
             href="/"
             aria-label="AutoDine"
-            className="group inline-flex items-center rounded-[12px] border border-rail-line bg-[var(--p-rail-raised)] px-2.5 py-1.5 shadow-[0_1px_2px_rgba(43,32,21,0.06)] transition-[box-shadow,transform] duration-150 ease-[var(--o-ease)] hover:-translate-y-px hover:shadow-[0_3px_10px_rgba(43,32,21,0.10)]"
+            className="group inline-flex items-center rounded-[13px] border border-rail-line bg-[var(--p-rail-raised)] px-3 py-[7px] shadow-[0_1px_2px_rgba(43,32,21,0.06),inset_0_1px_0_rgba(255,255,255,0.7)] transition-[box-shadow,transform] duration-150 ease-[var(--o-ease)] hover:-translate-y-px hover:shadow-[0_3px_10px_rgba(43,32,21,0.10),inset_0_1px_0_rgba(255,255,255,0.7)]"
           >
             {/* The lockup sits on a raised porcelain chip rather than straight
                 on the sand: it is a warm brown drawing, and on the sand column
                 it was reading as part of the background. */}
-            <BrandLockup height={24} />
+            <BrandLockup height={27} />
           </Link>
 
           <button
@@ -404,7 +403,13 @@ export function DashboardBar({
               the venue is already answered by the rail's foot. The name is
               prefixed with the same glyph the rail uses for that destination,
               so the bar and the rail never disagree about what this page is. */}
-          <div className="flex min-w-0 items-center gap-3">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <span
+              aria-hidden="true"
+              className="hidden size-7 shrink-0 place-items-center rounded-[9px] border border-hair bg-paper text-gink-46 sm:grid [&_svg]:size-[15px]"
+            >
+              {activeSection ? ICONS[activeSection] : null}
+            </span>
             <span className="truncate text-[13.5px] font-semibold tracking-[-0.022em] text-gink">
               {activeLink?.label ?? 'Dashboard'}
             </span>
@@ -430,21 +435,6 @@ export function DashboardBar({
               </Link>
             )}
             {children}
-            {/* The one round control on the bar, the way the reference bar
-                ends: a quiet ring, then the jump search. It is a real
-                destination, not a decorative bell -- it opens the delayed
-                orders the screen already counts, and it is only drawn for a
-                role whose rail actually carries that screen. */}
-            {hasOrders ? (
-              <Link
-                href="/dashboard/orders?status=delayed"
-                aria-label="Open delayed orders"
-                title="Delayed orders"
-                className="grid size-9 shrink-0 place-items-center rounded-full border border-hair bg-paper text-gink-62 transition-[background-color,color,box-shadow,transform] duration-150 ease-[var(--o-ease)] hover:-translate-y-px hover:bg-card hover:text-gink hover:shadow-[var(--p-shadow-1)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--p-accent)] active:translate-y-0"
-              >
-                <BellIcon />
-              </Link>
-            ) : null}
             {/* The jump search keeps its 92px field from `sm` up. At 320px it
                 was the 26px that pushed the bar sideways, and a phone already
                 carries every destination in the drawer, so the field is the
@@ -472,26 +462,6 @@ function initialsOf(name: string): string {
       .slice(0, 2)
       .map((word) => word[0]?.toUpperCase() ?? '')
       .join('') || 'A'
-  );
-}
-
-/** The ring button on the bar: a bell, drawn at the rail's 1.6px stroke. */
-function BellIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      width="16"
-      height="16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M18 8.5a6 6 0 1 0-12 0c0 4.4-1.6 5.5-1.6 5.5h15.2S18 12.9 18 8.5" />
-      <path d="M13.7 18.2a2 2 0 0 1-3.4 0" />
-    </svg>
   );
 }
 

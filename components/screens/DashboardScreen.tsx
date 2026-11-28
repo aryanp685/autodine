@@ -247,7 +247,7 @@ export function Dashboard({
         Everything under it keeps the kit's own type.
       */}
       <header className="mb-6 sm:mb-7">
-        <div className="relative overflow-hidden rounded-[var(--p-r-card)] border border-[var(--p-line-soft)] bg-[var(--p-card)] px-5 py-6 shadow-[var(--p-shadow-1)] sm:px-7 sm:py-7">
+        <div className="relative overflow-hidden rounded-[var(--p-r-card)] border border-[var(--p-line-soft)] bg-[linear-gradient(180deg,var(--p-card),color-mix(in_oklab,var(--p-paper-deep)_55%,var(--p-card)))] px-5 py-6 shadow-[var(--p-shadow-1),inset_0_1px_0_rgba(255,255,255,0.6)] sm:px-7 sm:py-7">
           {/* The card opens with a short warm rule: the one piece of the
               landing page's paper-and-ember language that survives a dense
               screen without adding a second accent. */}
@@ -257,10 +257,11 @@ export function Dashboard({
           />
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div className="min-w-0">
-              <p className="text-[10.5px] font-semibold tracking-[0.2em] text-[var(--p-ink-46)] uppercase">
+              <p className="flex items-center gap-2 text-[10.5px] font-semibold tracking-[0.2em] text-[var(--p-ink-46)] uppercase">
+                <span aria-hidden="true" className="size-1.5 rounded-full bg-[var(--p-accent)]" />
                 {live ? 'Your restaurant, at a glance' : 'Sample dashboard · fictional data'}
               </p>
-              <h1 className="ov-display mt-3 text-[clamp(2.1rem,3.4vw,3rem)] leading-[1.04] font-semibold tracking-[-0.02em] text-balance text-gink">
+              <h1 className="ov-display mt-3 text-[clamp(1.9rem,2.7vw,2.55rem)] leading-[1.08] font-semibold tracking-[-0.02em] text-balance break-words text-gink">
                 {greeting}
                 {venueName ? `, ${venueName}.` : '.'}
               </h1>
@@ -598,18 +599,18 @@ export function Dashboard({
             return (
               <div
                 key={card.label}
-                className={`flex flex-1 flex-col justify-center rounded-[var(--p-r-card)] border border-[var(--p-line-soft)] px-5 py-4 shadow-[var(--p-shadow-1)] sm:px-6 ${tint}`}
+                className={`flex flex-1 flex-col justify-center rounded-[var(--p-r-card)] border border-[var(--p-line-soft)] px-5 py-4 shadow-[var(--p-shadow-1),inset_0_1px_0_rgba(255,255,255,0.55)] transition-[box-shadow,transform] duration-200 ease-[var(--o-ease)] hover:-translate-y-px hover:shadow-[var(--p-shadow-2),inset_0_1px_0_rgba(255,255,255,0.55)] sm:px-6 ${tint}`}
               >
                 <span
                   aria-hidden="true"
                   className="mb-3 block h-[3px] w-7 rounded-full"
                   style={{ backgroundColor: rule }}
                 />
-                <p className="text-[11.5px] font-medium text-gink-64">{card.label}</p>
-                <span className="mt-1 text-[clamp(1.55rem,2.3vw,1.9rem)] leading-none font-semibold tracking-[-0.03em] text-gink tabular-nums">
+                <p className="text-[11px] font-semibold tracking-[0.06em] text-gink-64 uppercase">{card.label}</p>
+                <span className="mt-1.5 text-[clamp(1.55rem,2.3vw,1.9rem)] leading-none font-semibold tracking-[-0.03em] text-gink tabular-nums">
                   {card.value}
                 </span>
-                <span className="mt-1.5 text-[11.5px] leading-[1.4] text-gink-64">
+                <span className="mt-2 text-[11.5px] leading-[1.45] text-gink-64">
                   {card.meta}
                 </span>
               </div>
@@ -629,7 +630,10 @@ export function Dashboard({
           className="mt-6 overflow-hidden rounded-[var(--p-r-card)] border border-[var(--p-line-soft)] bg-[var(--p-line-soft)] shadow-[var(--p-shadow-1)]"
         >
           <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 bg-[var(--p-card)] px-5 pt-4 pb-3">
-            <h2 className="text-[13px] font-semibold tracking-[-0.01em] text-gink">Right now</h2>
+            <h2 className="flex items-center gap-2 text-[13px] font-semibold tracking-[-0.01em] text-gink">
+              <span aria-hidden="true" className="size-1.5 rounded-full bg-[var(--p-accent)]" />
+              Right now
+            </h2>
             <span className="text-[11.5px] text-gink-46 tabular-nums" suppressHydrationWarning>
               as of {venueClock} · {venueDate}
             </span>

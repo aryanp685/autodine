@@ -438,9 +438,9 @@ body {
      settled/ready/paid, a brick for money to chase. Both carry a matching
      wash so a tag can be one token instead of a colour-mix at every call
      site. */
-  --p-live: #1b7a45;
+  --p-live: #176c3d;
   --p-live-soft: #e8f4ec;
-  --p-due: #a82d21;
+  --p-due: #97271c;
   --p-due-soft: #fbeae7;
 
   /* ---- the rail --------------------------------------------------------
@@ -1973,6 +1973,20 @@ html.splash-seen [data-splash] {
     to {
       transform: scaleX(1);
       transform-origin: left center;
+    }
+  }
+
+  /* Notification toasts: a lifetime rail that drains over the 6s the card
+     stays up, so the dismissal never feels abrupt. */
+  .toast-life {
+    animation: toast-life-drain 6s linear both;
+  }
+  @keyframes toast-life-drain {
+    from {
+      transform: scaleX(1);
+    }
+    to {
+      transform: scaleX(0);
     }
   }
 }

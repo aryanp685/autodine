@@ -879,7 +879,7 @@ export function Tag({ tone = 'neutral', children }: { tone?: PillTone; children:
   return (
     <span
       className={[
-        'inline-flex items-center gap-1.5 rounded-full px-2.5 py-[3px] text-[11.5px] font-semibold tracking-[0.01em] whitespace-nowrap ring-1 ring-inset ring-black/[0.05]',
+        'inline-flex items-center gap-1.5 rounded-full px-2.5 py-[3px] text-[11.5px] font-semibold tracking-[0.01em] whitespace-nowrap',
         tones[tone],
       ].join(' ')}
     >
