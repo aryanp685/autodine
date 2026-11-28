@@ -39,7 +39,7 @@ const read = (p) => {
   }
 };
 
-// 1. Migration inventory: exactly 113 files, unique 14-digit versions.
+// 1. Migration inventory: exactly 124 files, unique 14-digit versions.
 // 98 at the 2026-11-14 baseline, plus three 2026-11-19 remediation migrations
 // (receipt-helper ACL restore, new-outlet 0% tax default, guest GST quote
 // projection) plus one announcement claim-recovery (20261119000400) plus two
@@ -52,11 +52,14 @@ const read = (p) => {
 // verification-session id drift repair (20261122190000), and the
 // method-aware manual settlement (20261124000100), readiness probes (20261124020000),
 // and finance-view ACL repair (20261124030000),
-// and the google review invite projection (20261124040000).
+// and the google review invite projection (20261124040000),
+// and the 2026-11-28 subscription batch: the temporary one-rupee Starter price
+// (20261128120000), the cancellation flow (20261128130000) and the coupon-use
+// release trigger (20261128150000).
 const migDir = join(root, 'supabase/migrations');
 const migFiles = readdirSync(migDir).filter((f) => f.endsWith('.sql')).sort();
 const versions = migFiles.map((f) => f.slice(0, 14));
-check('migration_count_121', migFiles.length === 121, `found ${migFiles.length}`);
+check('migration_count_124', migFiles.length === 124, `found ${migFiles.length}`);
 check('migration_versions_unique', new Set(versions).size === versions.length);
 check('migration_versions_14_digit', versions.every((v) => /^[0-9]{14}$/.test(v)));
 
@@ -70,7 +73,7 @@ for (const f of GST_B) check(`gst_irp_present:${f.slice(0,14)}`, migFiles.includ
 const manifest = existsSync(join(root, 'docs/migration-manifest-2026-11-14.md')) ? read('docs/migration-manifest-2026-11-14.md') : '';
 const manifestVersions = new Set([...manifest.matchAll(/`([0-9]{14})`/g)].map((m) => m[1]));
 const actualVersions = new Set(versions);
-check('manifest_tracks_all_121', actualVersions.size === manifestVersions.size && [...actualVersions].every((v) => manifestVersions.has(v)),
+check('manifest_tracks_all_124', actualVersions.size === manifestVersions.size && [...actualVersions].every((v) => manifestVersions.has(v)),
   `manifest ${manifestVersions.size} versions vs actual ${actualVersions.size}`);
 
 check('manifest_marks_gst_irp_unauthorized', manifest.includes('NOT AUTHORIZED') && manifest.includes('GST/IRP'));
@@ -81,9 +84,20 @@ const so = read('scripts/staging/verify-share-origin.mjs');
 check('share_origin_ref_pinned', so.includes("juwyhslzchjevqkdvwjm"));
 check('share_origin_origin_pinned', so.includes('https://new-git-arena-9b120325-autodine-iamjarvis9896-3988s-projects.vercel.app'));
 
-// 5. Fail-closed cron boundary: exactly one cron, daily (Vercel Hobby).
+// 5. Fail-closed cron boundary: Vercel Hobby allows at most two jobs and runs
+// each at most once a day. Both are named here, so an unexpected job cannot
+// appear, and a schedule that is not daily cannot either.
 const vercel = JSON.parse(read('vercel.json'));
-check('vercel_single_daily_cron', Array.isArray(vercel.crons) && vercel.crons.length === 1 && vercel.crons[0].schedule === '30 1 * * *');
+const crons = Array.isArray(vercel.crons) ? vercel.crons : [];
+const DAILY = /^\d{1,2} \d{1,2} \* \* \*$/;
+const CRON_PATHS = ['/api/cron/escalate', '/api/cron/subscription-expiry'];
+check(
+  'vercel_crons_daily_and_named',
+  crons.length > 0 &&
+    crons.length <= 2 &&
+    crons.every((c) => DAILY.test(c.schedule) && CRON_PATHS.includes(c.path)),
+  `${crons.length} job(s): ${crons.map((c) => `${c.path} ${c.schedule}`).join(', ')}`,
+);
 
 // 6. Billing fail-closed boundary: no production adapter by default.
 const sb = read('lib/billing/sandbox.ts');

@@ -384,10 +384,10 @@ export function DashboardBar({
             type="button"
             aria-expanded={open}
             aria-controls="app-rail"
-            /* Named as the pair of the sheet's own "Close navigation": the two
-               buttons do one job in two states. The word stays on screen as
-               "Menu", the name says what the tap does. */
-            aria-label="Open navigation"
+            /* Named as the pair of the sheet's own "Close navigation". The name
+               carries the visible word ("Menu") so voice control and the label
+               agree, and it says what the tap does. */
+            aria-label="Open menu"
             onClick={() => setOpen(true)}
             className="flex items-center gap-2 rounded-full bg-[color-mix(in_oklab,var(--p-ink)_7%,transparent)] py-2 pr-4 pl-3 text-[12.5px] font-medium text-gink transition-colors duration-150 ease-[var(--o-ease)] hover:bg-[color-mix(in_oklab,var(--p-ink)_11%,transparent)] lg:hidden"
           >
@@ -445,11 +445,17 @@ export function DashboardBar({
                 <BellIcon />
               </Link>
             ) : null}
-            <ShellSearch
-              onLaunch={() => setOpen(false)}
-              role={role}
-              operatingMode={operatingMode}
-            />
+            {/* The jump search keeps its 92px field from `sm` up. At 320px it
+                was the 26px that pushed the bar sideways, and a phone already
+                carries every destination in the drawer, so the field is the
+                one thing that can wait for a wider screen. */}
+            <div className="hidden sm:block">
+              <ShellSearch
+                onLaunch={() => setOpen(false)}
+                role={role}
+                operatingMode={operatingMode}
+              />
+            </div>
           </div>
         </div>
       </header>
