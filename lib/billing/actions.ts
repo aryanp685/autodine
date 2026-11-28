@@ -87,7 +87,10 @@ export async function choosePlanAction(plan: string): Promise<SubscriptionAction
       months,
       amountPaise,
       currency: BILLING_CURRENCY,
-      returnPath: '/dashboard/subscription',
+      // The browser comes back to the welcome screen, not the subscription
+      // list: Cashfree appends its own query params to return_url, so the plan
+      // travels in the path where nothing can overwrite it.
+      returnPath: `/dashboard/subscription/welcome/${plan}`,
       // Cashfree sends the browser back from its own checkout, so it needs a
       // full URL; relative would land the owner nowhere.
       origin: await siteOrigin(),

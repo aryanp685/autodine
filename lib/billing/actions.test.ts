@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
+vi.mock('@/lib/site-origin', () => ({ siteOrigin: async () => 'https://new-alpha-five-43.vercel.app' }));
 vi.mock('@/lib/db/staff', () => ({ getStaffContextDetailed: () => Promise.resolve(mocks.staffResult) }));
 vi.mock('./provider', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./provider')>();
@@ -64,5 +65,23 @@ describe('subscription Server Action authorization', () => {
     expect(result.providerUnavailable).toBe(true);
     expect(mocks.getBillingProvider).toHaveBeenCalledOnce();
     expect(staff.rpc).not.toHaveBeenCalled();
+  });
+
+  it('returns the buyer to the welcome screen for the plan they bought', async () => {
+    const staff = signedIn('owner');
+    mocks.staffResult = staff.value;
+    const createCheckoutSession = vi
+      .fn()
+      .mockResolvedValue({ url: 'https://payments.cashfree.com/order/#session_1', reference: 'ad_1' });
+    mocks.getBillingProvider.mockReturnValue({ name: 'cashfree', createCheckoutSession });
+
+    const result = await choosePlanAction('professional');
+
+    expect(result).toMatchObject({ ok: true, checkoutUrl: 'https://payments.cashfree.com/order/#session_1' });
+    // Cashfree appends its own query params to return_url, so the plan travels
+    // in the path.
+    expect(createCheckoutSession.mock.calls[0][0].returnPath).toBe(
+      '/dashboard/subscription/welcome/professional'
+    );
   });
 });
