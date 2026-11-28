@@ -1705,8 +1705,8 @@ body {
    visitors who allow motion get the entrance, so a reduced-motion or
    JS-less visit can never leave the card hidden at opacity 0. */
 @media (prefers-reduced-motion: no-preference) {
-  .auth-rise { animation: auth-rise-in 0.6s cubic-bezier(0.22, 1, 0.36, 1) both; }
-  .auth-rise-delay { animation-delay: 70ms; }
+  .auth-rise { animation: auth-rise-in 0.34s cubic-bezier(0.22, 1, 0.36, 1) both; }
+  .auth-rise-delay { animation-delay: 50ms; }
   @keyframes auth-rise-in {
     from { opacity: 0; transform: translateY(18px); }
     to { opacity: 1; transform: none; }
@@ -1811,8 +1811,11 @@ body {
    panel is fully readable if none of it plays. */
 .auth-panel-fade { opacity: 1; }
 @media (prefers-reduced-motion: no-preference) {
-  .auth-panel-fade { animation: auth-panel-in 0.7s cubic-bezier(0.22, 1, 0.36, 1) both; }
-  .auth-panel-fade-delay { animation-delay: 120ms; }
+  /* A quarter second, not a second: the panel carries the copy the page is
+     judged on, and a long opacity fade keeps that copy half-legible while it
+     runs. The movement is what reads, not the wait. */
+  .auth-panel-fade { animation: auth-panel-in 0.26s cubic-bezier(0.22, 1, 0.36, 1) both; }
+  .auth-panel-fade-delay { animation-delay: 60ms; }
   @keyframes auth-panel-in {
     from { opacity: 0; transform: translateY(14px); }
     to { opacity: 1; transform: none; }

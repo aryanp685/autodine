@@ -18,7 +18,7 @@ export function LoginScreen({ error, notice, next }: { error?: string; notice?: 
     <AuthShell
       visual={
         <aside className="pt-2" aria-label="Restaurant workspace overview">
-          <p className="flex items-center gap-2.5 text-[10.5px] font-semibold uppercase tracking-[0.18em] text-white/80">
+          <p className="flex items-center gap-2.5 text-[10.5px] font-semibold uppercase tracking-[0.18em] text-paper">
             <span aria-hidden="true" className="h-px w-6 bg-[var(--auth-accent-bright)]" />
             Back to your service
           </p>
@@ -26,13 +26,13 @@ export function LoginScreen({ error, notice, next }: { error?: string; notice?: 
             The room moves.<br />
             Stay <em className="font-display font-normal italic text-[var(--auth-accent-bright)]">connected.</em>
           </h2>
-          <p className="mt-5 max-w-[35ch] text-[14.5px] leading-[1.7] text-white/80">
+          <p className="mt-5 max-w-[35ch] text-[14.5px] leading-[1.7] text-paper">
             Your menu, kitchen tickets and counter, with a place for every part of service.
           </p>
 
           <div className="relative mt-9 overflow-hidden rounded-[26px] border border-white/15 bg-white/10 p-5 backdrop-blur-xl">
             <div className="relative flex items-center justify-between">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/75">Live service</p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-paper">Live service</p>
               <span className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-[10px] font-medium text-white">
                 <span aria-hidden="true" className="auth-live-dot size-1.5 rounded-full bg-[var(--auth-accent-bright)]" />
                 One order
@@ -49,15 +49,15 @@ export function LoginScreen({ error, notice, next }: { error?: string; notice?: 
                   <span aria-hidden="true" className={`size-1.5 shrink-0 rounded-full ${row.accent}`} />
                   <span className="min-w-0 flex-1">
                     <span className="block text-[12.5px] font-medium text-white">{row.place}</span>
-                    <span className="block text-[11px] text-white/80">{row.detail}</span>
+                    <span className="block text-[11px] text-paper">{row.detail}</span>
                   </span>
-                  <span className="shrink-0 text-[10.5px] font-medium text-[var(--auth-accent-bright)]">{row.state}</span>
+                  <span className="shrink-0 text-[10.5px] font-medium text-paper">{row.state}</span>
                   <span aria-hidden="true" className="text-[9px] tabular-nums tracking-[0.12em] text-white/35">{row.n}</span>
                 </li>
               ))}
             </ol>
 
-            <p className="relative mt-4 border-t border-white/10 pt-3.5 text-[11px] leading-relaxed text-white/80">
+            <p className="relative mt-4 border-t border-white/10 pt-3.5 text-[11px] leading-relaxed text-paper">
               Sending an order does not mark its bill as paid. Staff still check and record payment.
             </p>
           </div>

@@ -274,10 +274,19 @@ export function Dashboard({
                   and the kitchen board before; those two live in the rail, and
                   a masthead should answer a question, not offer a detour. */}
               <div className="flex items-baseline gap-2">
-                <span className="ov-display text-[1.6rem] leading-none font-semibold tracking-[-0.02em] text-gink tabular-nums">
+                {/* suppressHydrationWarning: the clock is read on the server and
+                    again in the browser, and a minute boundary between the two
+                    is a real difference, not a bug. */}
+                <span
+                  className="ov-display text-[1.6rem] leading-none font-semibold tracking-[-0.02em] text-gink tabular-nums"
+                  suppressHydrationWarning
+                >
                   {venueClock}
                 </span>
-                <span className="text-[11.5px] font-medium text-[var(--p-ink-46)]">
+                <span
+                  className="text-[11.5px] font-medium text-[var(--p-ink-46)]"
+                  suppressHydrationWarning
+                >
                   {venueDate} · restaurant time
                 </span>
               </div>
@@ -621,7 +630,7 @@ export function Dashboard({
         >
           <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 bg-[var(--p-card)] px-5 pt-4 pb-3">
             <h2 className="text-[13px] font-semibold tracking-[-0.01em] text-gink">Right now</h2>
-            <span className="text-[11.5px] text-gink-46 tabular-nums">
+            <span className="text-[11.5px] text-gink-46 tabular-nums" suppressHydrationWarning>
               as of {venueClock} · {venueDate}
             </span>
           </div>

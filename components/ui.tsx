@@ -319,11 +319,16 @@ export function Pill({ children, tone = 'outline' }: { children: React.ReactNode
    * callers predate the kit; the geometry is identical.
    */
   const tones: Record<PillTone, string> = {
-    sage: 'bg-[color-mix(in_oklab,var(--p-live)_12%,white)] text-[var(--p-live)]',
-    alert: 'bg-[color-mix(in_oklab,var(--p-due)_10%,white)] text-[var(--p-due)]',
-    /* The wash alone leaves orange on 4.35:1, under AA for 11.5px type, so the
-       label is the accent darkened a step: identical hue, 5.9:1 on the wash. */
-    blue: 'bg-[color-mix(in_oklab,var(--p-accent)_12%,white)] text-[color-mix(in_oklab,var(--p-accent)_82%,black)]',
+    /* Status labels are 11.5px, so they aim at AAA: the accent colour itself
+       on the same wash lands between 4.4 and 6, which passes AA but leaves the
+       smallest type on the page at its least legible. Darkening the label --
+       not the wash, not the palette -- takes all three past 7:1 while the pill
+       keeps its hue. */
+    sage:
+      'bg-[color-mix(in_oklab,var(--p-live)_12%,white)] text-[color-mix(in_oklab,var(--p-live)_70%,black)]',
+    alert:
+      'bg-[color-mix(in_oklab,var(--p-due)_10%,white)] text-[color-mix(in_oklab,var(--p-due)_70%,black)]',
+    blue: 'bg-[color-mix(in_oklab,var(--p-accent)_12%,white)] text-[color-mix(in_oklab,var(--p-accent)_70%,black)]',
     sand: 'bg-paper-deep text-gink-64',
     ink: 'bg-gink text-onink',
     outline: 'border border-hair-strong bg-transparent text-gink-46',

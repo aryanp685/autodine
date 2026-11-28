@@ -27,6 +27,7 @@ export const authButtonClass =
  */
 export function AuthShell({
   visual,
+  mobileAside,
   eyebrow,
   title,
   lede,
@@ -36,6 +37,13 @@ export function AuthShell({
   notesTitle = 'What this build actually does',
 }: {
   visual?: ReactNode;
+  /**
+   * The same welcome, folded for a phone. The forest panel is removed below
+   * `lg` rather than compressed, so anything a small screen still needs to
+   * read — the setup journey, the one price note — is passed here and drawn
+   * under the card.
+   */
+  mobileAside?: ReactNode;
   eyebrow: string;
   title: ReactNode;
   lede: ReactNode;
@@ -75,9 +83,12 @@ export function AuthShell({
         }`}
       >
         <div className="auth-rise mx-auto w-full max-w-[452px]">
+          {/* Opaque on purpose: the form must never depend on what sits behind
+              it for its contrast, and white paper on paper reads the same as
+              the 95% veil it replaces. */}
           <section
             data-auth-card
-            className="relative overflow-hidden rounded-[26px] border border-white/80 bg-[var(--p-card)]/95 px-5 py-7 shadow-[0_30px_70px_-44px_rgba(43,32,21,0.45)] backdrop-blur-xl sm:px-8 sm:py-9"
+            className="relative overflow-hidden rounded-[26px] border border-white/80 bg-[var(--p-card)] px-5 py-7 shadow-[0_30px_70px_-44px_rgba(43,32,21,0.45)] sm:px-8 sm:py-9"
           >
             <span
               aria-hidden="true"
@@ -96,6 +107,8 @@ export function AuthShell({
 
             <div className="pt-6">{children}</div>
           </section>
+
+          {mobileAside ? <div className="mt-6 lg:hidden">{mobileAside}</div> : null}
 
           {notes && notes.length > 0 ? (
             <aside data-auth-notes className="mt-7 px-1">

@@ -89,6 +89,15 @@ describe('sign up', () => {
     expect(html).toContain('Minimum 10 characters');
   });
 
+  it('carries the setup journey onto a phone, where the forest panel is gone', () => {
+    // The journey is drawn twice on purpose: once on the desktop panel and
+    // once in the paper block below the form, which is the only copy a
+    // 390px screen sees.
+    expect(html.match(/Prepare your table cards/g)?.length).toBe(2);
+    expect(html).toContain('Your first hour');
+    expect(html).toContain('Restaurant setup overview');
+  });
+
   it('does not pre-tick consent', () => {
     expect(html).toContain('name="agree"');
     expect(html.match(/<input[^>]*name="agree"[^>]*>/)?.[0]).toContain('required=""');

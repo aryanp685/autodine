@@ -6,12 +6,18 @@ import { signUpAction } from '@/app/auth/actions';
 import { TRIAL_DAYS } from '@/lib/trial';
 
 /** Signup creates a workspace and starts its 21-day trial, not a paid plan. */
+const SETUP_STEPS = [
+  { title: 'Create your workspace', body: 'Your restaurant, menu and owner account.', time: '1 min' },
+  { title: 'Build your menu', body: 'Add dishes, prices and the details guests need.', time: '10 min' },
+  { title: 'Prepare your table cards', body: 'Print or share a QR card for each table.', time: '5 min' },
+];
+
 export function SignupScreen({ error }: { error?: string }) {
   return (
     <AuthShell
       visual={
         <aside className="pt-2" aria-label="Restaurant setup overview">
-          <p className="flex items-center gap-2.5 text-[10.5px] font-semibold uppercase tracking-[0.18em] text-white/80">
+          <p className="flex items-center gap-2.5 text-[10.5px] font-semibold uppercase tracking-[0.18em] text-paper">
             <span aria-hidden="true" className="h-px w-6 bg-[var(--auth-accent-bright)]" />
             Make room for better service
           </p>
@@ -19,22 +25,18 @@ export function SignupScreen({ error }: { error?: string }) {
             Your restaurant.<br />
             A <em className="font-display font-normal italic text-[var(--auth-accent-bright)]">fresh</em> start.
           </h2>
-          <p className="mt-5 max-w-[35ch] text-[14.5px] leading-[1.7] text-white/80">
+          <p className="mt-5 max-w-[35ch] text-[14.5px] leading-[1.7] text-paper">
             Create your workspace, then make it yours. Add dishes and prepare your table cards
             before trying the ordering flow.
           </p>
 
           <div className="relative mt-9 overflow-hidden rounded-[26px] border border-white/15 bg-white/10 p-5 backdrop-blur-xl">
-            <p className="relative flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/75">
+            <p className="relative flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-paper">
               <span aria-hidden="true" className="size-1 rounded-full bg-[var(--auth-accent-bright)]" />
               Your first hour
             </p>
             <ol className="relative mt-3 space-y-2.5" aria-label="Your setup journey">
-              {[
-                { title: 'Create your workspace', body: 'Your restaurant, menu and owner account.', time: '1 min' },
-                { title: 'Build your menu', body: 'Add dishes, prices and the details guests need.', time: '10 min' },
-                { title: 'Prepare your table cards', body: 'Print or share a QR card for each table.', time: '5 min' },
-              ].map((step, index) => (
+              {SETUP_STEPS.map((step, index) => (
                 <li key={step.title} className="flex items-start gap-3.5 rounded-2xl border border-white/10 bg-white/10 p-3.5 transition-colors duration-300 hover:border-white/25 hover:bg-white/15">
                   <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-full bg-[var(--auth-accent-bright)]/15 font-display text-[12px] italic text-[var(--auth-accent-bright)]">
                     0{index + 1}
@@ -44,12 +46,12 @@ export function SignupScreen({ error }: { error?: string }) {
                       <span className="block text-[12.5px] font-medium text-white">{step.title}</span>
                       <span className="shrink-0 text-[10px] tabular-nums text-white/40">{step.time}</span>
                     </span>
-                    <span className="mt-0.5 block text-[11px] leading-relaxed text-white/80">{step.body}</span>
+                    <span className="mt-0.5 block text-[11px] leading-relaxed text-paper">{step.body}</span>
                   </span>
                 </li>
               ))}
             </ol>
-            <p className="relative mt-4 border-t border-white/10 pt-3.5 text-[11px] leading-relaxed text-white/80">
+            <p className="relative mt-4 border-t border-white/10 pt-3.5 text-[11px] leading-relaxed text-paper">
               Nothing is charged at signup. Your workspace starts with one restaurant and one menu.
             </p>
           </div>
@@ -59,6 +61,7 @@ export function SignupScreen({ error }: { error?: string }) {
           </Link>
         </aside>
       }
+      mobileAside={<SetupJourney />}
       notesTitle="Your workspace, clearly explained"
       eyebrow="Create an account"
       title={<>Start with your <span className="font-bold text-[var(--auth-accent-ink)]">restaurant</span></>}
@@ -183,5 +186,56 @@ export function SignupScreen({ error }: { error?: string }) {
         </p>
       </form>
     </AuthShell>
+  );
+}
+
+/**
+ * The forest panel's setup journey, folded for a phone.
+ *
+ * Below `lg` the shell removes the panel rather than compressing it, so the
+ * three steps a new owner is about to walk would otherwise be desktop-only.
+ * Same copy, same order, drawn on paper instead of dark glass.
+ */
+function SetupJourney() {
+  return (
+    <aside
+      aria-label="Restaurant setup overview"
+      className="rounded-2xl border border-hair bg-[var(--p-card)]/90 p-4"
+    >
+      <p className="flex items-center gap-2 text-[10.5px] font-semibold tracking-[0.16em] text-[var(--auth-accent-ink)] uppercase">
+        <span aria-hidden="true" className="size-1 rounded-full bg-[var(--auth-accent)]" />
+        Your first hour
+      </p>
+      <p className="mt-2 text-[11.5px] leading-relaxed text-gink-64">
+        Create your workspace, then make it yours. Add dishes and prepare your table cards before
+        trying the ordering flow.
+      </p>
+      <ol className="mt-3 space-y-2" aria-label="Your setup journey">
+        {SETUP_STEPS.map((step, index) => (
+          <li key={step.title} className="flex items-start gap-3">
+            <span
+              aria-hidden="true"
+              className="grid size-7 shrink-0 place-items-center rounded-full bg-[color-mix(in_oklab,var(--auth-accent)_14%,white)] font-display text-[11.5px] italic text-[var(--auth-accent-ink)]"
+            >
+              0{index + 1}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="flex items-baseline justify-between gap-3">
+                <span className="block text-[12.5px] font-medium text-[var(--auth-heading)]">
+                  {step.title}
+                </span>
+                <span className="shrink-0 text-[10px] tabular-nums text-gink-46">{step.time}</span>
+              </span>
+              <span className="mt-0.5 block text-[11px] leading-relaxed text-gink-64">
+                {step.body}
+              </span>
+            </span>
+          </li>
+        ))}
+      </ol>
+      <p className="mt-3 border-t border-hair pt-2.5 text-[11px] leading-relaxed text-gink-64">
+        Nothing is charged at signup. Your workspace starts with one restaurant and one menu.
+      </p>
+    </aside>
   );
 }
