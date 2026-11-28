@@ -109,11 +109,20 @@ export function SubscriptionScreen({
   outlet: OutletBar | null;
 }) {
   const [flash, setFlash] = useState<SubscriptionActionResult | null>(null);
+  // Cancellation is the one action on this screen that changes the bill, so it
+  // is asked once -- in place, with the date and what stays -- instead of
+  // firing on the first press of a ghost button (components/screens/
+  // SubscriptionScreen.cancel.test.tsx holds this).
+  const [confirmingCancel, setConfirmingCancel] = useState(false);
   const state = data.state;
   // The subscription routes admit owners and managers. Plan changes, cancellation
   // and payment retries are owner-only; each Server Action repeats that check,
   // and the cancellation RPC independently enforces it in the database.
   const isOwner = data.role === 'owner';
+  // The day access would end if the owner cancelled now: the end of the paid
+  // period for a plan, the last day of the trial for a trial.
+  const cancelEndsAt =
+    state?.period.expiresAt ?? (state?.plan === 'trial' ? state.trial.endsAt : null);
 
   async function run(action: () => Promise<SubscriptionActionResult>) {
     setFlash(null);
@@ -406,12 +415,52 @@ export function SubscriptionScreen({
               </SubmitButton>
             ) : null}
           </div>
+        ) : state?.expired || state?.readOnly ? (
+          <p className="mt-4 text-[13px] leading-[1.6]">
+            Nothing is running on this account, so there is nothing to cancel. Choose a plan above
+            to start again.
+          </p>
+        ) : confirmingCancel ? (
+          <div
+            className="mt-4 rounded-[12px] border border-hair-strong bg-accent-soft/60 p-4"
+            role="group"
+            aria-label="Confirm cancellation"
+          >
+            <p className="text-[13.5px] font-medium">
+              End the subscription on {when(cancelEndsAt)}?
+            </p>
+            <ul className="mt-2 space-y-1 text-[12.5px] leading-[1.6] text-gink-64">
+              <li>No further charges after that date.</li>
+              <li>Every outlet becomes read-only; every order, menu and table stays readable.</li>
+              <li>Nothing is deleted. Choosing a plan again switches writing back on.</li>
+            </ul>
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <SubmitButton
+                className={btn('danger', 'sm')}
+                pendingLabel="Requesting…"
+                onClick={() => {
+                  setConfirmingCancel(false);
+                  void run(requestCancellationAction);
+                }}
+              >
+                Yes, end it on {when(cancelEndsAt)}
+              </SubmitButton>
+              <SubmitButton
+                className={btn('solid', 'sm')}
+                pendingLabel="Keeping…"
+                onClick={() => setConfirmingCancel(false)}
+              >
+                Keep my subscription
+              </SubmitButton>
+            </div>
+          </div>
         ) : (
           <div className="mt-4">
             <SubmitButton
               className={btn('ghost', 'sm')}
-              pendingLabel="Requesting…"
-              onClick={() => run(requestCancellationAction)}
+              pendingLabel="Opening…"
+              aria-expanded={confirmingCancel}
+              onClick={() => setConfirmingCancel(true)}
             >
               Request cancellation
             </SubmitButton>

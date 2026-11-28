@@ -843,6 +843,110 @@ describe.skipIf(!URL_VALUE)('Model C subscription and billing', () => {
       expect(after.plan_status).toBe('active');
       expect(after.cancel_requested_at).toBeNull();
     });
+
+    it('never locks a trial out on the day it is cancelled', async () => {
+      // A trial cancelled to stop the paid plan from starting: the 21 days were
+      // granted, so they still run. Before this was pinned, cancelling a trial
+      // made the account read-only on the spot.
+      const a = await newAccount();
+      await db.query(
+        "update accounts set plan='trial', plan_status='trialing', plan_expires_at=null, trial_started_at=now()-interval '3 days', trial_ends_at=now()+interval '18 days' where id=$1",
+        [a.account],
+      );
+      await db.query(
+        "update restaurants set plan='trial', plan_status='trialing', plan_expires_at=null, trial_started_at=now()-interval '3 days' where id=$1",
+        [a.restaurant],
+      );
+
+      await committed(a.owner, async () => db.query('select request_subscription_cancellation($1)', [a.restaurant]));
+
+      const after = (await db.query(
+        'select plan_status, cancel_effective_at, plan_expires_at, account_can_write(id) can from accounts where id=$1',
+        [a.account],
+      )).rows[0];
+      expect(after.plan_status).toBe('cancel_requested');
+      expect(after.plan_expires_at).toBeNull();
+      expect(after.can).toBe(true);
+
+      // And the read model agrees: still inside the trial, so not ended.
+      const state = await staff(a.owner, async () => (await db.query('select account_subscription_state($1) s', [a.restaurant])).rows[0].s);
+      expect(state.status).toBe('cancel_requested');
+      expect(state.expired).toBe(false);
+      expect(state.canWrite).toBe(true);
+      expect(state.trial.running).toBe(false);
+
+      // When the trial does end, the sweep ends access as usual.
+      await db.query("update accounts set trial_ends_at = now() - interval '1 minute' where id=$1", [a.account]);
+      await db.query('select expire_subscriptions()');
+      expect((await db.query('select plan_status, account_can_write(id) can from accounts where id=$1', [a.account])).rows[0])
+        .toMatchObject({ plan_status: 'expired', can: false });
+      expect((await db.query('select count(*)::int n from restaurants where account_id=$1', [a.account])).rows[0].n).toBe(1);
+    });
+
+    it('is idempotent: a second request returns the same date and writes nothing', async () => {
+      const a = await newAccount();
+      await payFor(a.name, 'starter');
+
+      const first = await committed(a.owner, async () => (await db.query('select request_subscription_cancellation($1) r', [a.restaurant])).rows[0].r);
+      expect(first.status).toBe('requested');
+      const stamped = (await db.query('select cancel_requested_at, cancel_effective_at from accounts where id=$1', [a.account])).rows[0];
+
+      await new Promise((resolve) => setTimeout(resolve, 15));
+      const second = await committed(a.owner, async () => (await db.query('select request_subscription_cancellation($1) r', [a.restaurant])).rows[0].r);
+      expect(second.status).toBe('already_requested');
+      expect(new Date(second.effective_at).getTime()).toBe(new Date(first.effective_at).getTime());
+
+      const after = (await db.query('select cancel_requested_at, cancel_effective_at from accounts where id=$1', [a.account])).rows[0];
+      expect(new Date(after.cancel_requested_at).getTime()).toBe(new Date(stamped.cancel_requested_at).getTime());
+      expect(new Date(after.cancel_effective_at).getTime()).toBe(new Date(stamped.cancel_effective_at).getTime());
+      expect((await db.query(
+        "select count(*)::int n from subscription_events where account_id=$1 and kind='cancellation_requested'",
+        [a.account],
+      )).rows[0].n).toBe(1);
+    });
+
+    it('refuses an account with nothing running, and records no cancellation dated in the past', async () => {
+      const a = await newAccount();
+      await db.query("update accounts set plan='starter', plan_status='active', plan_expires_at=now()-interval '2 days' where id=$1", [a.account]);
+      await db.query('select expire_subscriptions()');
+
+      await expect(committed(a.owner, () => db.query('select request_subscription_cancellation($1)', [a.restaurant])))
+        .rejects.toMatchObject({ message: expect.stringContaining('nothing_to_cancel') });
+
+      const after = (await db.query('select plan_status, cancel_requested_at from accounts where id=$1', [a.account])).rows[0];
+      expect(after).toMatchObject({ plan_status: 'expired', cancel_requested_at: null });
+      expect((await db.query(
+        "select count(*)::int n from subscription_events where account_id=$1 and kind='cancellation_requested'",
+        [a.account],
+      )).rows[0].n).toBe(0);
+    });
+
+    it('reads a period whose last day has passed as ended, sweep or no sweep', async () => {
+      // The daily expiry job keeps the record honest; the read model never
+      // waits for it. This account's sweep has not run yet.
+      const a = await newAccount();
+      await payFor(a.name, 'starter');
+      await db.query("update accounts set plan_expires_at = now() - interval '1 hour' where id=$1", [a.account]);
+
+      const state = await staff(a.owner, async () => (await db.query('select account_subscription_state($1) s', [a.restaurant])).rows[0].s);
+      expect(state.status).toBe('active');
+      expect(state.canWrite).toBe(false);
+      expect(state.readOnly).toBe(true);
+      expect(state.expired).toBe(true);
+    });
+
+    it('reads as running, not ended, between a confirmed cancellation and its effective date', async () => {
+      const a = await newAccount();
+      await payFor(a.name, 'professional');
+      await committed(a.owner, async () => db.query('select request_subscription_cancellation($1)', [a.restaurant]));
+      await db.query('select confirm_subscription_cancellation($1,$2,$3)', [a.name, 'test-provider', randomUUID()]);
+
+      const state = await staff(a.owner, async () => (await db.query('select account_subscription_state($1) s', [a.restaurant])).rows[0].s);
+      expect(state.status).toBe('cancelled');
+      expect(state.expired).toBe(false);
+      expect(state.canWrite).toBe(true);
+      expect(state.cancellation.confirmed).toBe(true);
+    });
   });
 
   // ─────────────────────────────────────────────────────────────────────────

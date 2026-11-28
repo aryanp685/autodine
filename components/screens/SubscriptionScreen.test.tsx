@@ -204,6 +204,60 @@ describe('when a payment has failed', () => {
   });
 });
 
+describe('when the subscription is stopping', () => {
+  it('stops offering the cancellation once the subscription has ended', () => {
+    const html = renderToStaticMarkup(
+      <SubscriptionScreen
+        data={data({
+          state: {
+            ...data().state!,
+            plan: 'starter',
+            planLabel: 'Starter',
+            status: 'expired',
+            trial: { startedAt: null, endsAt: null, daysRemaining: 0, running: false },
+            period: { startedAt: '2026-10-01T00:00:00Z', expiresAt: '2026-11-01T00:00:00Z', endsAt: '2026-11-01T00:00:00Z' },
+            canWrite: false,
+            readOnly: true,
+            expired: true,
+          },
+        })}
+        outlet={null}
+      />,
+    );
+    // Nothing is running, so there is nothing to cancel: the database would
+    // refuse it, and the screen does not offer what it cannot do.
+    expect(html).not.toContain('Request cancellation');
+    expect(html).toContain('Nothing is running on this account, so there is nothing to cancel.');
+  });
+
+  it('reads a confirmed cancellation inside the paid period as running, not ended', () => {
+    const html = renderToStaticMarkup(
+      <SubscriptionScreen
+        data={data({
+          state: {
+            ...data().state!,
+            plan: 'professional',
+            planLabel: 'Professional',
+            status: 'cancelled',
+            pricePaise: 199900,
+            trial: { startedAt: null, endsAt: null, daysRemaining: 0, running: false },
+            period: { startedAt: '2026-11-01T00:00:00Z', expiresAt: '2026-12-01T00:00:00Z', endsAt: '2026-12-01T00:00:00Z' },
+            cancellation: { requestedAt: '2026-11-10T00:00:00Z', effectiveAt: '2026-12-01T00:00:00Z', confirmed: true },
+            canWrite: true,
+            readOnly: false,
+            expired: false,
+          },
+        })}
+        outlet={null}
+      />,
+    );
+    expect(html).toContain('Cancelled');
+    expect(html).not.toContain('Subscription ended');
+    // A confirmed cancellation cannot be withdrawn -- the provider ended it.
+    expect(html).not.toContain('Keep my subscription</button>');
+  });
+});
+
 describe('a receipt', () => {
   // The disclaimer lives on the receipt page itself; what is asserted here is
   // that the one constant exists and names the difference.

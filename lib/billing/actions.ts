@@ -142,9 +142,13 @@ export async function withdrawCancellationAction(): Promise<SubscriptionActionRe
 /**
  * Ask for the subscription to stop at the end of the period.
  *
- * The owner is not asked to confirm twice, but they are told exactly what they
- * keep: every outlet, every order, every menu — readable, nothing deleted —
- * until the end of the period already paid for.
+ * The screen asks once, in a confirm step that names the date, and this action
+ * is idempotent behind it: a second press returns the date already recorded
+ * and writes nothing, so a double tap cannot move the date or file a second
+ * request. An account with nothing running (expired, or a period that already
+ * ended) is refused with its own sentence instead of a cancellation dated in
+ * the past. Whatever the state, the owner keeps every outlet, every order and
+ * every menu -- readable, nothing deleted -- until the day already paid for.
  */
 export async function requestCancellationAction(): Promise<SubscriptionActionResult> {
   const context = await getStaffContextDetailed();
@@ -160,13 +164,33 @@ export async function requestCancellationAction(): Promise<SubscriptionActionRes
   });
 
   if (error) {
+    // Each refusal the database can give gets its own sentence, so the owner
+    // learns what is actually true rather than "something went wrong".
+    const reason = error.message ?? '';
+    if (reason.includes('nothing_to_cancel')) {
+      return {
+        ok: false,
+        message:
+          'This subscription has already ended, so there is nothing left to cancel. Choose a plan to start again.',
+      };
+    }
     // The function refuses a caller who is not an owner of this restaurant, so
     // a kitchen login pressing this gets the same sentence as a stranger.
     return { ok: false, message: 'Only an owner of this account can cancel the subscription.' };
   }
 
-  const effectiveAt = (data as { effective_at?: string } | null)?.effective_at;
+  const result = data as { effective_at?: string; status?: string } | null;
+  const effectiveAt = result?.effective_at;
   revalidatePath('/dashboard/subscription', 'layout');
+
+  if (result?.status === 'already_requested') {
+    return {
+      ok: true,
+      message: effectiveAt
+        ? `This subscription is already set to end on ${new Date(effectiveAt).toLocaleDateString('en-IN', { dateStyle: 'long' })}. Nothing else to do.`
+        : 'This subscription is already set to end at the close of its period. Nothing else to do.',
+    };
+  }
 
   return {
     ok: true,

@@ -85,3 +85,41 @@ describe('subscription Server Action authorization', () => {
     );
   });
 });
+
+describe('requesting a cancellation', () => {
+  it('turns each database refusal into a sentence the owner can act on', async () => {
+    const staff = signedIn('owner');
+    mocks.staffResult = staff.value;
+
+    staff.rpc.mockResolvedValueOnce({ data: null, error: { message: 'nothing_to_cancel' } });
+    expect(await requestCancellationAction()).toEqual({
+      ok: false,
+      message:
+        'This subscription has already ended, so there is nothing left to cancel. Choose a plan to start again.',
+    });
+
+    staff.rpc.mockResolvedValueOnce({ data: null, error: { message: 'not_found' } });
+    expect(await requestCancellationAction()).toEqual({
+      ok: false,
+      message: 'Only an owner of this account can cancel the subscription.',
+    });
+  });
+
+  it('answers a repeated request with the date already recorded instead of a second one', async () => {
+    const staff = signedIn('owner');
+    mocks.staffResult = staff.value;
+
+    staff.rpc
+      .mockResolvedValueOnce({ data: { status: 'requested', effective_at: '2026-12-01T12:00:00Z' }, error: null })
+      .mockResolvedValueOnce({ data: { status: 'already_requested', effective_at: '2026-12-01T12:00:00Z' }, error: null });
+
+    const first = await requestCancellationAction();
+    const second = await requestCancellationAction();
+
+    expect(first).toMatchObject({ ok: true, message: 'Cancellation requested. Every outlet and every row of data stays readable until 1 December 2026.' });
+    expect(second).toMatchObject({
+      ok: true,
+      message: 'This subscription is already set to end on 1 December 2026. Nothing else to do.',
+    });
+  });
+});
