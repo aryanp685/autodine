@@ -11,6 +11,13 @@ describe('buildCsp', () => {
     expect(csp).not.toContain('unsafe-eval');
   });
 
+  it('opens eval only for a development server, never for a built one', () => {
+    expect(csp).not.toContain('unsafe-eval');
+    const dev = buildCsp({ nonce: 'n', dev: true });
+    expect(dev).toContain("script-src 'self' 'nonce-n' 'unsafe-eval'");
+    expect(dev).not.toMatch(/script-src[^;]*unsafe-inline/);
+  });
+
   it('closes the classic holes', () => {
     expect(csp).toContain("object-src 'none'");
     expect(csp).toContain("base-uri 'self'");

@@ -504,3 +504,51 @@ describe('Dashboard active table sessions', () => {
     expect(html).toContain('/bill/ord-late-1');
   });
 });
+
+describe('Dashboard kitchen pipeline', () => {
+  it('counts every ticket into one stage, and the four stages add up to the day', () => {
+    const html = renderToStaticMarkup(
+      <Dashboard
+        data={live({
+          orders: [
+            { id: 'o1', code: 'MA-1', table: 'T1', placedAt: '2026-10-21T10:00:00Z', paymentStatus: 'pending', prepStatus: 'new', totalPaise: 1000 },
+            { id: 'o2', code: 'MA-2', table: 'T2', placedAt: '2026-10-21T10:05:00Z', paymentStatus: 'paid', prepStatus: 'preparing', totalPaise: 2000 },
+            { id: 'o3', code: 'MA-3', table: 'T3', placedAt: '2026-10-21T10:10:00Z', paymentStatus: 'paid', prepStatus: 'ready', totalPaise: 3000 },
+            { id: 'o4', code: 'MA-4', table: 'T4', placedAt: '2026-10-21T10:15:00Z', paymentStatus: 'paid', prepStatus: 'served', totalPaise: 4000 },
+          ],
+        })}
+      />,
+    );
+    expect(html).toContain('Kitchen pipeline');
+    expect(html).toContain('3 tickets still open');
+    // Every stage is drawn once per ticket that sits in it, and the legend
+    // carries the same number the bar's width is built from.
+    for (const stage of ['new', 'preparing', 'ready', 'served']) {
+      expect(html, `${stage} segment`).toContain(`data-stage="${stage}"`);
+    }
+    expect(html).toContain('Served');
+    expect(html).toContain('>1</span>');
+  });
+
+  it('stays off a day with no tickets, because an empty bar is not a quiet day', () => {
+    const html = renderToStaticMarkup(<Dashboard data={live({ orders: [] })} />);
+    expect(html).not.toContain('Kitchen pipeline');
+  });
+
+  it('draws the demo band from the same five rows the demo table lists', () => {
+    const html = renderToStaticMarkup(<Dashboard data={null} />);
+    expect(html).toContain('Kitchen pipeline');
+    // The sample rows are New, Preparing, Ready, Served, Ready: four still
+    // open, five tickets in all.
+    expect(html).toContain('4 tickets still open');
+    // Ready holds two of the five; the legend carries that number.
+    expect(html).toContain('>2</span>');
+  });
+
+  it('does not present a counter-due bill as paid in the demo ledger', () => {
+    const html = renderToStaticMarkup(<Dashboard data={null} />);
+    // PaymentPill labels the pending state "Counter due"; the two unpaid
+    // sample rows must carry it instead of the sage "Paid" pill.
+    expect(html.match(/Counter due<\/span>/g)).toHaveLength(2);
+  });
+});

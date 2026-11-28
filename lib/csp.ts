@@ -34,6 +34,13 @@ export type CspInput = {
   nonce: string;
   /** NEXT_PUBLIC_SUPABASE_URL; empty in demo mode. */
   supabaseUrl?: string | null;
+  /**
+   * True only for a development server. React's dev build calls eval() to
+   * rebuild call stacks and refuses to hydrate without it, so a production
+   * policy applied to `next dev` leaves every page inert. Production never
+   * sets this, and the test suite asserts as much.
+   */
+  dev?: boolean;
 };
 
 /** Only an https origin survives; anything else is simply left out. */
@@ -48,10 +55,13 @@ function httpsOrigin(value: string | null | undefined): string | null {
   }
 }
 
-export function buildCsp({ nonce, supabaseUrl }: CspInput): string {
+export function buildCsp({ nonce, supabaseUrl, dev = false }: CspInput): string {
   const supabase = httpsOrigin(supabaseUrl);
 
   const scriptSrc = ["'self'", `'nonce-${nonce}'`];
+  // React's development build eval()s to reconstruct call stacks; without it
+  // the app never hydrates. Production keeps the strict policy.
+  if (dev) scriptSrc.push("'unsafe-eval'");
   // Allow loopback origins for the optional local AutoDine Print Bridge
   // (127.0.0.1 / localhost only — never arbitrary LAN or remote http://).
   const connectSrc = [

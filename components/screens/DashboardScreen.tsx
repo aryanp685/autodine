@@ -54,6 +54,13 @@ function prepState(status: string): 'new' | 'preparing' | 'ready' | 'served' {
   return 'new';
 }
 
+/* The sample rows spell payment out. "Counter due" is money still owed, so it
+   must not read as paid -- not in the table, and not in the pipeline's count
+   of settled bills. */
+function demoPaymentState(payment: string): 'paid' | 'pending' | 'failed' {
+  return payment === 'Counter due' ? 'pending' : paymentState(payment);
+}
+
 /* ============================================================================
    Editorial Minimal — locked design system dashboard
    Slim left rail, big numerals, hairlines, lots of air.
@@ -157,7 +164,57 @@ export function Dashboard({
   const hasPeak = (hourly[peakIndex] ?? 0) > 0;
 
   const orders = live ? (data?.orders ?? []) : [];
+
+  /*
+   * The pipeline reads the same rows the table below lists, sample ones
+   * included, so the band and the ledger cannot disagree. The demo rows spell
+   * payment out ("Paid at counter", "Counter due"), so they are reduced to the
+   * two statuses the surface understands.
+   */
+  const pipelineRows = live
+    ? orders.map((order) => ({
+        prepStatus: order.prepStatus,
+        paymentStatus: order.paymentStatus,
+      }))
+    : recentOrders.map((order) => ({
+        prepStatus: order.state.toLowerCase(),
+        paymentStatus: demoPaymentState(order.payment),
+      }));
   const openCount = live && stats ? stats.openOrders : 5;
+
+  /*
+   * The kitchen queue in stage order. "Needs attention" says something is
+   * late; this says where the queue actually is, which is the question a host
+   * is asked when a table wants to know how long the food will take. Served is
+   * kept in the strip so the four stages always add up to the day's tickets --
+   * a pipeline that quietly drops finished work is a chart that lies.
+   */
+  const stageOrder = [
+    { key: 'new' as const, label: 'New' },
+    { key: 'preparing' as const, label: 'Preparing' },
+    { key: 'ready' as const, label: 'Ready' },
+    { key: 'served' as const, label: 'Served' },
+  ];
+  const stageCounts = pipelineRows.reduce(
+    (acc, order) => {
+      acc[prepState(order.prepStatus)] += 1;
+      return acc;
+    },
+    { new: 0, preparing: 0, ready: 0, served: 0 },
+  );
+  const stageTotal = pipelineRows.length;
+  const waitingOnKitchen = stageCounts.new + stageCounts.preparing + stageCounts.ready;
+
+  /* The two facts that turn a running total into a rate: how many bills it
+     took, and what an hour of trading has been worth. Both come from the same
+     rows as the figure above, so they cannot disagree with it. */
+  const settledBills = pipelineRows.filter(
+    (order) => paymentState(order.paymentStatus) === 'paid',
+  ).length;
+  const revenuePerHour =
+    chartable && hourly.length > 0 && stats
+      ? Math.round(stats.revenueTodayPaise / hourly.length)
+      : null;
 
   /*
    * Four things an owner checks between seatings, in the order they act on
@@ -190,7 +247,14 @@ export function Dashboard({
         Everything under it keeps the kit's own type.
       */}
       <header className="mb-6 sm:mb-7">
-        <div className="rounded-[var(--p-r-card)] border border-[var(--p-line-soft)] bg-[var(--p-card)] px-5 py-6 shadow-[var(--p-shadow-1)] sm:px-7 sm:py-7">
+        <div className="relative overflow-hidden rounded-[var(--p-r-card)] border border-[var(--p-line-soft)] bg-[var(--p-card)] px-5 py-6 shadow-[var(--p-shadow-1)] sm:px-7 sm:py-7">
+          {/* The card opens with a short warm rule: the one piece of the
+              landing page's paper-and-ember language that survives a dense
+              screen without adding a second accent. */}
+          <span
+            aria-hidden="true"
+            className="absolute inset-x-0 top-0 h-[2px] bg-[linear-gradient(90deg,var(--p-accent),color-mix(in_oklab,var(--p-accent)_35%,transparent)_38%,transparent)]"
+          />
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div className="min-w-0">
               <p className="text-[10.5px] font-semibold tracking-[0.2em] text-[var(--p-ink-46)] uppercase">
@@ -388,6 +452,30 @@ export function Dashboard({
               <p className="mt-3 max-w-[32ch] text-[12.5px] leading-[1.5] text-gink-64">
                 {leadStat.meta}
               </p>
+              {/* The total is a fact; these are the readings that make it a
+                  rate. Same rows, same money, divided -- so they can never
+                  contradict the figure above them. */}
+              {live ? (
+                <dl className="mt-4 flex flex-wrap items-stretch gap-x-5 gap-y-2 border-t border-[var(--p-line-soft)] pt-3">
+                  <div className="flex min-w-0 flex-col gap-0.5">
+                    <dt className="text-[10.5px] font-medium tracking-[0.06em] text-gink-46 uppercase">
+                      Bills settled
+                    </dt>
+                    <dd className="text-[13.5px] font-semibold text-gink tabular-nums">
+                      {settledBills} of {stats ? stats.ordersToday : 0}
+                    </dd>
+                  </div>
+                  <span aria-hidden="true" className="w-px self-stretch bg-[var(--p-line-soft)]" />
+                  <div className="flex min-w-0 flex-col gap-0.5">
+                    <dt className="text-[10.5px] font-medium tracking-[0.06em] text-gink-46 uppercase">
+                      Per trading hour
+                    </dt>
+                    <dd className="text-[13.5px] font-semibold text-gink tabular-nums">
+                      {revenuePerHour === null ? '—' : <Money value={revenuePerHour} />}
+                    </dd>
+                  </div>
+                </dl>
+              ) : null}
             </div>
 
             {/* the shape of the day, under the figure across the card */}
@@ -419,6 +507,14 @@ export function Dashboard({
                           about precision the buckets do not have. */}
                       <div className="mt-1.5 flex items-baseline justify-between gap-3">
                         <span className="text-[10.5px] text-gink-46 tabular-nums">{hourLabel(0)}</span>
+                        {hourly.length > 2 ? (
+                          <span
+                            aria-hidden="true"
+                            className="text-[10.5px] text-gink-46/80 tabular-nums"
+                          >
+                            {hourLabel(Math.round((hourly.length - 1) / 2))}
+                          </span>
+                        ) : null}
                         <span className="text-[10.5px] text-gink-46 tabular-nums">
                           {hourLabel(hourly.length - 1)}
                         </span>
@@ -480,11 +576,26 @@ export function Dashboard({
             const tint = tinted
               ? 'bg-[color-mix(in_oklab,var(--p-accent-soft)_62%,var(--p-card))]'
               : 'bg-[var(--p-card)]';
+            /* One hair of colour per tile, and each reading its own: the queue
+               is accent, money is the settled green, the count is amber. It is
+               the only colour an untinted tile carries, so the band reads as a
+               series of readings rather than three white boxes. */
+            const rule =
+              card.label === 'Open orders'
+                ? 'var(--p-accent)'
+                : card.label === 'Average ticket'
+                  ? 'var(--p-stage-ready)'
+                  : 'var(--p-stage-new)';
             return (
               <div
                 key={card.label}
                 className={`flex flex-1 flex-col justify-center rounded-[var(--p-r-card)] border border-[var(--p-line-soft)] px-5 py-4 shadow-[var(--p-shadow-1)] sm:px-6 ${tint}`}
               >
+                <span
+                  aria-hidden="true"
+                  className="mb-3 block h-[3px] w-7 rounded-full"
+                  style={{ backgroundColor: rule }}
+                />
                 <p className="text-[11.5px] font-medium text-gink-64">{card.label}</p>
                 <span className="mt-1 text-[clamp(1.55rem,2.3vw,1.9rem)] leading-none font-semibold tracking-[-0.03em] text-gink tabular-nums">
                   {card.value}
@@ -552,6 +663,68 @@ export function Dashboard({
               small
             />
           </div>
+        </section>
+      ) : null}
+
+      {/* -------------------------------------------------- kitchen pipeline
+          Four stages, one bar. The band answers "how far behind is the food"
+          before any list is read: the width of each stage is its share of
+          today's tickets, so a kitchen stuck in "preparing" looks stuck. It is
+          hidden on a day with no tickets -- an empty bar would read as a
+          failed load, not as a quiet day. */}
+      {!blocked && stageTotal > 0 ? (
+        <section
+          aria-label="Kitchen pipeline"
+          className="mt-4 rounded-[var(--p-r-card)] border border-[var(--p-line-soft)] bg-[var(--p-card)] px-5 py-4 shadow-[var(--p-shadow-1)]"
+        >
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <h2 className="text-[13px] font-semibold tracking-[-0.01em] text-gink">
+              Kitchen pipeline
+            </h2>
+            <p className="text-[11.5px] text-gink-46 tabular-nums">
+              {waitingOnKitchen === 0
+                ? 'Nothing waiting · every ticket served'
+                : `${waitingOnKitchen} ticket${waitingOnKitchen === 1 ? '' : 's'} still open`}
+              {' · '}
+              {stageTotal} today
+            </p>
+          </div>
+          <div
+            aria-hidden="true"
+            className="mt-3 flex h-2 items-stretch gap-[3px] overflow-hidden rounded-full bg-[var(--p-line-soft)]"
+          >
+            {stageOrder.map((stage) => (
+              <span
+                key={stage.key}
+                data-stage={stage.key}
+                className="ov-stage-first h-full rounded-full transition-[flex-grow] duration-[420ms] ease-[var(--o-ease)] motion-reduce:transition-none"
+                style={{
+                  flexGrow: stageCounts[stage.key],
+                  flexBasis: 0,
+                  backgroundColor: `var(--p-stage-${stage.key})`,
+                  opacity: stageCounts[stage.key] === 0 ? 0 : 1,
+                }}
+              />
+            ))}
+          </div>
+          <ul className="mt-2.5 flex flex-wrap gap-x-5 gap-y-1.5">
+            {stageOrder.map((stage) => (
+              <li
+                key={stage.key}
+                className="flex items-center gap-1.5 text-[11.5px] text-gink-64"
+              >
+                <span
+                  aria-hidden="true"
+                  className="size-1.5 shrink-0 rounded-full"
+                  style={{ backgroundColor: `var(--p-stage-${stage.key})` }}
+                />
+                {stage.label}
+                <span className="font-semibold text-gink tabular-nums">
+                  {stageCounts[stage.key]}
+                </span>
+              </li>
+            ))}
+          </ul>
         </section>
       ) : null}
 
@@ -799,7 +972,7 @@ export function Dashboard({
                 code: o.id,
                 table: o.table,
                 placed: o.at,
-                payment: paymentState(o.payment),
+                payment: demoPaymentState(o.payment),
                 prep: prepState(o.state.toLowerCase()),
                 totalPaise: rupeesToPaise(o.total),
               }))}

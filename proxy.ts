@@ -28,7 +28,11 @@ export async function proxy(request: NextRequest) {
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
   const requestId = crypto.randomUUID();
   request.headers.set('x-request-id', requestId);
-  const csp = buildCsp({ nonce, supabaseUrl: SUPABASE_URL });
+  const csp = buildCsp({
+    nonce,
+    supabaseUrl: SUPABASE_URL,
+    dev: process.env.NODE_ENV !== 'production',
+  });
   request.headers.set('x-nonce', nonce);
   request.headers.set('Content-Security-Policy', csp);
 

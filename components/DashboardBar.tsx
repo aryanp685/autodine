@@ -144,6 +144,7 @@ export function DashboardBar({
   const role = outlet?.outlets.find((entry) => entry.id === outlet.activeId)?.role ?? null;
   const operatingMode = outlet?.operatingMode ?? 'mode_b';
   const groups = groupsForRole(role, operatingMode);
+  const hasOrders = groups.some((group) => group.links.some((link) => link.key === 'orders'));
 
   const activeLink = DASHBOARD_LINKS.find((link) => link.key === activeSection);
   const activeOutlet =
@@ -216,11 +217,12 @@ export function DashboardBar({
           <Link
             href="/"
             aria-label="AutoDine"
-            className="group inline-flex rounded-[10px] px-1 py-1"
+            className="group inline-flex items-center rounded-[12px] border border-rail-line bg-[var(--p-rail-raised)] px-2.5 py-1.5 shadow-[0_1px_2px_rgba(43,32,21,0.06)] transition-[box-shadow,transform] duration-150 ease-[var(--o-ease)] hover:-translate-y-px hover:shadow-[0_3px_10px_rgba(43,32,21,0.10)]"
           >
-            {/* On the sand column the lockup sits straight on the rail, the way
-                the reference dashboard mounts it -- no chip behind it. */}
-            <BrandLockup height={26} />
+            {/* The lockup sits on a raised porcelain chip rather than straight
+                on the sand: it is a warm brown drawing, and on the sand column
+                it was reading as part of the background. */}
+            <BrandLockup height={24} />
           </Link>
 
           <button
@@ -245,7 +247,7 @@ export function DashboardBar({
           </div>
         )}
 
-        <nav aria-label="Restaurant" className="flex-1 overflow-y-auto px-3 py-3">
+        <nav aria-label="Restaurant" className="flex-1 overflow-y-auto px-3 py-3.5">
           {groups.map((group) => (
             <div key={group.name} className="mb-4 last:mb-0">
               <div className="flex items-center gap-2 px-3 pt-2 pb-2">
@@ -278,8 +280,8 @@ export function DashboardBar({
                     onClick={() => setOpen(false)}
                     data-rail-row="true"
                     className={[
-                      'group relative mb-0.5 flex items-center gap-2.5 rounded-[var(--p-r-control)] px-3 py-[9px] text-[13px]',
-                      'transition-[background-color,color,box-shadow] duration-150 ease-[var(--o-ease)]',
+                      'group relative mb-[3px] flex items-center gap-3 rounded-[var(--p-r-control)] px-3 py-2.5 text-[13px]',
+                      'transition-[background-color,color,box-shadow,transform] duration-150 ease-[var(--o-ease)] hover:translate-x-[1px] motion-reduce:hover:translate-x-0',
                       current
                         ? 'bg-[var(--p-rail-active)] font-semibold text-[var(--p-rail-active-ink)] shadow-[0_1px_2px_rgba(43,32,21,0.16)]'
                         : 'text-rail-ink-64 hover:bg-[var(--p-rail-hover)] hover:text-rail-ink',
@@ -314,14 +316,14 @@ export function DashboardBar({
             white card on the sand, with a hairline. */}
         <div className="border-t border-rail-line p-2.5">
           <div className="rounded-[var(--p-r-block)] border border-rail-line bg-[var(--p-rail-raised)] p-2">
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-2.5 rounded-[10px] p-1">
               <span
                 aria-hidden="true"
                 className="grid size-9 shrink-0 place-items-center rounded-[10px] bg-[color-mix(in_oklab,var(--p-rail-active)_10%,transparent)] text-[11.5px] font-semibold text-[var(--p-rail-active)]"
               >
                 {initialsOf(activeOutlet?.name ?? 'AutoDine')}
               </span>
-              <span className="min-w-0 leading-tight">
+              <span className="min-w-0 flex-1 leading-tight">
                 <span className="block truncate text-[12.5px] font-medium text-rail-ink">
                   {activeOutlet?.name ?? 'AutoDine'}
                 </span>
@@ -330,6 +332,9 @@ export function DashboardBar({
                   {operatingMode === 'mode_a' ? ' · Mode A' : ''}
                 </span>
               </span>
+              {/* A who-am-I block, nothing more: the rail already carries the
+                  settings door, and the product asks for each destination to
+                  appear exactly once, so this card does not open its own. */}
             </div>
 
             {/* Sign out sits with the account, not at the bottom of the page.
@@ -374,7 +379,7 @@ export function DashboardBar({
           scrolled ? 'shadow-[var(--p-shadow-1)]' : 'shadow-none',
         ].join(' ')}
       >
-        <div className="flex h-14 items-center gap-3 px-4 sm:px-6">
+        <div className="flex h-14 items-center gap-3 px-4 sm:h-[60px] sm:px-6">
           <button
             type="button"
             aria-expanded={open}
@@ -399,22 +404,14 @@ export function DashboardBar({
               the venue is already answered by the rail's foot. The name is
               prefixed with the same glyph the rail uses for that destination,
               so the bar and the rail never disagree about what this page is. */}
-          <div className="flex min-w-0 items-center gap-2.5">
-            {active ? (
-              <span
-                aria-hidden="true"
-                className="hidden size-7 shrink-0 place-items-center rounded-[10px] bg-[var(--p-accent-soft)] text-[var(--p-accent-ink)] sm:grid [&_svg]:size-[15px]"
-              >
-                {ICONS[active]}
-              </span>
-            ) : null}
-            <span className="truncate text-[13.5px] font-semibold tracking-[-0.015em] text-gink">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="truncate text-[13.5px] font-semibold tracking-[-0.022em] text-gink">
               {activeLink?.label ?? 'Dashboard'}
             </span>
             {activeOutlet && (
               <>
-                <span aria-hidden="true" className="hidden h-3 w-px bg-hair-strong sm:block" />
-                <span className="hidden truncate text-[12.5px] text-gink-46 sm:block">
+                <span aria-hidden="true" className="hidden h-4 w-px shrink-0 bg-hair-strong sm:block" />
+                <span className="hidden truncate text-[12.5px] tracking-[-0.005em] text-gink-46 sm:block">
                   {activeOutlet.name}
                 </span>
               </>
@@ -433,6 +430,21 @@ export function DashboardBar({
               </Link>
             )}
             {children}
+            {/* The one round control on the bar, the way the reference bar
+                ends: a quiet ring, then the jump search. It is a real
+                destination, not a decorative bell -- it opens the delayed
+                orders the screen already counts, and it is only drawn for a
+                role whose rail actually carries that screen. */}
+            {hasOrders ? (
+              <Link
+                href="/dashboard/orders?status=delayed"
+                aria-label="Open delayed orders"
+                title="Delayed orders"
+                className="grid size-9 shrink-0 place-items-center rounded-full border border-hair bg-paper text-gink-62 transition-[background-color,color,box-shadow,transform] duration-150 ease-[var(--o-ease)] hover:-translate-y-px hover:bg-card hover:text-gink hover:shadow-[var(--p-shadow-1)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--p-accent)] active:translate-y-0"
+              >
+                <BellIcon />
+              </Link>
+            ) : null}
             <ShellSearch
               onLaunch={() => setOpen(false)}
               role={role}
@@ -454,6 +466,26 @@ function initialsOf(name: string): string {
       .slice(0, 2)
       .map((word) => word[0]?.toUpperCase() ?? '')
       .join('') || 'A'
+  );
+}
+
+/** The ring button on the bar: a bell, drawn at the rail's 1.6px stroke. */
+function BellIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="16"
+      height="16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M18 8.5a6 6 0 1 0-12 0c0 4.4-1.6 5.5-1.6 5.5h15.2S18 12.9 18 8.5" />
+      <path d="M13.7 18.2a2 2 0 0 1-3.4 0" />
+    </svg>
   );
 }
 
