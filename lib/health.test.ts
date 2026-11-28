@@ -223,3 +223,22 @@ describe('restricted financial schema health',()=>{
   expect(Object.values(await probeOperationalSchema(client({code:'PGRST202',message:'missing'})))).toEqual(Array(5).fill('missing'));
  });
 });
+
+describe('health payload is public, the schema map is not', () => {
+  it('accepts only the configured secret, compared in constant time', async () => {
+    const { healthDetailAllowed } = await import('./health');
+    const secret = 'health-secret-for-monitors-only';
+    expect(healthDetailAllowed(secret, secret)).toBe(true);
+    expect(healthDetailAllowed('health-secret-for-monitors-onlX', secret)).toBe(false);
+    expect(healthDetailAllowed(secret.slice(0, 8), secret)).toBe(false);
+    expect(healthDetailAllowed('', secret)).toBe(false);
+    expect(healthDetailAllowed(null, secret)).toBe(false);
+  });
+
+  it('fails closed when no secret is configured or it is too short to matter', async () => {
+    const { healthDetailAllowed } = await import('./health');
+    expect(healthDetailAllowed('anything', undefined)).toBe(false);
+    expect(healthDetailAllowed('anything', '   ')).toBe(false);
+    expect(healthDetailAllowed('short', 'short')).toBe(false);
+  });
+});

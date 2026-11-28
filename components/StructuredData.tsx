@@ -6,12 +6,32 @@ type Props = {
   nonce?: string | null;
 };
 
+/**
+ * JSON-LD inside a <script> must not be able to close that tag.
+ *
+ * The payload carries owner-written text (restaurant name, address), so a name
+ * containing `</script>` would otherwise end the block and inject markup into
+ * the public menu page. Escaping these five characters keeps the JSON valid --
+ * each becomes a JSON escape, not a literal -- so parsers see the same values.
+ */
+const JSON_LD_ESCAPES: Record<string, string> = {
+  '<': '\\u003c',
+  '>': '\\u003e',
+  '&': '\\u0026',
+  '\u2028': '\\u2028',
+  '\u2029': '\\u2029',
+};
+
+export function jsonLdMarkup(value: unknown): string {
+  return JSON.stringify(value).replace(/[<>&\u2028\u2029]/g, (character) => JSON_LD_ESCAPES[character] ?? character);
+}
+
 function jsonLd(value: unknown, nonce: string | null | undefined) {
   return (
     <script
       type="application/ld+json"
       nonce={nonce ?? undefined}
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(value) }}
+      dangerouslySetInnerHTML={{ __html: jsonLdMarkup(value) }}
     />
   );
 }

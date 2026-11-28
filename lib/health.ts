@@ -26,6 +26,8 @@
  * network, a database or an environment.
  */
 
+import { createHash, timingSafeEqual } from 'node:crypto';
+
 export type Probe = 'applied' | 'missing' | 'unknown' | 'unreachable' | 'unauthorized';
 
 export type Health = {
@@ -252,4 +254,21 @@ export function isReady(health: Health, operational: Record<string, Probe>): boo
   return health.configured && health.serverKey && health.reachable && health.credentials === 'accepted' &&
     Object.values(health.schema).every(value => value === 'applied') &&
     Object.values(operational).length > 0 && Object.values(operational).every(value => value === 'applied');
+}
+
+/**
+ * Who may see the schema detail behind `ok`.
+ *
+ * `ok` is the monitoring signal and stays public. The probe names underneath it
+ * describe which migrations a deployment is running, which is a map of the
+ * backend for anyone reading it, so it is shown only to a caller that presents
+ * HEALTH_SECRET. Both sides are hashed before comparison so a wrong-length
+ * guess cannot crash or be timed.
+ */
+export function healthDetailAllowed(provided: string | null | undefined, expected: string | undefined): boolean {
+  const secret = expected?.trim() ?? '';
+  if (secret.length < 16) return false;
+  if (typeof provided !== 'string' || provided.length === 0) return false;
+  const digest = (value: string) => createHash('sha256').update(value, 'utf8').digest();
+  return timingSafeEqual(digest(secret), digest(provided));
 }

@@ -10,11 +10,15 @@ const mocks = vi.hoisted(() => ({
   isSupabaseAdminConfigured: true,
 }));
 
-vi.mock('@/lib/health', () => ({
-  probeHealth: mocks.probeHealth,
-  probeOperationalSchema: mocks.probeOperationalSchema,
-  isReady: mocks.isReady,
-}));
+vi.mock('@/lib/health', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/health')>();
+  return {
+    ...actual,
+    probeHealth: mocks.probeHealth,
+    probeOperationalSchema: mocks.probeOperationalSchema,
+    isReady: mocks.isReady,
+  };
+});
 vi.mock('@/lib/supabase/admin', () => ({ getSupabaseAdmin: mocks.getSupabaseAdmin }));
 vi.mock('@/lib/supabase/server', () => ({ createSupabaseServerClient: mocks.createSupabaseServerClient }));
 vi.mock('@/lib/supabase/env', () => ({
@@ -73,5 +77,46 @@ describe('GET /api/health', () => {
     // no tenant values, JWTs, or secrets may appear.
     expect(line).not.toMatch(/eyJ|password|secret|@example|synthetic/i);
     warn.mockRestore();
+  });
+});
+
+describe('GET /api/health schema detail', () => {
+  const SECRET = 'monitor-secret-long-enough';
+  const withSecret = () => new Request('http://localhost/api/health', { headers: { 'x-health-secret': SECRET } });
+
+  it('returns only ok to an anonymous caller, even when the deployment is ready', async () => {
+    vi.stubEnv('HEALTH_SECRET', SECRET);
+    const response = await GET(new Request('http://localhost/api/health'));
+    const body = await response.json();
+    expect(response.status).toBe(200);
+    expect(body).toEqual({ ok: true, checkedAt: expect.any(String) });
+    expect(JSON.stringify(body)).not.toMatch(/schema|trialAndWriteGate|serverKey|credentialProbe/);
+    vi.unstubAllEnvs();
+  });
+
+  it('returns only ok when no monitor secret is configured at all', async () => {
+    vi.stubEnv('HEALTH_SECRET', '');
+    const response = await GET(withSecret());
+    const body = await response.json();
+    expect(body.schema).toBeUndefined();
+    expect(body.ok).toBe(true);
+    vi.unstubAllEnvs();
+  });
+
+  it('refuses a wrong or truncated secret', async () => {
+    vi.stubEnv('HEALTH_SECRET', SECRET);
+    const wrong = await GET(new Request('http://localhost/api/health', { headers: { 'x-health-secret': SECRET.slice(0, 10) } }));
+    expect((await wrong.json()).schema).toBeUndefined();
+    vi.unstubAllEnvs();
+  });
+
+  it('shows the probe map to the monitor that presents the secret', async () => {
+    vi.stubEnv('HEALTH_SECRET', SECRET);
+    const response = await GET(withSecret());
+    const body = await response.json();
+    expect(response.status).toBe(200);
+    expect(body.schema).toMatchObject({ trialAndWriteGate: 'applied' });
+    expect(body.operational).toMatchObject({ invoices: 'applied' });
+    vi.unstubAllEnvs();
   });
 });
