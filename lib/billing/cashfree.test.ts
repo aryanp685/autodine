@@ -104,4 +104,44 @@ describe('Cashfree SaaS billing adapter (Rail B)', () => {
     });
     expect(validateBillingEvent(parsed!)).toEqual({ ok: true });
   });
+
+  it('sends Cashfree an absolute return_url, because checkout leaves this site', async () => {
+    const provider = createCashfreeBillingProvider({
+      BILLING_PROVIDER: CASHFREE_PROVIDER_ID,
+      CASHFREE_CLIENT_ID: 'cfapp123',
+      BILLING_WEBHOOK_SECRET: SECRET,
+    });
+    expect(provider).not.toBeNull();
+
+    const bodies: Array<Record<string, unknown>> = [];
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>);
+      return new Response(JSON.stringify({ payment_session_id: 'session_123', order_id: 'ad_test_1' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }) as typeof fetch;
+
+    const request = {
+      accountId: 'saffron-and-smoke',
+      plan: 'starter',
+      months: 1,
+      amountPaise: starter.paise,
+      currency: 'INR',
+      returnPath: '/dashboard/subscription',
+    } as const;
+
+    try {
+      await provider!.createCheckoutSession({ ...request, origin: 'https://new-alpha-five-43.vercel.app' });
+      await provider!.createCheckoutSession(request);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+
+    const returnUrl = (body: Record<string, unknown>) => (body.order_meta as { return_url: string }).return_url;
+    expect(returnUrl(bodies[0])).toBe('https://new-alpha-five-43.vercel.app/dashboard/subscription');
+    // No origin (scripts, tests): the relative path is passed through as before.
+    expect(returnUrl(bodies[1])).toBe('/dashboard/subscription');
+  });
 });

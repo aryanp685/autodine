@@ -187,6 +187,22 @@ export function parseCashfreeWebhookPayload(payload: unknown, rawBody: string): 
   };
 }
 
+/**
+ * Cashfree refuses a relative `return_url`: the browser leaves this site for
+ * the Cashfree checkout, so the path has to come back as a full URL. The
+ * origin is the one the owner started checkout from; without one (scripts,
+ * tests) the path is passed through unchanged.
+ */
+function absoluteReturnUrl(request: CheckoutRequest): string {
+  const path = request.returnPath;
+  if (!request.origin) return path;
+  try {
+    return new URL(path, request.origin).toString();
+  } catch {
+    return path;
+  }
+}
+
 export function createCashfreeBillingProvider(
   env: Record<string, string | undefined> = process.env,
 ): BillingProvider | null {
@@ -218,7 +234,7 @@ export function createCashfreeBillingProvider(
             customer_phone: '9999999999',
           },
           order_meta: {
-            return_url: request.returnPath,
+            return_url: absoluteReturnUrl(request),
           },
           order_tags: {
             restaurant_name: request.accountId,

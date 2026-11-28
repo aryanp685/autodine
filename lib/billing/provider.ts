@@ -50,6 +50,12 @@ export type CheckoutRequest = {
   currency: string;
   /** Where to return the browser. Relative to this site. */
   returnPath: string;
+  /**
+   * The origin the checkout was started from, so a provider that demands a
+   * full URL (Cashfree's `order_meta.return_url`) gets one. Optional: callers
+   * with no request to read fall back to the relative path.
+   */
+  origin?: string;
 };
 
 export type ProviderPayment = {

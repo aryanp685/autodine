@@ -4,17 +4,17 @@
  * THE LINE THIS FILE HOLDS
  *
  * An owner may START a trial, READ their subscription, REQUEST a cancellation
- * and CHANGE their mind. An owner may NOT switch a paid plan on: that needs
- * money to have moved, and nothing in this deployment can move money.
+ * and CHANGE their mind. An owner may NOT switch a paid plan on directly: that
+ * needs money to have moved, and only the provider's signed webhook says so.
  *
  * So every action here is one of two kinds:
  *
  *   - Provider-independent and real: request a cancellation, withdraw the
  *     request, and everything that only reads.
- *   - Provider-dependent and REFUSED: choosing a paid plan. Those return
- *     `PROVIDER_UNAVAILABLE_MESSAGE` and record nothing. They are written out
- *     in full rather than left as a TODO, so the day a provider is configured
- *     the change is one line: call the provider instead of returning early.
+ *   - Provider-dependent, and real only once a provider is configured: choosing
+ *     a paid plan opens a Cashfree checkout (lib/billing/cashfree.ts). The plan
+ *     itself is still switched by the webhook, never by this file; without
+ *     credentials the action fails closed with `PROVIDER_UNAVAILABLE_MESSAGE`.
  *
  * Nothing here trusts the browser. The restaurant id comes from the session's
  * membership (lib/db/staff.ts), the price is read from the server's catalog,
@@ -27,6 +27,7 @@
 import { revalidatePath } from 'next/cache';
 
 import { getStaffContextDetailed } from '@/lib/db/staff';
+import { siteOrigin } from '@/lib/site-origin';
 import { formatBillMoney } from '@/lib/bill';
 import { BILLING_CURRENCY, BILLING_PERIOD_MONTHS, planName, planPriceForMonths } from './catalog';
 import { getBillingProvider, PROVIDER_UNAVAILABLE_MESSAGE } from './provider';
@@ -87,6 +88,9 @@ export async function choosePlanAction(plan: string): Promise<SubscriptionAction
       amountPaise,
       currency: BILLING_CURRENCY,
       returnPath: '/dashboard/subscription',
+      // Cashfree sends the browser back from its own checkout, so it needs a
+      // full URL; relative would land the owner nowhere.
+      origin: await siteOrigin(),
     });
     return {
       ok: true,
