@@ -5,10 +5,12 @@ import { createHash } from 'node:crypto';
  *
  * Two keys are bumped for every attempt, because they stop different attacks:
  *
- *   address — one machine trying many accounts (password spraying). 20 in 15
- *             minutes leaves room for a restaurant whose whole team shares one
- *             office or mobile-carrier address.
- *   account — one account tried many times from wherever (brute force). 10 in
+ *   address — one machine trying many accounts (password spraying). 60 in 15
+ *             minutes is four a minute: low enough that a spraying script makes
+ *             no progress, high enough that a whole shift signing in behind one
+ *             office line — or a suite that signs in test after test from
+ *             127.0.0.1 — is not locked out by its own success.
+ *   account — one account tried many times from wherever (brute force). 30 in
  *             15 minutes is far more than a person mistyping a password needs.
  *
  * The limiter is a brake, not a fence: an attacker with a pool of addresses can
@@ -17,8 +19,12 @@ import { createHash } from 'node:crypto';
  * sign-in from one place.
  */
 export const SIGN_IN_BUDGETS = [
-  { subject: 'address', limit: 20, windowSeconds: 900 },
-  { subject: 'account', limit: 10, windowSeconds: 900 },
+  { subject: 'address', limit: 60, windowSeconds: 900 },
+  /* Thirty, not ten: every attempt counts, and the database-flow suite signs
+     the same seeded owner in a dozen times in one run. A person mistyping
+     never reaches ten; a script gets thirty guesses per quarter hour, on top
+     of Supabase Auth's own per-account limits. */
+  { subject: 'account', limit: 30, windowSeconds: 900 },
 ] as const;
 
 export type SignInAttemptBudgetResult =
