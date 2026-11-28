@@ -58,16 +58,21 @@ function money(paise: number): string {
   return formatBillMoney(paise);
 }
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/**
+ * "28 Dec 2026", computed rather than formatted.
+ *
+ * Intl.DateTimeFormat output can differ between the Node render and the
+ * browser hydration (React then reports a mismatch and keeps the server text),
+ * so the restaurant's day is derived from the IST offset by hand.
+ */
 function day(iso: string | null): string | null {
   if (!iso) return null;
-  const parsed = new Date(iso);
-  if (Number.isNaN(parsed.getTime())) return null;
-  return new Intl.DateTimeFormat('en-IN', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    timeZone: 'Asia/Kolkata',
-  }).format(parsed);
+  const parsed = Date.parse(iso);
+  if (Number.isNaN(parsed)) return null;
+  const ist = new Date(parsed + 5.5 * 60 * 60 * 1000);
+  return `${ist.getUTCDate()} ${MONTHS[ist.getUTCMonth()]} ${ist.getUTCFullYear()}`;
 }
 
 export function PlanWelcomeScreen({
