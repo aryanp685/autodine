@@ -255,10 +255,13 @@ export function createCashfreeBillingProvider(
       }
       const data = (await res.json()) as Record<string, unknown>;
       const paymentSessionId = typeof data.payment_session_id === 'string' ? data.payment_session_id : '';
+      // Cashfree's hosted checkout lives at /order/#<session>, not /forms/<id>:
+      // /forms is the payment-links page and answers a session id with
+      // "Oops! Invalid form", which is exactly what a live buyer saw.
       const checkoutUrl =
         (typeof data.payment_link === 'string' && data.payment_link) ||
         (paymentSessionId
-          ? `${creds.env === 'production' ? 'https://payments.cashfree.com' : 'https://payments-test.cashfree.com'}/forms/${paymentSessionId}`
+          ? `${creds.env === 'production' ? 'https://payments.cashfree.com' : 'https://payments-test.cashfree.com'}/order/#${paymentSessionId}`
           : '');
       if (!checkoutUrl) {
         throw new Error('Cashfree did not return a checkout URL.');

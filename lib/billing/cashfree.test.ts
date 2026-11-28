@@ -144,4 +144,48 @@ describe('Cashfree SaaS billing adapter (Rail B)', () => {
     // No origin (scripts, tests): the relative path is passed through as before.
     expect(returnUrl(bodies[1])).toBe('/dashboard/subscription');
   });
+
+  it('opens the hosted checkout at /order/#session, never the payment-links /forms page', async () => {
+    // /forms/<session> is Cashfree's payment-links page: a live buyer landed on
+    // "Oops! Invalid form" because the session id is not a link id.
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async () =>
+      new Response(JSON.stringify({ payment_session_id: 'session_abc', order_id: 'ad_test_2' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })) as typeof fetch;
+
+    const request = {
+      accountId: 'saffron-and-smoke',
+      plan: 'starter',
+      months: 1,
+      amountPaise: starter.paise,
+      currency: 'INR',
+      returnPath: '/dashboard/subscription',
+    } as const;
+
+    try {
+      const live = createCashfreeBillingProvider({
+        BILLING_PROVIDER: CASHFREE_PROVIDER_ID,
+        CASHFREE_CLIENT_ID: 'cfapp123',
+        CASHFREE_ENV: 'production',
+        BILLING_WEBHOOK_SECRET: SECRET,
+      })!;
+      const sandbox = createCashfreeBillingProvider({
+        BILLING_PROVIDER: CASHFREE_PROVIDER_ID,
+        CASHFREE_CLIENT_ID: 'cfapp123',
+        CASHFREE_ENV: 'sandbox',
+        BILLING_WEBHOOK_SECRET: SECRET,
+      })!;
+
+      expect((await live.createCheckoutSession(request)).url).toBe(
+        'https://payments.cashfree.com/order/#session_abc'
+      );
+      expect((await sandbox.createCheckoutSession(request)).url).toBe(
+        'https://payments-test.cashfree.com/order/#session_abc'
+      );
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
 });
