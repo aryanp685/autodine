@@ -107,6 +107,19 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json(GENERIC_FAILURE, { status: 500 });
   }
 
+  // Cashfree's dashboard "Test" button posts a fixed sample of type WEBHOOK
+  // with no order, no account tag and nothing to apply. Answering 2xx is what
+  // turns that Test row green; every real event type keeps the full checks
+  // below, so nothing is granted by this path.
+  if (isCashfree && event.type === 'WEBHOOK') {
+    await supabase
+      .from('billing_webhook_events')
+      .update({ outcome: 'ignored:provider-test' })
+      .eq('provider', providerName)
+      .eq('provider_event_id', event.id);
+    return NextResponse.json({ status: 'ignored', eventId: event.id }, { status: 200 });
+  }
+
   // 5. The amount must be the approved price, in the approved currency.
   const validation = validateBillingEvent(event);
   if (!validation.ok) {

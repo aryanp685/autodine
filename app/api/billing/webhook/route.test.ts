@@ -31,6 +31,7 @@ vi.mock('@/lib/supabase/env', () => ({
 import { POST, GET } from './route';
 import { PLAN_PRICES } from '@/lib/billing/catalog';
 import { signSandboxWebhookPayload } from '@/lib/billing/sandbox';
+import { signCashfreeWebhookPayload } from '@/lib/billing/cashfree';
 
 const SECRET = 'route-test-webhook-secret-0123456789abcdef';
 const starter = PLAN_PRICES.find((plan) => plan.id === 'starter')!;
@@ -169,6 +170,34 @@ describe('POST /api/billing/webhook', () => {
     }));
     expect(response.status).toBe(400);
     expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+
+  it('answers Cashfree’s dashboard test ping 200 and grants nothing', async () => {
+    process.env.BILLING_PROVIDER = 'cashfree';
+    process.env.CASHFREE_CLIENT_ID = 'cfapp123';
+    process.env.CASHFREE_CLIENT_SECRET = SECRET;
+    process.env.BILLING_WEBHOOK_SECRET = SECRET;
+    const rawBody = JSON.stringify({ type: 'WEBHOOK', data: { order: {}, payment: {} } });
+    const { signature, timestamp } = signCashfreeWebhookPayload(rawBody, SECRET);
+    try {
+      const response = await POST(
+        new Request('http://localhost/api/billing/webhook', {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'x-webhook-signature': signature,
+            'x-webhook-timestamp': timestamp,
+          },
+          body: rawBody,
+        }),
+      );
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({ status: 'ignored' });
+      expect(mocks.rpc).not.toHaveBeenCalled();
+    } finally {
+      delete process.env.CASHFREE_CLIENT_ID;
+      delete process.env.CASHFREE_CLIENT_SECRET;
+    }
   });
 
   it('GET is refused with 405', async () => {
