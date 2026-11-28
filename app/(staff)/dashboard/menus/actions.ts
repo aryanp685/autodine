@@ -47,6 +47,7 @@ import {
   ASSET_BUCKET,
   bucketPathFromUrl,
   checkSize,
+  contentMatchesImageType,
   dishAssetPath,
   publicAssetUrl,
   validateImage,
@@ -1526,6 +1527,13 @@ export async function uploadDishPhotoAction(formData: FormData): Promise<void> {
   const sized = checkSize('dish', file.size, checked.extension);
   if (!sized.ok) fail(sized.message);
 
+  // The type in the form is the browser's claim; the header bytes are the
+  // file. Refuse a mismatch here so a non-image never lands in a public bucket.
+  const bytes = await file.arrayBuffer();
+  if (!contentMatchesImageType(new Uint8Array(bytes), checked.contentType)) {
+    fail('That file’s contents do not match its name. Choose the real image file.');
+  }
+
   const { data: row, error: readError } = await ctx.supabase
     .from('items')
     .select('id, name, image_url')
@@ -1539,7 +1547,7 @@ export async function uploadDishPhotoAction(formData: FormData): Promise<void> {
 
   const { error: uploadError } = await ctx.supabase.storage
     .from(ASSET_BUCKET)
-    .upload(path, await file.arrayBuffer(), {
+    .upload(path, bytes, {
       contentType: checked.contentType,
       upsert: false,
       cacheControl: '31536000',

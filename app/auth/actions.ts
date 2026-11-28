@@ -34,6 +34,8 @@ import { homeForRole } from '@/lib/db/team';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { formatIncidentLogLine } from '@/lib/monitoring-incidents';
 import { operationalIncidents } from '@/lib/incident-registry';
+import { signInLimitedMessage } from '@/lib/sign-in-attempt-budget';
+import { consumeSignInAttemptBudgetForCaller } from '@/lib/server/sign-in-rate-limit';
 import {
   normalizeAuthEmail,
   PENDING_SIGNUP_EMAIL_COOKIE,
@@ -354,6 +356,23 @@ export async function signInAction(formData: FormData): Promise<void> {
 
   const supabase = await createSupabaseServerClient();
   if (!supabase) fail('/login', 'Sign-in is not available yet: the database is not connected.');
+
+  /* Every wrong guess is answered with the same vague sentence, so the only
+     cost of guessing is time -- unless time is free. Two counters
+     (lib/sign-in-attempt-budget.ts) put a floor under it: one per caller, one
+     per account. The refusal names the wait and never the account, so it says
+     nothing about who has an account here. */
+  const budget = await consumeSignInAttemptBudgetForCaller(email);
+  if (!budget.allowed) {
+    if (budget.reason === 'limited') fail('/login', signInLimitedMessage(budget.retryAfterSeconds));
+    console.warn(
+      `[autodine:alert] ${JSON.stringify({
+        event: 'sign_in_rate_limit_unavailable',
+        kind: 'sign_in_rate_limit_unavailable',
+        severity: 'warning',
+      })}`,
+    );
+  }
 
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) {

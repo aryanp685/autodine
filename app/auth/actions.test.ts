@@ -24,6 +24,7 @@ const mocks = vi.hoisted(() => ({
   signOut: vi.fn(),
   getStaffContextDetailed: vi.fn(),
   homeForRole: vi.fn(),
+  consumeSignInAttemptBudgetForCaller: vi.fn(),
 }));
 
 vi.mock('next/headers', () => ({ cookies: mocks.cookies }));
@@ -33,6 +34,9 @@ vi.mock('@/lib/supabase/server', () => ({ createSupabaseServerClient: mocks.crea
 vi.mock('@/lib/supabase/admin', () => ({ getSupabaseAdmin: mocks.getSupabaseAdmin }));
 vi.mock('@/lib/db/staff', () => ({ getStaffContextDetailed: mocks.getStaffContextDetailed }));
 vi.mock('@/lib/db/team', () => ({ homeForRole: mocks.homeForRole }));
+vi.mock('@/lib/server/sign-in-rate-limit', () => ({
+  consumeSignInAttemptBudgetForCaller: mocks.consumeSignInAttemptBudgetForCaller,
+}));
 vi.mock('@/lib/slug', () => ({ slugify: mocks.slugify, uniqueSlug: mocks.uniqueSlug }));
 
 import {
@@ -100,6 +104,7 @@ beforeEach(() => {
   mocks.resetPasswordForEmail.mockResolvedValue({ error: null });
   mocks.resend.mockResolvedValue({ error: null });
   mocks.signInWithPassword.mockResolvedValue({ error: null });
+  mocks.consumeSignInAttemptBudgetForCaller.mockResolvedValue({ allowed: true });
   mocks.getUser.mockResolvedValue({ data: { user: { id: 'user-1', email: 'owner@example.test' } } });
   mocks.updateUser.mockResolvedValue({ error: null });
   mocks.signOut.mockResolvedValue({ error: null });
@@ -378,6 +383,44 @@ describe('verified account login', () => {
     expect(decodeURIComponent(destination)).toContain('Email or password is incorrect.');
     expect(destination).not.toContain('user not found');
     expect(mocks.getStaffContextDetailed).not.toHaveBeenCalled();
+  });
+
+  it('counts the attempt against the normalised email before the password is checked', async () => {
+    await expect(signInAction(loginForm())).rejects.toThrow(/^REDIRECT:/);
+
+    expect(mocks.consumeSignInAttemptBudgetForCaller).toHaveBeenCalledWith('owner@example.test');
+    expect(mocks.consumeSignInAttemptBudgetForCaller.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.signInWithPassword.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('refuses further guesses once a budget is spent and says only how long to wait', async () => {
+    mocks.consumeSignInAttemptBudgetForCaller.mockResolvedValueOnce({
+      allowed: false,
+      reason: 'limited',
+      retryAfterSeconds: 240,
+    });
+
+    await expect(signInAction(loginForm())).rejects.toThrow(/^REDIRECT:/);
+
+    const destination = decodeURIComponent(mocks.redirect.mock.calls[0][0] as string);
+    expect(destination).toContain('/login?error=');
+    expect(destination).toContain('Too many sign-in attempts');
+    expect(destination).toContain('4 minutes');
+    expect(mocks.signInWithPassword).not.toHaveBeenCalled();
+  });
+
+  it('does not turn a limiter outage into a sign-in outage', async () => {
+    mocks.consumeSignInAttemptBudgetForCaller.mockResolvedValueOnce({
+      allowed: false,
+      reason: 'unavailable',
+      retryAfterSeconds: null,
+    });
+
+    await expect(signInAction(loginForm())).rejects.toThrow(/^REDIRECT:/);
+
+    expect(mocks.signInWithPassword).toHaveBeenCalledTimes(1);
+    expect(mocks.redirect).toHaveBeenCalledWith('/dashboard');
   });
 });
 

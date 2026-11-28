@@ -896,4 +896,60 @@ describe.skipIf(!URL_VALUE)('Billing Spec v2.0 (disposable PostgreSQL)', () => {
     ).rows[0].res;
     expect(wrongSlug).toEqual({ found: false });
   }, 25000);
+
+  it('gives a coupon use back when the code is cleared, swapped or the bill is cancelled', async () => {
+    const { ownerId, cashierId, restaurantId, itemId } = await seedFixture();
+
+    await asUser(ownerId, () =>
+      db.query(
+        `select upsert_restaurant_coupon($1, 'ONCE', 'percent', 1000, 0, null, 1, null, null, 'One use only', true)`,
+        [restaurantId],
+      ),
+    );
+
+    const createOrder = async (label: string) =>
+      asUser(cashierId, async () => {
+        const r = await db.query(
+          `select create_counter_order($1, 'takeaway', null, $2::jsonb, null, $3, null) as res`,
+          [restaurantId, JSON.stringify([{ item_id: itemId, qty: 1 }]), label],
+        );
+        return r.rows[0].res.order_id as string;
+      });
+
+    const uses = async () =>
+      Number(
+        (
+          await db.query(`select uses_count from restaurant_coupons where restaurant_id = $1 and code = 'ONCE'`, [
+            restaurantId,
+          ])
+        ).rows[0].uses_count,
+      );
+
+    const orderA = await createOrder('Guest A');
+    await asUser(cashierId, () => db.query(`select apply_coupon_to_order($1, 'ONCE')`, [orderA]));
+    expect(await uses()).toBe(1);
+
+    // Removing the code gives the one use back, so the counter stays honest.
+    await asUser(cashierId, () => db.query(`select apply_coupon_to_order($1, '')`, [orderA]));
+    expect(await uses()).toBe(0);
+
+    // The code is usable again precisely because the use came back.
+    await asUser(cashierId, () => db.query(`select apply_coupon_to_order($1, 'ONCE')`, [orderA]));
+    expect(await uses()).toBe(1);
+
+    // While the first bill holds it, the one-use code is spent for everyone else.
+    const orderB = await createOrder('Guest B');
+    await expect(
+      asUser(cashierId, () => db.query(`select apply_coupon_to_order($1, 'ONCE')`, [orderB])),
+    ).rejects.toThrow(/usage limit/i);
+
+    // Taking it off the first bill releases it for the second.
+    await asUser(cashierId, () => db.query(`select apply_coupon_to_order($1, '')`, [orderA]));
+    await asUser(cashierId, () => db.query(`select apply_coupon_to_order($1, 'ONCE')`, [orderB]));
+    expect(await uses()).toBe(1);
+
+    // A cancelled bill never used the code either.
+    await db.query(`update orders set prep_status = 'cancelled' where id = $1`, [orderB]);
+    expect(await uses()).toBe(0);
+  }, 25000);
 });

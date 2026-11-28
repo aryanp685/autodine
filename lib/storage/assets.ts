@@ -23,6 +23,7 @@
 
 import { randomUUID } from 'node:crypto';
 import { SUPABASE_URL } from '@/lib/supabase/env';
+import { sniffImageMime } from '@/lib/branding/image-meta';
 
 export const ASSET_BUCKET = 'restaurant-assets';
 
@@ -105,6 +106,17 @@ export function checkSize(kind: AssetKind, size: number, extension: string): Val
     };
   }
   return { ok: true, extension, contentType: '' };
+}
+
+/**
+ * The bytes against the type the file claims to be.
+ *
+ * `validateImage` reads the browser's word for the type; this reads the file.
+ * Both must agree before a byte reaches the public bucket, otherwise an HTML
+ * page renamed `.png` is served happily from our own domain.
+ */
+export function contentMatchesImageType(bytes: Uint8Array, contentType: string): boolean {
+  return sniffImageMime(bytes) === contentType;
 }
 
 /**

@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { readJsonObject, JsonInputError } from '@/lib/http-json';
 import { recoverGuestOrderAttempt } from '@/lib/db/order-recovery';
 import { isOrderToken } from '@/lib/db/order-status';
+import { consumeGuestRecoverBudget } from '@/lib/server/guest-recover-rate-limit';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -27,6 +28,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       { ok: false, reason: 'bad_request' },
       { status: 400, headers: NO_STORE },
+    );
+  }
+
+  const budget = await consumeGuestRecoverBudget((name) => request.headers.get(name));
+  if (budget.state === 'limited') {
+    return NextResponse.json(
+      { ok: false, reason: 'too_many' },
+      { status: 429, headers: { ...NO_STORE, 'retry-after': String(budget.retryAfterSeconds) } },
     );
   }
 

@@ -28,6 +28,7 @@ import {
   ASSET_BUCKET,
   assetPath,
   checkSize,
+  contentMatchesImageType,
   isBucketPath,
   validateImage,
   type AssetKind,
@@ -77,11 +78,19 @@ async function uploadBrandAsset(kind: Extract<AssetKind, 'logo' | 'banner'>, for
   const sized = checkSize(kind, file.size, checked.extension);
   if (!sized.ok) fail(sized.message);
 
+  // `validateImage` reads the browser's word for the type; this reads the
+  // bytes. An HTML page renamed .png would pass the first check and be served
+  // from our own domain, so both have to agree before anything is written.
+  const bytes = await file.arrayBuffer();
+  if (!contentMatchesImageType(new Uint8Array(bytes), checked.contentType)) {
+    fail('That file’s contents do not match its name. Choose the real image file.');
+  }
+
   const path = assetPath(ctx.restaurantId, kind, checked.extension);
 
   const { error: uploadError } = await ctx.supabase.storage
     .from(ASSET_BUCKET)
-    .upload(path, await file.arrayBuffer(), {
+    .upload(path, bytes, {
       contentType: checked.contentType,
       // The path is unique per upload, so an existing object here means
       // something is wrong; refusing to overwrite keeps that visible.
