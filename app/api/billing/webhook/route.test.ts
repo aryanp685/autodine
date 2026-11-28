@@ -48,14 +48,27 @@ function chainable() {
   return chain;
 }
 
-function makeAdmin() {
+function makeAdmin(slugs: Record<string, string> = {}) {
   const chain = chainable();
   mocks.update.mockReturnValue(chain);
-  return {
-    from: vi.fn(() => ({
-      insert: mocks.insert,
-      update: mocks.update,
+  // The route resolves a checkout's slug tag to the restaurant name the payment
+  // RPCs key on. An unknown slug reads as no row, so the tag passes through.
+  const restaurants = {
+    select: vi.fn(() => ({
+      eq: vi.fn((_column: string, value: string) => ({
+        limit: vi.fn(async () => ({
+          data: slugs[value] ? [{ name: slugs[value] }] : [],
+          error: null,
+        })),
+      })),
     })),
+  };
+  return {
+    from: vi.fn((table: string) =>
+      table === 'restaurants'
+        ? { select: restaurants.select }
+        : { insert: mocks.insert, update: mocks.update },
+    ),
     rpc: mocks.rpc,
   };
 }
@@ -145,6 +158,22 @@ describe('POST /api/billing/webhook', () => {
       p_amount_paise: starter.paise,
       p_currency: 'INR',
       p_months: 1,
+    }));
+  });
+
+  it('resolves a checkout slug tag to the restaurant name the RPCs key on', async () => {
+    process.env.BILLING_PROVIDER = 'sandbox';
+    process.env.AUTODINE_BILLING_SANDBOX = '1';
+    process.env.BILLING_WEBHOOK_SECRET = SECRET;
+    mocks.adminClient.value = makeAdmin({ 'synthetic-kitchen': 'Synthetic Kitchen' });
+    const response = await POST(signedRequest({
+      ...succeededPayload,
+      event_id: 'evt_route_slug',
+      data: { ...succeededPayload.data, restaurant_name: 'synthetic-kitchen' },
+    }));
+    expect(response.status).toBe(200);
+    expect(mocks.rpc).toHaveBeenCalledWith('record_subscription_payment', expect.objectContaining({
+      p_restaurant_name: 'Synthetic Kitchen',
     }));
   });
 

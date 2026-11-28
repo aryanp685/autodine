@@ -152,6 +152,26 @@ export async function POST(request: Request): Promise<NextResponse> {
 
 type DispatchResult = { ok: true; result: unknown } | { ok: false; error: string };
 
+type AdminClient = NonNullable<ReturnType<typeof getSupabaseAdmin>>;
+
+/**
+ * A checkout tags its order with the tenant SLUG, because that is the one
+ * tenant handle that stays unique when an owner renames the restaurant. The
+ * payment RPCs key a tenant by the restaurant NAME. Resolve the tag here, at
+ * the one place money lands, and hand back the tag unchanged when it is not a
+ * slug — a name (or an id) still reaches the database, which is the authority.
+ */
+async function tenantNameFor(supabase: AdminClient, tag: string): Promise<string> {
+  const { data, error } = await supabase
+    .from('restaurants')
+    .select('name')
+    .eq('slug', tag)
+    .limit(1);
+  if (error) return tag;
+  const name = Array.isArray(data) && typeof data[0]?.name === 'string' ? data[0].name.trim() : '';
+  return name || tag;
+}
+
 /** Hand one validated event to the database. The database re-checks it all. */
 async function dispatch(
   event: NonNullable<ReturnType<typeof parseBillingEvent>>,
@@ -166,9 +186,11 @@ async function dispatch(
   if (!event.restaurantName) return { ok: false, error: 'missing-reference' };
   if (event.status === 'succeeded' && event.amountPaise === null) return { ok: false, error: 'missing-amount' };
 
+  const restaurantName = await tenantNameFor(supabase, event.restaurantName);
+
   if (event.status === 'succeeded') {
     const { data, error } = await supabase.rpc('record_subscription_payment', {
-      p_restaurant_name: event.restaurantName,
+      p_restaurant_name: restaurantName,
       p_provider: providerName,
       p_provider_event_id: event.id,
       p_plan: event.plan ?? '',
@@ -183,7 +205,7 @@ async function dispatch(
 
   if (event.status === 'failed') {
     const { data, error } = await supabase.rpc('record_subscription_payment_failure', {
-      p_restaurant_name: event.restaurantName,
+      p_restaurant_name: restaurantName,
       p_provider: providerName,
       p_provider_event_id: event.id,
       p_plan: event.plan ?? undefined,
@@ -197,7 +219,7 @@ async function dispatch(
 
   if (event.status === 'refunded') {
     const { data, error } = await supabase.rpc('record_subscription_refund', {
-      p_restaurant_name: event.restaurantName,
+      p_restaurant_name: restaurantName,
       p_provider: providerName,
       p_provider_event_id: event.id,
       p_reference: event.reference ?? undefined,
