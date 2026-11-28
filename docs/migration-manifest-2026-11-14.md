@@ -153,6 +153,7 @@ without separate written authorization each.
 | `20261128120000` | `test_price_starter_one_rupee` | TEMPORARY: Starter priced at ₹1 for one live Cashfree payment, so subscription activation is proven end to end. The ₹999 price returns when testing ends. | Added 2026-11-28; applied to production for the test, must be reverted. |
 | `20261128130000` | `subscription_cancellation_flow` | Makes cancellation exact: a cancelled trial keeps write access to the end of its period, a second request returns the recorded date and writes nothing, a request with no running period is refused, and the sweep clears the plan without dating the cancellation in the past. | Added 2026-11-28; hosted application to be confirmed against the project. |
 | `20261128150000` | `coupon_usage_release` | One trigger gives a coupon use back when the code is cleared, swapped or the order cancelled, so `uses_count` stops drifting upward; paid bills keep their use. | Added 2026-11-28; hosted application to be confirmed against the project. |
+| `20261128160000` | `rate_limit_release_on_success` | `release_rate_limit_hit(key)` hands back one counted attempt, and the sign-in action calls it once the password is accepted, so the brake counts refused guesses instead of successful logins. | Added 2026-11-28; hosted application to be confirmed against the project. |
 
 ## Owner-operation (never applied automatically — separate on purpose)
 

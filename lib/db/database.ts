@@ -672,6 +672,11 @@ export type Database = {
         Args: { p_key: string; p_limit: number; p_window_seconds: number };
         Returns: { allowed: boolean; retry_after_seconds: number }[];
       };
+      /** Migration 20261128160000: hand back the attempt a successful sign-in was charged for. */
+      release_rate_limit_hit: {
+        Args: { p_key: string };
+        Returns: undefined;
+      };
       /** One cross-device winner for a kitchen announcement; staff role is checked in SQL. */
       claim_kitchen_order_announcement: {
         Args: { p_order_id: string };

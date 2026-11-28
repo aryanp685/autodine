@@ -5,13 +5,18 @@ import { createHash } from 'node:crypto';
  *
  * Two keys are bumped for every attempt, because they stop different attacks:
  *
- *   address — one machine trying many accounts (password spraying). 90 in 15
- *             minutes is six a minute: low enough that a spraying script makes
- *             no progress, high enough that a whole shift signing in behind one
- *             office line — or a suite that signs in test after test from
- *             127.0.0.1 — is not locked out by its own success.
- *   account — one account tried many times from wherever (brute force). 30 in
- *             15 minutes is far more than a person mistyping a password needs.
+ * Only attempts that did NOT get in stay on the counter: a successful sign-in
+ * hands its own attempt back (lib/server/sign-in-rate-limit.ts), so a whole
+ * shift behind one office line — or a suite signing the same seeded owner in
+ * test after test from 127.0.0.1 — never spends the allowance by doing nothing
+ * wrong. What remains counted is guesses.
+ *
+ *   address — one machine trying many accounts (password spraying). 20 failed
+ *             attempts in 15 minutes is low enough that a spraying script makes
+ *             no useful progress on any account behind that address.
+ *   account — one account tried many times from wherever (brute force). 10
+ *             failed attempts in 15 minutes is far more than a person
+ *             mistyping a password needs.
  *
  * The limiter is a brake, not a fence: an attacker with a pool of addresses can
  * still spread attempts out, and Supabase Auth applies its own per-account
@@ -19,13 +24,8 @@ import { createHash } from 'node:crypto';
  * sign-in from one place.
  */
 export const SIGN_IN_BUDGETS = [
-  { subject: 'address', limit: 90, windowSeconds: 900 },
-  /* Thirty, not ten: every attempt counts, successful ones included, and the
-     database-flow suite signs the same seeded owner in about two dozen times
-     in one run, all from 127.0.0.1. A person mistyping never reaches ten; a
-     script still gets thirty guesses per quarter hour, on top of Supabase
-     Auth's own per-account limits. */
-  { subject: 'account', limit: 30, windowSeconds: 900 },
+  { subject: 'address', limit: 20, windowSeconds: 900 },
+  { subject: 'account', limit: 10, windowSeconds: 900 },
 ] as const;
 
 export type SignInAttemptBudgetResult =

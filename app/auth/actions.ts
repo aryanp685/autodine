@@ -35,7 +35,10 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { formatIncidentLogLine } from '@/lib/monitoring-incidents';
 import { operationalIncidents } from '@/lib/incident-registry';
 import { signInLimitedMessage } from '@/lib/sign-in-attempt-budget';
-import { consumeSignInAttemptBudgetForCaller } from '@/lib/server/sign-in-rate-limit';
+import {
+  consumeSignInAttemptBudgetForCaller,
+  releaseSignInAttemptBudgetForCaller,
+} from '@/lib/server/sign-in-rate-limit';
 import {
   normalizeAuthEmail,
   PENDING_SIGNUP_EMAIL_COOKIE,
@@ -380,6 +383,11 @@ export async function signInAction(formData: FormData): Promise<void> {
     // an attacker which of the two was wrong is not.
     fail('/login', 'Email or password is incorrect.');
   }
+
+  /* Correct password: hand the attempt back, so the counters measure guesses
+     rather than logins. Best effort and awaited before the redirect, because a
+     sign-in that already succeeded must not be slowed by a counter write. */
+  await releaseSignInAttemptBudgetForCaller(email);
 
   if (next) redirect(next);
 

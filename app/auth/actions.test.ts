@@ -25,6 +25,7 @@ const mocks = vi.hoisted(() => ({
   getStaffContextDetailed: vi.fn(),
   homeForRole: vi.fn(),
   consumeSignInAttemptBudgetForCaller: vi.fn(),
+  releaseSignInAttemptBudgetForCaller: vi.fn(),
 }));
 
 vi.mock('next/headers', () => ({ cookies: mocks.cookies }));
@@ -36,6 +37,7 @@ vi.mock('@/lib/db/staff', () => ({ getStaffContextDetailed: mocks.getStaffContex
 vi.mock('@/lib/db/team', () => ({ homeForRole: mocks.homeForRole }));
 vi.mock('@/lib/server/sign-in-rate-limit', () => ({
   consumeSignInAttemptBudgetForCaller: mocks.consumeSignInAttemptBudgetForCaller,
+  releaseSignInAttemptBudgetForCaller: mocks.releaseSignInAttemptBudgetForCaller,
 }));
 vi.mock('@/lib/slug', () => ({ slugify: mocks.slugify, uniqueSlug: mocks.uniqueSlug }));
 
@@ -105,6 +107,7 @@ beforeEach(() => {
   mocks.resend.mockResolvedValue({ error: null });
   mocks.signInWithPassword.mockResolvedValue({ error: null });
   mocks.consumeSignInAttemptBudgetForCaller.mockResolvedValue({ allowed: true });
+  mocks.releaseSignInAttemptBudgetForCaller.mockResolvedValue(undefined);
   mocks.getUser.mockResolvedValue({ data: { user: { id: 'user-1', email: 'owner@example.test' } } });
   mocks.updateUser.mockResolvedValue({ error: null });
   mocks.signOut.mockResolvedValue({ error: null });
@@ -392,6 +395,24 @@ describe('verified account login', () => {
     expect(mocks.consumeSignInAttemptBudgetForCaller.mock.invocationCallOrder[0]).toBeLessThan(
       mocks.signInWithPassword.mock.invocationCallOrder[0],
     );
+  });
+
+  it('hands the attempt back when the password was right, so logins never spend the allowance', async () => {
+    await expect(signInAction(loginForm())).rejects.toThrow(/^REDIRECT:/);
+
+    expect(mocks.releaseSignInAttemptBudgetForCaller).toHaveBeenCalledTimes(1);
+    expect(mocks.releaseSignInAttemptBudgetForCaller).toHaveBeenCalledWith('owner@example.test');
+    expect(mocks.releaseSignInAttemptBudgetForCaller.mock.invocationCallOrder[0]).toBeGreaterThan(
+      mocks.signInWithPassword.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('keeps the attempt charged when the password was wrong', async () => {
+    mocks.signInWithPassword.mockResolvedValueOnce({ error: { message: 'Invalid login credentials' } });
+
+    await expect(signInAction(loginForm())).rejects.toThrow(/^REDIRECT:/);
+
+    expect(mocks.releaseSignInAttemptBudgetForCaller).not.toHaveBeenCalled();
   });
 
   it('refuses further guesses once a budget is spent and says only how long to wait', async () => {

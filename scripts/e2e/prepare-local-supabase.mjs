@@ -85,10 +85,11 @@ try {
   // Keep this exact count synchronized with the migration chain: a lower
   // bound would allow one or more missing files to be hidden by the current
   // count, and an added migration must deliberately update this assertion.
-  // 124 since 2026-11-28: the one-rupee Starter test price, the cancellation
-  // flow and the coupon-use release joined the chain (the release guard in
-  // scripts/release/verify-release-readiness.mjs carries the same number).
-  const expectedRepositoryMigrations = 124;
+  // 125 since 2026-11-28: the one-rupee Starter test price, the cancellation
+  // flow, the coupon-use release and the sign-in attempt refund joined the
+  // chain (the release guard in scripts/release/verify-release-readiness.mjs
+  // carries the same number).
+  const expectedRepositoryMigrations = 125;
   const requiredBoundaryMigrations = [
     '20261112000500_role_scoped_order_reads.sql',
     '20261112000600_cap_subscription_history_ceiling.sql',
