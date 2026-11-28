@@ -192,6 +192,27 @@ export function hourLabel(hour: number): string {
   return `${clockHour(h)} ${meridiem(h)}`;
 }
 
+/**
+ * Today on the restaurant's wall: `Thu 27 Nov`.
+ *
+ * The masthead pairs it with the clock so "Good evening" is anchored to a day
+ * the reader can check, and a venue in another timezone is never told someone
+ * else's date.
+ */
+export function calendarLabelInZone(
+  timeZone: string | null | undefined,
+  at: string | Date,
+): string {
+  const date = at instanceof Date ? at : new Date(at);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleDateString('en-GB', {
+    timeZone: timeZone || RESTAURANT_TIME_ZONE,
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  });
+}
+
 export function clockTimeInZone(
   timeZone: string | null | undefined,
   at: string | Date,

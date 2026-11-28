@@ -27,6 +27,7 @@ import { MarkSessionPaidButton } from '@/components/owner/MarkSessionPaidButton'
 import { CloseSessionButton } from '@/components/owner/CloseSessionButton';
 import { accessSummary, planSentence } from '@/lib/access';
 import {
+  calendarLabelInZone,
   clockTimeInZone,
   hourInZone,
   hourLabel,
@@ -81,8 +82,11 @@ export function Dashboard({
 
   // The greeting follows the restaurant's clock, not the reader's: a kitchen
   // that opens at 6pm should not be told "good morning" by a phone in London.
-  const localHour = hourInZone(timezone ?? RESTAURANT_TIME_ZONE, new Date());
+  const now = new Date();
+  const localHour = hourInZone(timezone ?? RESTAURANT_TIME_ZONE, now);
   const greeting = localHour < 12 ? 'Good morning' : localHour < 17 ? 'Good afternoon' : 'Good evening';
+  const venueClock = clockTimeInZone(timezone ?? RESTAURANT_TIME_ZONE, now);
+  const venueDate = calendarLabelInZone(timezone ?? RESTAURANT_TIME_ZONE, now);
 
   const cards: Array<{ label: string; value: ReactNode; meta: string }> = live && stats
     ? [
@@ -155,6 +159,23 @@ export function Dashboard({
   const orders = live ? (data?.orders ?? []) : [];
   const openCount = live && stats ? stats.openOrders : 5;
 
+  /*
+   * Four things an owner checks between seatings, in the order they act on
+   * them: who is sitting, what is still owed, what is going wrong, and what is
+   * selling. Each is a number already on this page, pulled up so the answer is
+   * readable without scrolling two sections. Zero stays zero -- "0 open
+   * tables" is a fact about the room, and hiding it would make an empty room
+   * look like a missing read.
+   */
+  const openTables = live ? (data?.activeSessions.length ?? 0) : 0;
+  const unsettled = live
+    ? (data?.activeSessions.filter((s) => s.outstandingPaise > 0) ?? [])
+    : [];
+  const unsettledPaise = unsettled.reduce((sum, s) => sum + s.outstandingPaise, 0);
+  const flagged = live ? (data?.orderHealth?.flaggedOrders.length ?? 0) : 0;
+  const delayed = live ? (data?.orderHealth?.delayedCount ?? 0) : 0;
+  const bestSeller = itemRows[0];
+
   return (
     <OwnerPage active="overview" outlet={outlet} signOut={!blocked}>
       <OpsSurface tone="welcome">
@@ -183,19 +204,26 @@ export function Dashboard({
                 {live ? 'Here’s what’s happening in your restaurant today.' : venueMeta}
               </p>
             </div>
-            <div className="flex flex-wrap items-center gap-2 sm:pb-1">
-              {outlet?.operatingMode === 'mode_a' ? (
-                <BtnLink href="/dashboard/orders" tone="ghost">
-                  Orders &amp; KOT handoff
-                </BtnLink>
-              ) : (
-                <BtnLink href="/cashier" tone="ghost">
-                  Open the counter
-                </BtnLink>
-              )}
-              <BtnLink href="/kitchen" tone="accent">
-                Open the kitchen board
-              </BtnLink>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:gap-7 lg:flex-col lg:items-end lg:gap-2.5 lg:pb-1.5">
+              {/* The clock the house runs on, and whether this screen is
+                  telling the truth right now. Both were links to the counter
+                  and the kitchen board before; those two live in the rail, and
+                  a masthead should answer a question, not offer a detour. */}
+              <div className="flex items-baseline gap-2">
+                <span className="ov-display text-[1.6rem] leading-none font-semibold tracking-[-0.02em] text-gink tabular-nums">
+                  {venueClock}
+                </span>
+                <span className="text-[11.5px] font-medium text-[var(--p-ink-46)]">
+                  {venueDate} · restaurant time
+                </span>
+              </div>
+              <p className="inline-flex items-center gap-2 self-start rounded-full border border-[var(--p-line-soft)] bg-[var(--p-paper)] px-2.5 py-1 text-[10.5px] font-semibold tracking-[0.08em] text-[var(--p-ink-64)] uppercase sm:self-auto lg:self-end">
+                <span
+                  aria-hidden="true"
+                  className={live && !blocked ? 'ov-live-dot' : 'ov-live-dot ov-live-dot--still'}
+                />
+                {live && !blocked ? 'Live · refreshes itself' : live ? 'Sign in to see today' : 'Sample data'}
+              </p>
             </div>
           </div>
         </div>
@@ -377,6 +405,8 @@ export function Dashboard({
                       height={120}
                       baseline="zero"
                       area
+                      areaGradient
+                      strokeWidth={2.4}
                       label="Revenue by hour of the day"
                       className="h-auto w-full"
                       markIndex={hasPeak ? peakIndex : undefined}
@@ -393,11 +423,19 @@ export function Dashboard({
                           {hourLabel(hourly.length - 1)}
                         </span>
                       </div>
-                      {/* The line says the shape; this says the answer. */}
-                      <div className="mt-2.5 flex flex-wrap items-baseline gap-x-2 gap-y-1 border-t border-[var(--p-line-soft)] pt-2.5">
-                        <span className="text-[11.5px] font-medium text-gink">Busiest hour</span>
-                        <span className="text-[11.5px] text-gink-46">{hourRangeLabel(peakIndex)}</span>
-                        <span className="ml-auto text-[13px] font-semibold text-gink tabular-nums">
+                      {/* The line says the shape; this says the answer. One
+                          chip rather than a second table row: the eye has
+                          already found the peak dot, so the value sits beside
+                          the words that name it. */}
+                      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-[var(--p-line-soft)] pt-3">
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--p-accent-soft)] px-2 py-0.5 text-[10.5px] font-semibold tracking-[0.06em] text-[var(--p-accent-ink)] uppercase">
+                          <span aria-hidden="true" className="size-1.5 rounded-full bg-[var(--p-accent)]" />
+                          Busiest hour
+                        </span>
+                        <span className="text-[11.5px] text-gink-46 tabular-nums">
+                          {hourRangeLabel(peakIndex)}
+                        </span>
+                        <span className="ml-auto text-[13.5px] font-semibold text-gink tabular-nums">
                           <Money value={hourly[peakIndex]} />
                         </span>
                       </div>
@@ -459,6 +497,63 @@ export function Dashboard({
           })}
         </aside>
       </section>
+
+      {/* ----------------------------------------------------------- right now
+          The four answers an owner actually needs between seatings, lifted out
+          of the sections below so they do not have to be hunted for. A number
+          that is zero keeps its place and says so ("Room is clear") rather than
+          disappearing: an empty room and a broken read must not look alike. */}
+      {!blocked ? (
+        <section
+          aria-label="Right now"
+          className="mt-6 overflow-hidden rounded-[var(--p-r-card)] border border-[var(--p-line-soft)] bg-[var(--p-line-soft)] shadow-[var(--p-shadow-1)]"
+        >
+          <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 bg-[var(--p-card)] px-5 pt-4 pb-3">
+            <h2 className="text-[13px] font-semibold tracking-[-0.01em] text-gink">Right now</h2>
+            <span className="text-[11.5px] text-gink-46 tabular-nums">
+              as of {venueClock} · {venueDate}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-px sm:grid-cols-4">
+            <ServiceFact
+              href="/dashboard/tables"
+              label="Open tables"
+              value={String(openTables)}
+              note={openTables === 0 ? 'Room is clear' : openTables === 1 ? 'table seated' : 'tables seated'}
+            />
+            <ServiceFact
+              href="/dashboard/orders"
+              label="Bills to settle"
+              value={unsettledPaise > 0 ? <Money value={unsettledPaise} /> : '₹0'}
+              note={
+                unsettled.length === 0
+                  ? 'Everything settled'
+                  : `${unsettled.length} table${unsettled.length === 1 ? '' : 's'} running a bill`
+              }
+            />
+            <ServiceFact
+              href="/dashboard/orders"
+              label="Needs attention"
+              value={flagged === 0 ? 'All clear' : String(flagged)}
+              note={
+                flagged === 0
+                  ? 'No delays or unconfirmed orders'
+                  : delayed > 0
+                    ? `${delayed} running late`
+                    : 'Open a delayed order'
+              }
+              tone={flagged === 0 ? 'calm' : 'warn'}
+            />
+            <ServiceFact
+              href="/dashboard/menus"
+              label="Best seller"
+              value={bestSeller ? bestSeller.name : 'Nothing sold yet'}
+              note={bestSeller ? `${bestSeller.qty} sold today` : 'Today is still young'}
+              small
+            />
+          </div>
+        </section>
+      ) : null}
 
       {/* ------------------------------------------------------------- ranked
           A leaderboard strip, not a list inside a panel. One card per dish, in
@@ -782,5 +877,49 @@ function OrderTable({
         </tbody>
       </table>
     </TableWrap>
+  );
+}
+
+/**
+ * One cell of the "Right now" band.
+ *
+ * It is a link, because every one of these numbers is a place the owner will
+ * want to go next; the whole cell is the target so a thumb on a phone does not
+ * have to find a word. The hairline between cells is the grid's `gap-px` on a
+ * line-coloured parent, which keeps the rules even at every breakpoint.
+ */
+function ServiceFact({
+  href,
+  label,
+  value,
+  note,
+  tone = 'calm',
+  small = false,
+}: {
+  href: string;
+  label: string;
+  value: ReactNode;
+  note: ReactNode;
+  tone?: 'calm' | 'warn';
+  /** A name rather than a figure: one size down so it does not shout. */
+  small?: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      className="group flex min-h-11 flex-col justify-between gap-2 bg-[var(--p-card)] px-4 py-3.5 no-underline transition-colors duration-150 hover:bg-[var(--p-paper)] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--p-accent)] sm:px-5"
+    >
+      <span className="text-[10px] font-semibold tracking-[0.13em] text-[var(--p-ink-46)] uppercase">
+        {label}
+      </span>
+      <span
+        className={`truncate font-semibold tracking-[-0.02em] tabular-nums ${
+          small ? 'text-[13.5px]' : 'text-[18px] leading-none'
+        } ${tone === 'warn' ? 'text-[var(--p-due)]' : 'text-gink'}`}
+      >
+        {value}
+      </span>
+      <span className="truncate text-[11.5px] text-gink-46">{note}</span>
+    </Link>
   );
 }

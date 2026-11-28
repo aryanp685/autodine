@@ -248,8 +248,14 @@ export function DashboardBar({
         <nav aria-label="Restaurant" className="flex-1 overflow-y-auto px-3 py-3">
           {groups.map((group) => (
             <div key={group.name} className="mb-4 last:mb-0">
-              <div className="px-3 pt-1 pb-2 text-[10px] font-semibold tracking-[0.2em] text-rail-ink-40 uppercase">
-                {group.name}
+              <div className="flex items-center gap-2 px-3 pt-2 pb-2">
+                <span className="text-[10px] font-semibold tracking-[0.2em] text-rail-ink-40 uppercase">
+                  {group.name}
+                </span>
+                {/* A rule to the edge of the column closes each group, so the
+                    rail reads as labelled sections rather than one long list
+                    with words in it. */}
+                <span aria-hidden="true" className="h-px flex-1 bg-rail-line" />
               </div>
               {group.links.map((link) => {
                 const current = link.key === activeSection;
@@ -273,16 +279,20 @@ export function DashboardBar({
                     data-rail-row="true"
                     className={[
                       'group relative mb-0.5 flex items-center gap-2.5 rounded-[var(--p-r-control)] px-3 py-[9px] text-[13px]',
-                      'transition-[background-color,color] duration-150 ease-[var(--o-ease)]',
+                      'transition-[background-color,color,box-shadow] duration-150 ease-[var(--o-ease)]',
                       current
-                        ? 'bg-[var(--p-rail-active)] font-semibold text-[var(--p-rail-active-ink)]'
+                        ? 'bg-[var(--p-rail-active)] font-semibold text-[var(--p-rail-active-ink)] shadow-[0_1px_2px_rgba(43,32,21,0.16)]'
                         : 'text-rail-ink-64 hover:bg-[var(--p-rail-hover)] hover:text-rail-ink',
                     ].join(' ')}
                   >
                     <span
                       aria-hidden="true"
                       className={[
-                        'shrink-0 transition-colors',
+                        /* One optical box for every glyph: the icon set is
+                           drawn on different grids, and a fixed 18px cell is
+                           what makes the column of labels line up to the
+                           pixel. */
+                        'grid size-[18px] shrink-0 place-items-center transition-colors [&_svg]:size-[17px]',
                         current
                           ? 'text-[var(--p-rail-active-ink)]'
                           : 'text-rail-ink-40 group-hover:text-rail-ink-64',
@@ -393,12 +403,12 @@ export function DashboardBar({
             {active ? (
               <span
                 aria-hidden="true"
-                className="hidden shrink-0 text-[var(--p-accent)] sm:block [&_svg]:size-[15px]"
+                className="hidden size-7 shrink-0 place-items-center rounded-[10px] bg-[var(--p-accent-soft)] text-[var(--p-accent-ink)] sm:grid [&_svg]:size-[15px]"
               >
                 {ICONS[active]}
               </span>
             ) : null}
-            <span className="truncate text-[13px] font-semibold tracking-[-0.015em] text-gink">
+            <span className="truncate text-[13.5px] font-semibold tracking-[-0.015em] text-gink">
               {activeLink?.label ?? 'Dashboard'}
             </span>
             {activeOutlet && (

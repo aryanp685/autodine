@@ -429,6 +429,7 @@ body {
   --p-accent-strong: #a3370a;
   --p-accent-deep: #a3370a;
   --p-accent-soft: #fcefe8;
+  --p-accent-ink: #b4531b;
   --p-accent-wash: rgba(194, 65, 12, 0.05);
   --p-brass: #9a3a0d;
 
@@ -1895,6 +1896,43 @@ html.splash-seen [data-splash] {
     to {
       opacity: 1;
       transform: none;
+    }
+  }
+}
+
+/* ---------------------------------------------------------- live indicator
+   One small dot that says the screen is reading the database, not a snapshot
+   from this morning. It breathes rather than pulses: a 2.4s opacity cycle is
+   legible in peripheral vision without being a notification. The still variant
+   is for demo and signed-out states, where nothing is refreshing and a pulse
+   would be a lie. */
+.ov-live-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: var(--p-accent);
+  /* A wash, drawn as an outline rather than a shadow: the design guard keeps
+     every elevation on the two shadow tokens, and this is not elevation. */
+  outline: 3px solid var(--p-accent-wash);
+}
+
+.ov-live-dot--still {
+  background: var(--p-ink-46);
+  outline: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  :not(.ov-live-dot--still).ov-live-dot {
+    animation: ov-breathe 2.4s ease-in-out infinite;
+  }
+  @keyframes ov-breathe {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.45;
     }
   }
 }

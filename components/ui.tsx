@@ -178,6 +178,8 @@ export function Sparkline({
   markIndex,
   baseline = 'zero',
   area = false,
+  areaGradient = false,
+  strokeWidth = 1.6,
   label = 'Revenue by hour',
 }: {
   data: number[];
@@ -202,6 +204,14 @@ export function Sparkline({
   baseline?: 'zero' | 'min';
   /** A soft wash under the line. Only meaningful with `baseline="zero"`. */
   area?: boolean;
+  /**
+   * Fades the wash from the line down to the floor instead of a flat tint.
+   * The overview's chart is the screen's one big picture, so the fill carries
+   * direction: strongest under the busiest hour, gone by the axis.
+   */
+  areaGradient?: boolean;
+  /** The line weight, when the shape is the point rather than a sparkline. */
+  strokeWidth?: number;
   /** What the shape is, for a screen reader. */
   label?: string;
 }) {
@@ -214,6 +224,9 @@ export function Sparkline({
       : height - ((d - min) / (max - min || 1)) * height;
   const pts = data.map((d, i) => `${(i * step).toFixed(2)},${y(d).toFixed(2)}`).join(' ');
   const mark = markIndex !== undefined && data[markIndex] !== undefined ? markIndex : null;
+  // Stable per-swatch id: two charts with different labels get different
+  // gradients, and the same label twice is the same paint anyway.
+  const fillId = `pg-${label.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}`;
 
   return (
     <svg
@@ -227,12 +240,21 @@ export function Sparkline({
          viewBox on the busiest hour of the day. */
       style={{ overflow: 'visible' }}
     >
+      {area && baseline === 'zero' && areaGradient ? (
+        <defs>
+          <linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="currentColor" stopOpacity="0.22" />
+            <stop offset="55%" stopColor="currentColor" stopOpacity="0.08" />
+            <stop offset="100%" stopColor="currentColor" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+      ) : null}
       {area && baseline === 'zero' ? (
         <polygon
           data-area="true"
           points={`0,${height} ${pts} ${width},${height}`}
-          fill="currentColor"
-          fillOpacity="0.055"
+          fill={areaGradient ? `url(#${fillId})` : 'currentColor'}
+          fillOpacity={areaGradient ? undefined : '0.055'}
         />
       ) : null}
       {/* The floor. Without it a line that starts at zero has nothing to stand
@@ -252,12 +274,24 @@ export function Sparkline({
         points={pts}
         fill="none"
         stroke="currentColor"
-        strokeWidth="1.6"
+        strokeWidth={strokeWidth}
         strokeLinejoin="round"
         strokeLinecap="round"
       />
       {mark !== null ? (
-        <circle data-peak="true" cx={mark * step} cy={y(data[mark])} r="3" fill="currentColor" />
+        <>
+          {/* A halo, not a dot: the peak is the one figure the eye should land
+              on, and a 3px dot at 520px wide is a speck. */}
+          <circle
+            data-peak-halo="true"
+            cx={mark * step}
+            cy={y(data[mark])}
+            r="7"
+            fill="currentColor"
+            fillOpacity="0.16"
+          />
+          <circle data-peak="true" cx={mark * step} cy={y(data[mark])} r="3" fill="currentColor" />
+        </>
       ) : null}
     </svg>
   );
