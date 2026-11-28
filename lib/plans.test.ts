@@ -81,7 +81,7 @@ describe('plans', () => {
     // Approved prices. A change here is a commercial decision, not a copy
     // edit, so it is pinned rather than merely ordered.
     expect(Object.fromEntries(PLANS.map((plan) => [plan.id, plan.price]))).toEqual({
-      starter: 999,
+      starter: 1,
       professional: 1999,
       business: 3699,
     });
@@ -218,13 +218,14 @@ describe('plan matrix cannot drift from the database', () => {
  */
 describe('prices in SQL and TypeScript are the same money', () => {
   // The billing migration holds the currency and amount guards;
-  // 20261126200000 (pricing v2) is the latest declaration of plan_price_paise.
+  // 20261128120000 (temporary Starter test price) is the latest declaration of
+  // plan_price_paise until the revert migration restores the approved prices.
   const SQL = readFileSync(
     new URL('../supabase/migrations/20261110001100_subscription_billing.sql', import.meta.url),
     'utf8'
   );
   const PRICE_SQL = readFileSync(
-    new URL('../supabase/migrations/20261126200000_pricing_v2_and_professional_trial.sql', import.meta.url),
+    new URL('../supabase/migrations/20261128120000_test_price_starter_one_rupee.sql', import.meta.url),
     'utf8'
   );
 
@@ -239,6 +240,7 @@ describe('prices in SQL and TypeScript are the same money', () => {
 
   // 999 rupees -> 99900 paise. Read the multiplication, not a bare literal:
   // a price pasted in without the *100 is exactly the bug worth catching.
+  // Starter is (1 * 100) while the temporary live-payment test price is on.
   for (const plan of ['starter', 'professional', 'business'] as const) {
     it(`${plan} is ${PLANS.find((p) => p.id === plan)!.price} rupees in both places`, () => {
       const match = body.match(new RegExp(`when '${plan}'\\s+then\\s+\\(?(\\d+)\\s*\\*\\s*100`));

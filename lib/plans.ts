@@ -100,7 +100,9 @@ export const PLANS: Plan[] = [
   {
     id: 'starter',
     name: 'Starter',
-    price: 999,
+    // TEMPORARY live-payment test price. Revert to 999 with the same commit
+    // that restores public.plan_price_paise() in the database.
+    price: 1,
     fit: 'One room, one menu, one counter.',
     outlets: 1,
   },

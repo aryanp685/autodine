@@ -76,7 +76,7 @@ describe('Cashfree SaaS billing adapter (Rail B)', () => {
     // Tampered body is refused
     expect(
       verifyCashfreeWebhookSignature({
-        rawBody: rawBody.replace(String(starter.rupees), '1'),
+        rawBody: rawBody.replace(String(starter.rupees), String(starter.rupees + 1)),
         headers: { 'x-webhook-signature': signature, 'x-webhook-timestamp': timestamp },
         secret: SECRET,
         now,

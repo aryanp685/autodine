@@ -96,11 +96,11 @@ describe.skipIf(!URL_VALUE)('Model C subscription and billing', () => {
 
   // ─────────────────────────────────────────────────────────────────────────
   describe('the plan catalog', () => {
-    it('prices the three plans at 999, 1999 and 3699 rupees a month', async () => {
+    it('prices the three plans at 1, 1999 and 3699 rupees a month', async () => {
       const prices = (await db.query(
         "select plan_price_paise('starter') starter, plan_price_paise('professional') professional, plan_price_paise('business') business",
       )).rows[0];
-      expect(Number(prices.starter)).toBe(99900);
+      expect(Number(prices.starter)).toBe(100);
       expect(Number(prices.professional)).toBe(199900);
       expect(Number(prices.business)).toBe(369900);
     });

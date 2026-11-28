@@ -51,7 +51,7 @@ describe('the subscription screen an owner sees', () => {
     for (const plan of PLAN_PRICES) {
       expect(ownerHtml).toContain(plan.name);
     }
-    expect(ownerHtml).toContain('₹999.00');
+    expect(ownerHtml).toContain('₹1.00');
     expect(ownerHtml).toContain('₹1,999.00');
     expect(ownerHtml).toContain('₹3,699.00');
     expect(ownerHtml).toContain('Unlimited outlets');

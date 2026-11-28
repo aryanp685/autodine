@@ -44,7 +44,7 @@ export default function TermsPage() {
 
       <LegalSection title="Plans and prices">
         <p>
-          The approved monthly prices are Starter ₹999, Professional ₹1,999 and Business ₹3,699. One
+          The approved monthly prices are Starter ₹1, Professional ₹1,999 and Business ₹3,699. One
           subscription belongs to an account and is shared by its outlets. Plan subscriptions are
           billed through Cashfree checkout inside the app; the public pricing pages link to signup, not
           to a purchase.
