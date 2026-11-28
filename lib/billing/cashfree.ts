@@ -7,6 +7,11 @@
  * Fails closed: returns null unless BILLING_PROVIDER=cashfree AND valid
  * Cashfree credentials are present. Never invents defaults or bypasses
  * signature/amount verification.
+ *
+ * Signing: Cashfree signs every webhook with the merchant's client secret, the
+ * same secret the API calls use (cashfree.com/docs/api-reference/webhooks/
+ * payloads-and-signatures). BILLING_WEBHOOK_SECRET, when set, overrides that
+ * for accounts that expose a dedicated webhook secret.
  */
 
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
@@ -32,6 +37,8 @@ export function getCashfreeCredentials(
 
   const clientId = (env['CASHFREE_CLIENT_ID'] ?? env[BILLING_API_KEY_ENV] ?? '').trim();
   const clientSecret = (env['CASHFREE_CLIENT_SECRET'] ?? env[BILLING_WEBHOOK_SECRET_ENV] ?? '').trim();
+  // Cashfree signs with the client secret; a dedicated webhook secret is the
+  // exception, so BILLING_WEBHOOK_SECRET only wins when it is actually set.
   const webhookSecret = (env[BILLING_WEBHOOK_SECRET_ENV] ?? clientSecret).trim();
 
   if (!clientId || clientSecret.length < MIN_SECRET_LENGTH || webhookSecret.length < MIN_SECRET_LENGTH) {
